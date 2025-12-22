@@ -1,0 +1,19 @@
+# .clang-format
+BasedOnStyle: LLVM
+IndentWidth:   4
+TabWidth:      4
+UseTab:        Never
+
+IndentCaseLabels: true 
+AllowShortBlocksOnASingleLine: true
+AllowShortCaseLabelsOnASingleLine: true
+SeparateDefinitionBlocks: Always
+AccessModifierOffset: -4
+AlwaysBreakTemplateDeclarations: Yes
+ColumnLimit: 80 
+DerivePointerAlignment: false
+PointerAlignment: Left
+AlignTrailingComments: true
+AlignAfterOpenBracket: Align
+ReflowComments: true
+AllowAllParametersOfDeclarationOnNextLine: true
