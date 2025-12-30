@@ -55,38 +55,74 @@ IMPL(and, R.write(rd, R[rs1] & R[rs2]))
 IMPL(andi, R.write(rd, R[rs1] & imm))
 IMPL(auipc, R.write(rd, pc + imm))
 IMPL(beq, {
-    if (R[rs1] == R[rs2])
-        hart->pc = pc + imm;
+    if (R[rs1] == R[rs2]) {
+        addr_t npc = pc + imm;
+        if (npc & 0x3) [[unlikely]]
+            Trap::raise_exception(pc, Exception::InstructionAddressMisaligned,
+                                  npc);
+        hart->pc = npc;
+    }
 })
 IMPL(bge, {
-    if (static_cast<int64_t>(R[rs1]) >= static_cast<int64_t>(R[rs2]))
-        hart->pc = pc + imm;
+    if (static_cast<int64_t>(R[rs1]) >= static_cast<int64_t>(R[rs2])) {
+        addr_t npc = pc + imm;
+        if (npc & 0x3) [[unlikely]]
+            Trap::raise_exception(pc, Exception::InstructionAddressMisaligned,
+                                  npc);
+        hart->pc = npc;
+    }
 })
 IMPL(bgeu, {
-    if (R[rs1] >= R[rs2])
-        hart->pc = pc + imm;
+    if (R[rs1] >= R[rs2]) {
+        addr_t npc = pc + imm;
+        if (npc & 0x3) [[unlikely]]
+            Trap::raise_exception(pc, Exception::InstructionAddressMisaligned,
+                                  npc);
+        hart->pc = npc;
+    }
 })
 IMPL(blt, {
-    if (static_cast<int64_t>(R[rs1]) < static_cast<int64_t>(R[rs2]))
-        hart->pc = pc + imm;
+    if (static_cast<int64_t>(R[rs1]) < static_cast<int64_t>(R[rs2])) {
+        addr_t npc = pc + imm;
+        if (npc & 0x3) [[unlikely]]
+            Trap::raise_exception(pc, Exception::InstructionAddressMisaligned,
+                                  npc);
+        hart->pc = npc;
+    }
 })
 IMPL(bltu, {
-    if (R[rs1] < R[rs2])
-        hart->pc = pc + imm;
+    if (R[rs1] < R[rs2]) {
+        addr_t npc = pc + imm;
+        if (npc & 0x3) [[unlikely]]
+            Trap::raise_exception(pc, Exception::InstructionAddressMisaligned,
+                                  npc);
+        hart->pc = npc;
+    }
 })
 IMPL(bne, {
-    if (R[rs1] != R[rs2])
-        hart->pc = pc + imm;
+    if (R[rs1] != R[rs2]) {
+        addr_t npc = pc + imm;
+        if (npc & 0x3) [[unlikely]]
+            Trap::raise_exception(pc, Exception::InstructionAddressMisaligned,
+                                  npc);
+        hart->pc = npc;
+    }
 })
 IMPL(fence, /* nop */)
 IMPL(fence_i, /* nop */)
 IMPL(jal, {
+    addr_t npc = pc + imm;
+    if (npc & 0x3) [[unlikely]]
+        Trap::raise_exception(pc, Exception::InstructionAddressMisaligned, npc);
     R.write(rd, pc + 4);
-    hart->pc = pc + imm;
+    hart->pc = npc;
 })
 IMPL(jalr, {
     uint64_t t = pc + 4;
-    hart->pc = (R[rs1] + imm) & ~1ULL;
+    addr_t npc = (R[rs1] + imm) & ~1ULL;
+    if (npc & 0x3) [[unlikely]]
+        Trap::raise_exception(pc, Exception::InstructionAddressMisaligned, npc);
+    hart->pc = npc;
     R.write(rd, t);
 })
 IMPL(lb, {
