@@ -58,11 +58,11 @@ UnimplementedCSR::write_checked(const DecodedInsn& insn,
     Trap::raise_exception(insn.pc, Exception::IllegalInstruction, insn.insn);
 }
 
-void ConstCSR::write_checked(const DecodedInsn& insn, PrivilegeLevel priv,
-                             reg_t v) {
-    if (!check_permissions(priv) || v != value_) [[unlikely]]
-        Trap::raise_exception(insn.pc, Exception::IllegalInstruction,
-                              insn.insn);
+[[noreturn]]
+void ConstCSR::write_checked(const DecodedInsn& insn,
+                             [[maybe_unused]] PrivilegeLevel priv,
+                             [[maybe_unused]] reg_t v) {
+    Trap::raise_exception(insn.pc, Exception::IllegalInstruction, insn.insn);
 }
 
 MSTATUS::MSTATUS(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {

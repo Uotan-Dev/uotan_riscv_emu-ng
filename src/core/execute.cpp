@@ -192,35 +192,43 @@ IMPL(xori, R.write(rd, R[rs1] ^ imm))
 // Zicsr Extension (CSR Instructions) and Privileged Instructions
 IMPL(csrrc, {
     reg_t t = csrs[csr]->read_checked(*d);
-    csrs[csr]->write_checked(*d, t & ~R[rs1]);
+    if (rs1)
+        csrs[csr]->write_checked(*d, t & ~R[rs1]);
     R.write(rd, t);
 })
 IMPL(csrrci, {
     uint64_t zimm = bits(d->insn, 19, 15);
     reg_t t = csrs[csr]->read_checked(*d);
-    csrs[csr]->write_checked(*d, t & ~zimm);
+    if (zimm)
+        csrs[csr]->write_checked(*d, t & ~zimm);
     R.write(rd, t);
 })
 IMPL(csrrs, {
     uint64_t t = csrs[csr]->read_checked(*d);
-    csrs[csr]->write_checked(*d, t | R[rs1]);
+    if (rs1)
+        csrs[csr]->write_checked(*d, t | R[rs1]);
     R.write(rd, t);
 })
 IMPL(csrrsi, {
     uint64_t zimm = bits(d->insn, 19, 15);
     uint64_t t = csrs[csr]->read_checked(*d);
-    csrs[csr]->write_checked(*d, t | zimm);
+    if (zimm)
+        csrs[csr]->write_checked(*d, t | zimm);
     R.write(rd, t);
 })
 IMPL(csrrw, {
-    uint64_t t = csrs[csr]->read_checked(*d);
-    csrs[csr]->write_checked(*d, R[rs1]);
-    R.write(rd, t);
+    if (rd) {
+        uint64_t t = csrs[csr]->read_checked(*d);
+        csrs[csr]->write_checked(*d, R[rs1]);
+        R.write(rd, t);
+    } else {
+        csrs[csr]->write_checked(*d, R[rs1]);
+    }
 })
 IMPL(csrrwi, {
     uint64_t zimm = bits(d->insn, 19, 15);
-    uint64_t t = csrs[csr]->read_checked(*d);
-    R.write(rd, t);
+    if (rd)
+        R.write(rd, csrs[csr]->read_checked(*d));
     csrs[csr]->write_checked(*d, zimm);
 })
 IMPL(ebreak, Trap::raise_exception(pc, Exception::Breakpoint, pc))

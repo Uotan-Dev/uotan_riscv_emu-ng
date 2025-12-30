@@ -177,8 +177,8 @@ public:
 
     void write_unchecked([[maybe_unused]] reg_t v) noexcept override {}
 
-    void write_checked(const DecodedInsn& insn, PrivilegeLevel priv,
-                       reg_t v) override;
+    [[noreturn]] void write_checked(const DecodedInsn& insn,
+                                    PrivilegeLevel priv, reg_t v) override;
 };
 
 // Hardwired CSR.
