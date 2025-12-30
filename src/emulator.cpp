@@ -131,7 +131,18 @@ void Emulator::cpu_thread() {
     }
     cpu_cond_.notify_all();
 
+    core::MCYCLE* mcycle =
+        dynamic_cast<core::MCYCLE*>(hart_->csrs[core::MCYCLE::ADDRESS].get());
+    core::MINSTRET* minstret = dynamic_cast<core::MINSTRET*>(
+        hart_->csrs[core::MINSTRET::ADDRESS].get());
+
+    // dynamic_cast() should always succeed.
+    if (!mcycle || !minstret)
+        std::terminate();
+
     while (!shutdown_) {
+        mcycle->advance();
+
         try {
             // FIXME: RV64C support
 
@@ -146,6 +157,8 @@ void Emulator::cpu_thread() {
 
             // Execute
             decoded_insn(*hart_, *mmu_);
+
+            minstret->advance();
         } catch (const core::Trap& trap) {
             // RISC-V Trap
             hart_->handle_exception(trap);

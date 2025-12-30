@@ -425,6 +425,57 @@ public:
     MCONFIGPTR(Hart* hart) : ConstCSR(hart, PrivilegeLevel::M, 0) {}
 };
 
+class MCYCLE final : public CSR {
+public:
+    static constexpr size_t ADDRESS = 0xB00;
+
+    MCYCLE(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {}
+
+    void advance() noexcept { value_++; }
+};
+
+class MINSTRET final : public CSR {
+public:
+    static constexpr size_t ADDRESS = 0xB02;
+
+    MINSTRET(Hart* hart)
+        : CSR(hart, PrivilegeLevel::M, 0), increase_suppressed_(false) {}
+
+    void write_checked(const DecodedInsn& insn, PrivilegeLevel priv,
+                       reg_t v) override {
+        CSR::write_checked(insn, priv, v);
+        increase_suppressed_ = true;
+    }
+
+    void advance() noexcept {
+        if (!increase_suppressed_) [[likely]]
+            value_++;
+        else
+            increase_suppressed_ = false;
+    }
+
+private:
+    bool increase_suppressed_;
+};
+
+class MHPMCOUNTERN final : public HardwiredCSR {
+public:
+    static constexpr size_t MIN_ADDRESS = 0xB03;
+    static constexpr size_t MAX_ADDRESS = 0xB1F;
+    static constexpr size_t DELTA_ADDRESS = 1;
+
+    MHPMCOUNTERN(Hart* hart) : HardwiredCSR(hart, PrivilegeLevel::M, 0) {}
+};
+
+class MHPMEVENTN final : public HardwiredCSR {
+public:
+    static constexpr size_t MIN_ADDRESS = 0x323;
+    static constexpr size_t MAX_ADDRESS = 0x33F;
+    static constexpr size_t DELTA_ADDRESS = 1;
+
+    MHPMEVENTN(Hart* hart) : HardwiredCSR(hart, PrivilegeLevel::M, 0) {}
+};
+
 class PMPCFGN final : public HardwiredCSR {
 public:
     static constexpr size_t MIN_ADDRESS = 0x3A0;

@@ -112,6 +112,16 @@ Hart::Hart(addr_t reset_pc) : pc(reset_pc) {
     csrs[MCAUSE::ADDRESS] = std::make_shared<MCAUSE>(this);
     csrs[MTVAL::ADDRESS] = std::make_shared<MTVAL>(this);
     csrs[MCONFIGPTR::ADDRESS] = std::make_shared<MCONFIGPTR>(this);
+    csrs[MCYCLE::ADDRESS] = std::make_shared<MCYCLE>(this);
+    csrs[MINSTRET::ADDRESS] = std::make_shared<MINSTRET>(this);
+
+    for (size_t i = MHPMCOUNTERN::MIN_ADDRESS; i <= MHPMCOUNTERN::MAX_ADDRESS;
+         i += MHPMCOUNTERN::DELTA_ADDRESS)
+        csrs[i] = std::make_shared<MHPMCOUNTERN>(this);
+
+    for (size_t i = MHPMEVENTN::MIN_ADDRESS; i <= MHPMEVENTN::MAX_ADDRESS;
+         i += MHPMEVENTN::DELTA_ADDRESS)
+        csrs[i] = std::make_shared<MHPMEVENTN>(this);
 
     for (size_t i = PMPCFGN::MIN_ADDRESS; i <= PMPCFGN::MAX_ADDRESS;
          i += PMPCFGN::DELTA_ADDRESS)
