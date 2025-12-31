@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 Nuo Shen, Nanjing University
+ * Copyright 2025-2026 Nuo Shen, Nanjing University
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,159 +23,262 @@
 
 namespace uemu::core {
 
-reg_t CSR::read_checked(const DecodedInsn& insn, PrivilegeLevel priv) const {
-    if (!check_permissions(priv)) [[unlikely]]
-        Trap::raise_exception(insn.pc, Exception::IllegalInstruction,
+reg_t CSR::read_checked(const DecodedInsn& insn) const {
+    if (!check_permissions()) [[unlikely]]
+        Trap::raise_exception(insn.pc, TrapCause::IllegalInstruction,
                               insn.insn);
 
     return read_unchecked();
 }
 
-void CSR::write_checked(const DecodedInsn& insn, PrivilegeLevel priv, reg_t v) {
-    if (!check_permissions(priv)) [[unlikely]]
-        Trap::raise_exception(insn.pc, Exception::IllegalInstruction,
+void CSR::write_checked(const DecodedInsn& insn, reg_t v) {
+    if (!check_permissions()) [[unlikely]]
+        Trap::raise_exception(insn.pc, TrapCause::IllegalInstruction,
                               insn.insn);
 
     write_unchecked(v);
 }
 
 [[noreturn]] reg_t
-UnimplementedCSR::read_checked(const DecodedInsn& insn,
-                               [[maybe_unused]] PrivilegeLevel priv) const {
+UnimplementedCSR::read_checked(const DecodedInsn& insn) const {
     if (trace_)
         std::cout << "Unimplemented CSR: " << address_ << std::endl;
 
-    Trap::raise_exception(insn.pc, Exception::IllegalInstruction, insn.insn);
+    Trap::raise_exception(insn.pc, TrapCause::IllegalInstruction, insn.insn);
 }
 
-[[noreturn]] void
-UnimplementedCSR::write_checked(const DecodedInsn& insn,
-                                [[maybe_unused]] PrivilegeLevel priv,
-                                [[maybe_unused]] reg_t v) {
+[[noreturn]] void UnimplementedCSR::write_checked(const DecodedInsn& insn,
+                                                  [[maybe_unused]] reg_t v) {
     if (trace_)
         std::cout << "Unimplemented CSR: " << address_ << std::endl;
 
-    Trap::raise_exception(insn.pc, Exception::IllegalInstruction, insn.insn);
+    Trap::raise_exception(insn.pc, TrapCause::IllegalInstruction, insn.insn);
 }
 
 [[noreturn]]
 void ConstCSR::write_checked(const DecodedInsn& insn,
-                             [[maybe_unused]] PrivilegeLevel priv,
                              [[maybe_unused]] reg_t v) {
-    Trap::raise_exception(insn.pc, Exception::IllegalInstruction, insn.insn);
+    Trap::raise_exception(insn.pc, TrapCause::IllegalInstruction, insn.insn);
 }
 
 MSTATUS::MSTATUS(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {
-    using F = MSTATUS::field;
-    using S = MSTATUS::shift;
+    using F = MSTATUS::Field;
+    using S = MSTATUS::Shift;
 
     read_mask_ = F::SIE | F::MIE | F::SPIE | F::MPIE | F::SPP | F::MPP | F::FS |
                  F::MPRV | F::SUM | F::MXR | F::TVM | F::TW | F::TSR | F::UXL |
                  F::SXL | F::SD;
 
-    // FIXME: MPP is excluded from write_mask_, bring it back and make it WARL
-    // after S-mode implementation
-    write_mask_ = F::MIE | F::MPIE | F::MPRV;
+    write_mask_ = F::MIE | F::MPIE | F::MPRV | F::MPP | F::SIE | F::SPIE |
+                  F::SPP | F::SUM | F::MXR | F::TVM | F::TW | F::TSR;
 
     reg_t misa = hart->csrs[MISA::ADDRESS]->read_unchecked();
     reg_t mxl = (misa >> MISA::MXL_SHIFT) & 0x3;
     assert(mxl == MISA::xlen_32 || mxl == MISA::xlen_64);
 
-    if (misa & MISA::S) {
-        write_mask_ |= F::SIE | F::SPIE | F::SPP | F::SUM | F::MXR | F::TVM |
-                       F::TW | F::TSR;
-
-        value_ |= (mxl << S::SXL_SHIFT);
-    }
-
-    if (misa & MISA::U)
-        value_ |= (mxl << S::UXL_SHIFT);
+    value_ = (mxl << S::SXL_SHIFT) | (mxl << S::UXL_SHIFT) |
+             static_cast<reg_t>(PrivilegeLevel::M) << S::MPP_SHIFT;
 
     if (misa & (MISA::F | MISA::D))
         value_ |= F::FS | F::SD;
-
-    value_ |= static_cast<reg_t>(PrivilegeLevel::M) << S::MPP_SHIFT;
 }
 
 Hart::Hart(addr_t reset_pc) : pc(reset_pc) {
-    csrs[MISA::ADDRESS] = std::make_shared<MISA>(
-        this, MISA::field::I | MISA::field::M |
-                  (MISA::Mxl::xlen_64 << MISA::shift::MXL_SHIFT));
-    csrs[MVENDORID::ADDRESS] = std::make_shared<MVENDORID>(this, 0);
-    csrs[MARCHID::ADDRESS] = std::make_shared<MARCHID>(this, 0);
-    csrs[MIMPID::ADDRESS] = std::make_shared<MIMPID>(this, 0x00000010);
-    csrs[MHARTID::ADDRESS] = std::make_shared<MHARTID>(this, 0);
-    csrs[MSTATUS::ADDRESS] = std::make_shared<MSTATUS>(this);
-    csrs[MTVEC::ADDRESS] = std::make_shared<MTVEC>(this);
-    csrs[MSCRATCH::ADDRESS] = std::make_shared<MSCRATCH>(this);
-    csrs[MEPC::ADDRESS] = std::make_shared<MEPC>(this);
-    csrs[MCAUSE::ADDRESS] = std::make_shared<MCAUSE>(this);
-    csrs[MTVAL::ADDRESS] = std::make_shared<MTVAL>(this);
-    csrs[MCONFIGPTR::ADDRESS] = std::make_shared<MCONFIGPTR>(this);
-    csrs[MCYCLE::ADDRESS] = std::make_shared<MCYCLE>(this);
-    csrs[MINSTRET::ADDRESS] = std::make_shared<MINSTRET>(this);
+    // Machine Level
+    add_csr<MISA>(MISA::Field::I | MISA::Field::M | MISA::Field::S |
+                  MISA::Field::U |
+                  (MISA::Mxl::xlen_64 << MISA::Shift::MXL_SHIFT));
+    add_csr<MVENDORID>(0);
+    add_csr<MARCHID>(0);
+    add_csr<MIMPID>(0x00000010);
+    add_csr<MHARTID>(0);
 
-    for (size_t i = MHPMCOUNTERN::MIN_ADDRESS; i <= MHPMCOUNTERN::MAX_ADDRESS;
-         i += MHPMCOUNTERN::DELTA_ADDRESS)
-        csrs[i] = std::make_shared<MHPMCOUNTERN>(this);
+    add_csr<MSTATUS>();
+    add_csr<MTVEC>();
+    add_csr<MEDELEG>();
+    add_csr<MIDELEG>();
+    add_csr<MIP>();
+    add_csr<MIE>();
+    add_csr<MSCRATCH>();
+    add_csr<MEPC>();
+    add_csr<MCAUSE>();
+    add_csr<MTVAL>();
 
-    for (size_t i = MHPMEVENTN::MIN_ADDRESS; i <= MHPMEVENTN::MAX_ADDRESS;
-         i += MHPMEVENTN::DELTA_ADDRESS)
-        csrs[i] = std::make_shared<MHPMEVENTN>(this);
+    add_csr<MCOUNTEREN>();
+    add_csr<MCYCLE>();
+    add_csr<MINSTRET>();
+    add_csr_ranged<MHPMCOUNTERN>();
+    add_csr_ranged<MHPMEVENTN>();
 
-    for (size_t i = PMPCFGN::MIN_ADDRESS; i <= PMPCFGN::MAX_ADDRESS;
-         i += PMPCFGN::DELTA_ADDRESS)
-        csrs[i] = std::make_shared<PMPCFGN>(this);
+    add_csr<MCONFIGPTR>();
+    add_csr<MENVCFG>();
 
-    for (size_t i = PMPADDRN::MIN_ADDRESS; i <= PMPADDRN::MAX_ADDRESS;
-         i += PMPADDRN::DELTA_ADDRESS)
-        csrs[i] = std::make_shared<PMPADDRN>(this);
+    add_csr_ranged<PMPCFGN>();
+    add_csr_ranged<PMPADDRN>();
 
-    csrs[TSELECT::ADDRESS] = std::make_shared<TSELECT>(this);
+    add_csr<TSELECT>();
+    add_csr_ranged<TDATAN>();
 
-    for (size_t i = TDATAN::MIN_ADDRESS; i <= TDATAN::MAX_ADDRESS;
-         i += TDATAN::DELTA_ADDRESS)
-        csrs[i] = std::make_shared<TDATAN>(this);
+    // Supervisor Level
+    add_csr<SSTATUS>();
+    add_csr<STVEC>();
+    add_csr<SIP>();
+    add_csr<SIE>();
+    add_csr<SSCRATCH>();
+    add_csr<SEPC>();
+    add_csr<SCAUSE>();
+    add_csr<STVAL>();
 
-    csrs[CYCLE::ADDRESS] = std::make_shared<CYCLE>(this);
-    csrs[INSTRET::ADDRESS] = std::make_shared<INSTRET>(this);
+    add_csr<SCOUNTEREN>();
+
+    add_csr<SENVCFG>();
+
+    add_csr<SATP>();
+
+    // User Level
+    add_csr<CYCLE>();
+    add_csr<INSTRET>();
 
     for (size_t i = HPMCOUNTERN::MIN_ADDRESS; i <= HPMCOUNTERN::MAX_ADDRESS;
          i += HPMCOUNTERN::DELTA_ADDRESS)
         csrs[i] = std::make_shared<HPMCOUNTERN>(this, i);
 
+    // Unimplemented CSR
     for (size_t i = 0; i < csrs.size(); i++)
         if (!csrs[i])
             csrs[i] = std::make_shared<UnimplementedCSR>(this, i, false);
 
+    // Start with Machine Mode
     priv = PrivilegeLevel::M;
 }
 
-void Hart::handle_exception(const Trap& trap) noexcept {
-    if (trap.cause == Exception::None) [[unlikely]]
+void Hart::handle_trap(const Trap& trap) noexcept {
+    if (trap.cause == TrapCause::None) [[unlikely]]
         std::terminate();
 
-    // TODO: S mode and U mode
+    const reg_t cause_val = static_cast<reg_t>(trap.cause);
+    const bool is_interrupt = (cause_val >> 63) & 1;
+    const reg_t cause_code = cause_val & ~(1ULL << 63);
 
-    csrs[MEPC::ADDRESS]->write_unchecked(trap.pc);
-    csrs[MCAUSE::ADDRESS]->write_unchecked(static_cast<uint64_t>(trap.cause));
-    csrs[MTVAL::ADDRESS]->write_unchecked(trap.tval);
+    PrivilegeLevel target_priv = PrivilegeLevel::M;
 
-    reg_t mstatus = csrs[MSTATUS::ADDRESS]->read_unchecked();
+    if (priv <= PrivilegeLevel::S) {
+        reg_t deleg_mask = 0;
+        if (is_interrupt)
+            deleg_mask = csrs[MIDELEG::ADDRESS]->read_unchecked();
+        else
+            deleg_mask = csrs[MEDELEG::ADDRESS]->read_unchecked();
 
-    if (mstatus & MSTATUS::field::MIE)
-        mstatus |= MSTATUS::field::MPIE;
-    else
-        mstatus &= ~MSTATUS::field::MPIE;
+        if ((deleg_mask >> cause_code) & 1)
+            target_priv = PrivilegeLevel::S;
+    }
 
-    mstatus &= ~MSTATUS::field::MPP;
-    mstatus |= (static_cast<reg_t>(this->priv) << MSTATUS::shift::MPP_SHIFT);
-    mstatus &= ~MSTATUS::field::MIE;
+    if (target_priv == PrivilegeLevel::S) {
+        csrs[SEPC::ADDRESS]->write_unchecked(trap.pc);
+        csrs[SCAUSE::ADDRESS]->write_unchecked(cause_val);
+        csrs[STVAL::ADDRESS]->write_unchecked(trap.tval);
 
-    csrs[MSTATUS::ADDRESS]->write_unchecked(mstatus);
+        reg_t sstatus = csrs[SSTATUS::ADDRESS]->read_unchecked();
 
-    this->pc = csrs[MTVEC::ADDRESS]->read_unchecked() & MTVEC::field::BASE;
-    this->priv = PrivilegeLevel::M;
+        if (sstatus & SSTATUS::Field::SIE)
+            sstatus |= SSTATUS::Field::SPIE;
+        else
+            sstatus &= ~SSTATUS::Field::SPIE;
+
+        if (priv >= PrivilegeLevel::S)
+            sstatus |= SSTATUS::Field::SPP;
+        else
+            sstatus &= ~SSTATUS::Field::SPP;
+
+        sstatus &= ~SSTATUS::Field::SIE;
+
+        csrs[SSTATUS::ADDRESS]->write_unchecked(sstatus);
+
+        reg_t stvec = csrs[STVEC::ADDRESS]->read_unchecked();
+        reg_t vector_base = stvec & ~3ULL;
+        reg_t vector_mode = stvec & 3ULL; // 0: Direct, 1: Vectored
+
+        if (is_interrupt && vector_mode == 1)
+            this->pc = vector_base + (cause_code << 2);
+        else
+            this->pc = vector_base;
+
+        this->priv = PrivilegeLevel::S;
+    } else {
+        csrs[MEPC::ADDRESS]->write_unchecked(trap.pc);
+        csrs[MCAUSE::ADDRESS]->write_unchecked(cause_val);
+        csrs[MTVAL::ADDRESS]->write_unchecked(trap.tval);
+
+        reg_t mstatus = csrs[MSTATUS::ADDRESS]->read_unchecked();
+
+        if (mstatus & MSTATUS::Field::MIE)
+            mstatus |= MSTATUS::Field::MPIE;
+        else
+            mstatus &= ~MSTATUS::Field::MPIE;
+
+        mstatus &= ~MSTATUS::Field::MPP;
+        mstatus |= (static_cast<reg_t>(priv) << MSTATUS::Shift::MPP_SHIFT);
+
+        mstatus &= ~MSTATUS::MIE;
+
+        csrs[MSTATUS::ADDRESS]->write_unchecked(mstatus);
+
+        reg_t mtvec = csrs[MTVEC::ADDRESS]->read_unchecked();
+        reg_t vector_base = mtvec & ~3ULL;
+        reg_t vector_mode = mtvec & 3ULL;
+
+        if (is_interrupt && vector_mode == 1)
+            this->pc = vector_base + (cause_code << 2);
+        else
+            this->pc = vector_base;
+
+        this->priv = PrivilegeLevel::M;
+    }
+}
+
+void Hart::check_interrupts() const {
+    const reg_t mip = csrs[MIP::ADDRESS]->read_unchecked();
+    const reg_t mie = csrs[MIE::ADDRESS]->read_unchecked();
+    const reg_t mstatus = csrs[MSTATUS::ADDRESS]->read_unchecked();
+    const reg_t mideleg = csrs[MIDELEG::ADDRESS]->read_unchecked();
+
+    const reg_t pending = mip & mie;
+
+    if (!pending)
+        return;
+
+    const reg_t m_pending = pending & ~mideleg;
+    const reg_t s_pending = pending & mideleg;
+
+    const bool m_enabled =
+        (priv < PrivilegeLevel::M) ||
+        (priv == PrivilegeLevel::M && (mstatus & MSTATUS::Field::MIE));
+    const bool s_enabled =
+        (priv < PrivilegeLevel::S) ||
+        (priv == PrivilegeLevel::S && (mstatus & MSTATUS::Field::SIE));
+
+    TrapCause selected_cause = TrapCause::None;
+
+    if (m_enabled && m_pending) {
+        if (m_pending & MIP::Field::MEIP)
+            selected_cause = TrapCause::MachineExternalInterrupt;
+        else if (m_pending & MIP::Field::MSIP)
+            selected_cause = TrapCause::MachineSoftwareInterrupt;
+        else if (m_pending & MIP::Field::MTIP)
+            selected_cause = TrapCause::MachineTimerInterrupt;
+    }
+
+    if (selected_cause == TrapCause::None && s_enabled && s_pending) {
+        if (s_pending & MIP::Field::SEIP)
+            selected_cause = TrapCause::SupervisorExternalInterrupt;
+        else if (s_pending & MIP::Field::SSIP)
+            selected_cause = TrapCause::SupervisorSoftwareInterrupt;
+        else if (s_pending & MIP::Field::STIP)
+            selected_cause = TrapCause::SupervisorTimerInterrupt;
+    }
+
+    if (selected_cause != TrapCause::None)
+        throw Trap(pc, selected_cause, 0);
 }
 
 } // namespace uemu::core

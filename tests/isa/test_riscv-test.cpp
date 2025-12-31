@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 Nuo Shen, Nanjing University
+ * Copyright 2025-2026 Nuo Shen, Nanjing University
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
+#include <filesystem>
 #include <gtest/gtest.h>
+#include <string>
+#include <vector>
 
 #include "device/sifive_test.hpp"
 #include "emulator.hpp"
@@ -27,11 +30,13 @@ void test_file(const std::string& file, std::vector<std::string>& failed) {
     Emulator emulator(TEST_DRAM_SIZE);
 
     try {
-        emulator.loadelf(file);
+        std::filesystem::path test_path = RISCV_TEST_DIR;
+        test_path = test_path.parent_path() / file;
+        emulator.loadelf(test_path.string());
     } catch (...) {
         std::cerr << "Exception happened while loading ELF. Skipping the test."
                   << std::endl;
-        EXPECT_TRUE(true);
+        EXPECT_TRUE(false);
         return;
     }
 
@@ -43,6 +48,19 @@ void test_file(const std::string& file, std::vector<std::string>& failed) {
         failed.emplace_back(file);
 
     EXPECT_EQ(emulator.shutdown_status(), device::SiFiveTest::Status::PASS);
+}
+
+void test_files(const std::vector<std::string>& files) {
+    std::vector<std::string> failed;
+
+    for (const auto& f : files)
+        test_file(f, failed);
+
+    if (!failed.empty()) {
+        std::cerr << "Failed tests:\n";
+        for (auto& f : failed)
+            std::cerr << f << std::endl;
+    }
 }
 
 TEST(RISCVTest, RV64MI) {
@@ -62,18 +80,105 @@ TEST(RISCVTest, RV64MI) {
         "riscv_test_riscv_tests_rv64mi_sd-misaligned.elf",
         "riscv_test_riscv_tests_rv64mi_sh-misaligned.elf",
         "riscv_test_riscv_tests_rv64mi_sw-misaligned.elf",
-        "riscv_test_riscv_tests_rv64mi_zicntr.elf"};
+        "riscv_test_riscv_tests_rv64mi_zicntr.elf",
+    };
 
-    std::vector<std::string> failed;
+    test_files(files);
+}
 
-    for (const auto& f : files)
-        test_file(f, failed);
+TEST(RISCVTest, RV64SI) {
+    std::vector<std::string> files = {
+        "riscv_test_riscv_tests_rv64si_csr.elf",
+        "riscv_test_riscv_tests_rv64si_dirty.elf",
+        "riscv_test_riscv_tests_rv64si_icache-alias.elf",
+        "riscv_test_riscv_tests_rv64si_ma_fetch.elf",
+        "riscv_test_riscv_tests_rv64si_sbreak.elf",
+        "riscv_test_riscv_tests_rv64si_scall.elf",
+        "riscv_test_riscv_tests_rv64si_wfi.elf",
+    };
 
-    if (!failed.empty()) {
-        std::cerr << "Failed tests:\n";
-        for (auto& f : failed)
-            std::cerr << f << std::endl;
-    }
+    test_files(files);
+}
+
+TEST(RISCVTest, RV64UI) {
+    std::vector<std::string> files = {
+        "riscv_test_riscv_tests_rv64ui_add.elf",
+        "riscv_test_riscv_tests_rv64ui_addi.elf",
+        "riscv_test_riscv_tests_rv64ui_addiw.elf",
+        "riscv_test_riscv_tests_rv64ui_addw.elf",
+        "riscv_test_riscv_tests_rv64ui_and.elf",
+        "riscv_test_riscv_tests_rv64ui_andi.elf",
+        "riscv_test_riscv_tests_rv64ui_auipc.elf",
+        "riscv_test_riscv_tests_rv64ui_beq.elf",
+        "riscv_test_riscv_tests_rv64ui_bge.elf",
+        "riscv_test_riscv_tests_rv64ui_bgeu.elf",
+        "riscv_test_riscv_tests_rv64ui_blt.elf",
+        "riscv_test_riscv_tests_rv64ui_bltu.elf",
+        "riscv_test_riscv_tests_rv64ui_bne.elf",
+        "riscv_test_riscv_tests_rv64ui_fence_i.elf",
+        "riscv_test_riscv_tests_rv64ui_jal.elf",
+        "riscv_test_riscv_tests_rv64ui_jalr.elf",
+        "riscv_test_riscv_tests_rv64ui_lb.elf",
+        "riscv_test_riscv_tests_rv64ui_lbu.elf",
+        "riscv_test_riscv_tests_rv64ui_ld.elf",
+        "riscv_test_riscv_tests_rv64ui_ld_st.elf",
+        "riscv_test_riscv_tests_rv64ui_lh.elf",
+        "riscv_test_riscv_tests_rv64ui_lhu.elf",
+        "riscv_test_riscv_tests_rv64ui_lui.elf",
+        "riscv_test_riscv_tests_rv64ui_lw.elf",
+        "riscv_test_riscv_tests_rv64ui_lwu.elf",
+        "riscv_test_riscv_tests_rv64ui_ma_data.elf",
+        "riscv_test_riscv_tests_rv64ui_or.elf",
+        "riscv_test_riscv_tests_rv64ui_ori.elf",
+        "riscv_test_riscv_tests_rv64ui_sb.elf",
+        "riscv_test_riscv_tests_rv64ui_sd.elf",
+        "riscv_test_riscv_tests_rv64ui_sh.elf",
+        "riscv_test_riscv_tests_rv64ui_simple.elf",
+        "riscv_test_riscv_tests_rv64ui_sll.elf",
+        "riscv_test_riscv_tests_rv64ui_slli.elf",
+        "riscv_test_riscv_tests_rv64ui_slliw.elf",
+        "riscv_test_riscv_tests_rv64ui_sllw.elf",
+        "riscv_test_riscv_tests_rv64ui_slt.elf",
+        "riscv_test_riscv_tests_rv64ui_slti.elf",
+        "riscv_test_riscv_tests_rv64ui_sltiu.elf",
+        "riscv_test_riscv_tests_rv64ui_sltu.elf",
+        "riscv_test_riscv_tests_rv64ui_sra.elf",
+        "riscv_test_riscv_tests_rv64ui_srai.elf",
+        "riscv_test_riscv_tests_rv64ui_sraiw.elf",
+        "riscv_test_riscv_tests_rv64ui_sraw.elf",
+        "riscv_test_riscv_tests_rv64ui_srl.elf",
+        "riscv_test_riscv_tests_rv64ui_srli.elf",
+        "riscv_test_riscv_tests_rv64ui_srliw.elf",
+        "riscv_test_riscv_tests_rv64ui_srlw.elf",
+        "riscv_test_riscv_tests_rv64ui_st_ld.elf",
+        "riscv_test_riscv_tests_rv64ui_sub.elf",
+        "riscv_test_riscv_tests_rv64ui_subw.elf",
+        "riscv_test_riscv_tests_rv64ui_sw.elf",
+        "riscv_test_riscv_tests_rv64ui_xor.elf",
+        "riscv_test_riscv_tests_rv64ui_xori.elf",
+    };
+
+    test_files(files);
+}
+
+TEST(RISCVTest, RV64UM) {
+    std::vector<std::string> files = {
+        "riscv_test_riscv_tests_rv64um_div.elf",
+        "riscv_test_riscv_tests_rv64um_divu.elf",
+        "riscv_test_riscv_tests_rv64um_divuw.elf",
+        "riscv_test_riscv_tests_rv64um_divw.elf",
+        "riscv_test_riscv_tests_rv64um_mul.elf",
+        "riscv_test_riscv_tests_rv64um_mulh.elf",
+        "riscv_test_riscv_tests_rv64um_mulhsu.elf",
+        "riscv_test_riscv_tests_rv64um_mulhu.elf",
+        "riscv_test_riscv_tests_rv64um_mulw.elf",
+        "riscv_test_riscv_tests_rv64um_rem.elf",
+        "riscv_test_riscv_tests_rv64um_remu.elf",
+        "riscv_test_riscv_tests_rv64um_remuw.elf",
+        "riscv_test_riscv_tests_rv64um_remw.elf",
+    };
+
+    test_files(files);
 }
 
 }; // namespace uemu::test

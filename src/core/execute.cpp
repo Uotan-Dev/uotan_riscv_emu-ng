@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 Nuo Shen, Nanjing University
+ * Copyright 2025-2026 Nuo Shen, Nanjing University
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,12 +38,7 @@ namespace uemu::core {
         execute_process;                                                       \
     }
 
-#define unimplemented()                                                        \
-    do {                                                                       \
-        Trap::raise_exception(pc, Exception::IllegalInstruction, d->insn);     \
-    } while (0)
-
-IMPL(inv, Trap::raise_exception(pc, Exception::IllegalInstruction, d->insn));
+IMPL(inv, Trap::raise_exception(pc, TrapCause::IllegalInstruction, d->insn));
 IMPL(c_inv, exec_inv(hart, mmu, d));
 
 // RV64I Base Integer Instructions
@@ -58,7 +53,7 @@ IMPL(beq, {
     if (R[rs1] == R[rs2]) {
         addr_t npc = pc + imm;
         if (npc & 0x3) [[unlikely]]
-            Trap::raise_exception(pc, Exception::InstructionAddressMisaligned,
+            Trap::raise_exception(pc, TrapCause::InstructionAddressMisaligned,
                                   npc);
         hart->pc = npc;
     }
@@ -67,7 +62,7 @@ IMPL(bge, {
     if (static_cast<int64_t>(R[rs1]) >= static_cast<int64_t>(R[rs2])) {
         addr_t npc = pc + imm;
         if (npc & 0x3) [[unlikely]]
-            Trap::raise_exception(pc, Exception::InstructionAddressMisaligned,
+            Trap::raise_exception(pc, TrapCause::InstructionAddressMisaligned,
                                   npc);
         hart->pc = npc;
     }
@@ -76,7 +71,7 @@ IMPL(bgeu, {
     if (R[rs1] >= R[rs2]) {
         addr_t npc = pc + imm;
         if (npc & 0x3) [[unlikely]]
-            Trap::raise_exception(pc, Exception::InstructionAddressMisaligned,
+            Trap::raise_exception(pc, TrapCause::InstructionAddressMisaligned,
                                   npc);
         hart->pc = npc;
     }
@@ -85,7 +80,7 @@ IMPL(blt, {
     if (static_cast<int64_t>(R[rs1]) < static_cast<int64_t>(R[rs2])) {
         addr_t npc = pc + imm;
         if (npc & 0x3) [[unlikely]]
-            Trap::raise_exception(pc, Exception::InstructionAddressMisaligned,
+            Trap::raise_exception(pc, TrapCause::InstructionAddressMisaligned,
                                   npc);
         hart->pc = npc;
     }
@@ -94,7 +89,7 @@ IMPL(bltu, {
     if (R[rs1] < R[rs2]) {
         addr_t npc = pc + imm;
         if (npc & 0x3) [[unlikely]]
-            Trap::raise_exception(pc, Exception::InstructionAddressMisaligned,
+            Trap::raise_exception(pc, TrapCause::InstructionAddressMisaligned,
                                   npc);
         hart->pc = npc;
     }
@@ -103,7 +98,7 @@ IMPL(bne, {
     if (R[rs1] != R[rs2]) {
         addr_t npc = pc + imm;
         if (npc & 0x3) [[unlikely]]
-            Trap::raise_exception(pc, Exception::InstructionAddressMisaligned,
+            Trap::raise_exception(pc, TrapCause::InstructionAddressMisaligned,
                                   npc);
         hart->pc = npc;
     }
@@ -113,7 +108,7 @@ IMPL(fence_i, /* nop */)
 IMPL(jal, {
     addr_t npc = pc + imm;
     if (npc & 0x3) [[unlikely]]
-        Trap::raise_exception(pc, Exception::InstructionAddressMisaligned, npc);
+        Trap::raise_exception(pc, TrapCause::InstructionAddressMisaligned, npc);
     R.write(rd, pc + 4);
     hart->pc = npc;
 })
@@ -121,7 +116,7 @@ IMPL(jalr, {
     uint64_t t = pc + 4;
     addr_t npc = (R[rs1] + imm) & ~1ULL;
     if (npc & 0x3) [[unlikely]]
-        Trap::raise_exception(pc, Exception::InstructionAddressMisaligned, npc);
+        Trap::raise_exception(pc, TrapCause::InstructionAddressMisaligned, npc);
     hart->pc = npc;
     R.write(rd, t);
 })
@@ -231,47 +226,83 @@ IMPL(csrrwi, {
         R.write(rd, csrs[csr]->read_checked(*d));
     csrs[csr]->write_checked(*d, zimm);
 })
-IMPL(ebreak, Trap::raise_exception(pc, Exception::Breakpoint, pc))
+IMPL(ebreak, Trap::raise_exception(pc, TrapCause::Breakpoint, pc))
 IMPL(ecall, {
     switch (hart->priv) {
         case PrivilegeLevel::M:
-            Trap::raise_exception(pc, Exception::EnvironmentCallFromM, 0);
+            Trap::raise_exception(pc, TrapCause::EnvironmentCallFromM, 0);
             break;
         case PrivilegeLevel::S:
-            Trap::raise_exception(pc, Exception::EnvironmentCallFromS, 0);
+            Trap::raise_exception(pc, TrapCause::EnvironmentCallFromS, 0);
             break;
         case PrivilegeLevel::U:
-            Trap::raise_exception(pc, Exception::EnvironmentCallFromU, 0);
+            Trap::raise_exception(pc, TrapCause::EnvironmentCallFromU, 0);
             break;
         default: std::unreachable();
     }
 })
 IMPL(mret, {
     if (hart->priv != PrivilegeLevel::M) [[unlikely]]
-        Trap::raise_exception(pc, Exception::IllegalInstruction, d->insn);
+        Trap::raise_exception(pc, TrapCause::IllegalInstruction, d->insn);
 
-    uint64_t mstatus = hart->csrs[MSTATUS::ADDRESS]->read_unchecked();
+    reg_t mstatus = hart->csrs[MSTATUS::ADDRESS]->read_unchecked();
 
     hart->pc = hart->csrs[MEPC::ADDRESS]->read_unchecked();
-    hart->priv = static_cast<PrivilegeLevel>((mstatus & MSTATUS::field::MPP) >>
-                                             MSTATUS::shift::MPP_SHIFT);
+    hart->priv = static_cast<PrivilegeLevel>((mstatus & MSTATUS::Field::MPP) >>
+                                             MSTATUS::Shift::MPP_SHIFT);
 
     if (hart->priv != PrivilegeLevel::M)
-        mstatus &= ~MSTATUS::field::MPRV;
+        mstatus &= ~MSTATUS::Field::MPRV;
 
-    if (mstatus & MSTATUS::field::MPIE)
-        mstatus |= MSTATUS::field::MIE;
+    if (mstatus & MSTATUS::Field::MPIE)
+        mstatus |= MSTATUS::Field::MIE;
     else
-        mstatus &= ~MSTATUS::field::MIE;
+        mstatus &= ~MSTATUS::Field::MIE;
 
-    mstatus |= MSTATUS::field::MPIE;
-    mstatus &= ~MSTATUS::field::MPP;
+    mstatus |= MSTATUS::Field::MPIE;
+    mstatus &= ~MSTATUS::Field::MPP;
 
     hart->csrs[MSTATUS::ADDRESS]->write_unchecked(mstatus);
 })
-IMPL(sfence_vma, unimplemented();)
-IMPL(sret, unimplemented();)
-IMPL(wfi, /* nop */)
+IMPL(sfence_vma, {
+    if (hart->priv == PrivilegeLevel::U ||
+        (hart->priv == PrivilegeLevel::S &&
+         (hart->csrs[MSTATUS::ADDRESS]->read_unchecked() & MSTATUS::TVM)))
+        [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::IllegalInstruction, d->insn);
+})
+IMPL(sret, {
+    if (hart->priv == PrivilegeLevel::U ||
+        (hart->priv == PrivilegeLevel::S &&
+         (hart->csrs[MSTATUS::ADDRESS]->read_unchecked() & MSTATUS::TSR)))
+        [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::IllegalInstruction, d->insn);
+
+    reg_t sstatus = hart->csrs[SSTATUS::ADDRESS]->read_unchecked();
+
+    hart->pc = hart->csrs[SEPC::ADDRESS]->read_unchecked();
+    hart->priv = static_cast<PrivilegeLevel>((sstatus & SSTATUS::Field::SPP) >>
+                                             SSTATUS::Shift::SPP_SHIFT);
+
+    if (hart->priv != PrivilegeLevel::M)
+        sstatus &= ~SSTATUS::Field::MPRV;
+
+    if (sstatus & SSTATUS::Field::SPIE)
+        sstatus |= SSTATUS::Field::SIE;
+    else
+        sstatus &= ~SSTATUS::Field::SIE;
+
+    sstatus |= SSTATUS::Field::SPIE;
+    sstatus &= ~SSTATUS::Field::SPP;
+
+    hart->csrs[SSTATUS::ADDRESS]->write_unchecked(sstatus);
+})
+IMPL(wfi, {
+    if (hart->priv == PrivilegeLevel::U ||
+        (hart->priv < PrivilegeLevel::M &&
+         (hart->csrs[MSTATUS::ADDRESS]->read_unchecked() & MSTATUS::TW)))
+        Trap::raise_exception(pc, TrapCause::IllegalInstruction, d->insn);
+})
 
 // RV64M Extension
 IMPL(div, {

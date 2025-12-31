@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 Nuo Shen, Nanjing University
+ * Copyright 2025-2026 Nuo Shen, Nanjing University
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 #pragma once
 
 #include <condition_variable>
-#include <string>
+#include <filesystem>
 #include <thread>
 
 #include "core/mmu.hpp"
@@ -38,13 +38,13 @@ public:
     void stop();
 
     // Load an elf from path to DRAM
-    void loadelf(const std::string& path);
+    void loadelf(const std::filesystem::path& path);
 
     // Load data from p to DRAM
     void load(addr_t addr, const void* p, size_t n);
 
     // Load a common file to DRAM
-    void load(addr_t addr, const std::string& path);
+    void load(addr_t addr, const std::filesystem::path& path);
 
     // Load data from a vector<T> to DRAM
     template <typename T>

@@ -208,8 +208,8 @@ write_sifive:                                                           \
 reset_vector:                                                           \
         INIT_XREG;                                                      \
         RISCV_MULTICORE_DISABLE;                                        \
-        /* INIT_SATP; */                                                      \
-        /* DELEGATE_NO_TRAPS; */                                              \
+        INIT_SATP;                                                      \
+        DELEGATE_NO_TRAPS;                                              \
         li TESTNUM, 0;                                                  \
         la t0, trap_vector;                                             \
         csrw mtvec, t0;                                                 \
@@ -224,7 +224,7 @@ reset_vector:                                                           \
                (1 << CAUSE_MISALIGNED_FETCH) |                          \
                (1 << CAUSE_USER_ECALL) |                                \
                (1 << CAUSE_BREAKPOINT);                                 \
-        /* csrw medeleg, t0; */                                         \
+        csrw medeleg, t0;                                               \
 1:      csrwi mstatus, 0;                                               \
         init;                                                           \
         EXTRA_INIT;                                                     \

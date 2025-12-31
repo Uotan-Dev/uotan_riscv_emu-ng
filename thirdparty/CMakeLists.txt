@@ -1,4 +1,4 @@
-# Copyright 2025 Nuo Shen, Nanjing University
+# Copyright 2025-2026 Nuo Shen, Nanjing University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -84,3 +84,6 @@ endfunction()
 
 # Example: build RV64MI tests (adjust the glob if you want other subdirs)
 build_asm("${RISCV_TESTS_DIR}/isa/rv64mi/*.S" "${CMAKE_BINARY_DIR}/testbins/rv64mi" "riscv_tests_rv64mi")
+build_asm("${RISCV_TESTS_DIR}/isa/rv64si/*.S" "${CMAKE_BINARY_DIR}/testbins/rv64si" "riscv_tests_rv64si")
+build_asm("${RISCV_TESTS_DIR}/isa/rv64ui/*.S" "${CMAKE_BINARY_DIR}/testbins/rv64ui" "riscv_tests_rv64ui")
+build_asm("${RISCV_TESTS_DIR}/isa/rv64um/*.S" "${CMAKE_BINARY_DIR}/testbins/rv64um" "riscv_tests_rv64um")

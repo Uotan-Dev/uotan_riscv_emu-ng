@@ -1,4 +1,4 @@
-# Copyright 2025 Nuo Shen, Nanjing University
+# Copyright 2025-2026 Nuo Shen, Nanjing University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ file(GLOB_RECURSE TEST_SOURCES
     "*.cpp"
 )
 
+add_definitions(-DRISCV_TEST_DIR="${CMAKE_CURRENT_BINARY_DIR}")
 add_executable(uemu_test ${TEST_SOURCES})
 
 target_link_libraries(uemu_test 

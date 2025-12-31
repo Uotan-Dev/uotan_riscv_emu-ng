@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 Nuo Shen, Nanjing University
+ * Copyright 2025-2026 Nuo Shen, Nanjing University
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,8 +38,9 @@ Emulator::Emulator(size_t dram_size) {
 
     bus_->add_device(std::make_shared<device::SiFiveTest>(
         [this](uint16_t code, device::SiFiveTest::Status status) -> void {
-            std::cout << "Emulator shutdown with code " << code
-                      << " and status " << status << std::endl;
+            std::cout << std::format(
+                "Emulator shutdown with code 0x{:x} and status 0x{:x}\n", code,
+                static_cast<uint16_t>(status));
             shutdown_ = true;
             shutdown_code_ = code;
             shutdown_status_ = static_cast<uint16_t>(status);
@@ -95,12 +96,12 @@ void Emulator::stop() {
     }
 }
 
-void Emulator::loadelf(const std::string& path) {
+void Emulator::loadelf(const std::filesystem::path& path) {
     hart_->pc = utils::ElfLoader::load(path, *dram_);
 
     std::cout << std::format("ELF loaded: {}\n"
                              "      entry PC = 0x{:016x}\n",
-                             path, hart_->pc)
+                             path.string(), hart_->pc)
               << std::endl;
 }
 
@@ -117,7 +118,7 @@ void Emulator::load(addr_t addr, const void* p, size_t n) {
     dram_->write_bytes(addr, p, n);
 }
 
-void Emulator::load(addr_t addr, const std::string& path) {
+void Emulator::load(addr_t addr, const std::filesystem::path& path) {
     auto data = utils::FileLoader::read_file(path);
 
     if (!data.empty())
@@ -140,10 +141,14 @@ void Emulator::cpu_thread() {
     if (!mcycle || !minstret)
         std::terminate();
 
+    std::cout << std::hex << hart_->pc << std::endl;
+
     while (!shutdown_) {
         mcycle->advance();
 
         try {
+            hart_->check_interrupts();
+
             // FIXME: RV64C support
 
             // Fetch instruction
@@ -161,7 +166,7 @@ void Emulator::cpu_thread() {
             minstret->advance();
         } catch (const core::Trap& trap) {
             // RISC-V Trap
-            hart_->handle_exception(trap);
+            hart_->handle_trap(trap);
             continue;
         } catch (...) {
             cpu_thread_exception_ = std::current_exception();
