@@ -510,4 +510,62 @@ public:
     TDATAN(Hart* hart) : HardwiredCSR(hart, PrivilegeLevel::M, 0) {}
 };
 
+class CYCLE final : public ConstCSR {
+public:
+    static constexpr size_t ADDRESS = 0xC00;
+
+    CYCLE(Hart* hart) : ConstCSR(hart, PrivilegeLevel::U, 0) {
+        if (!hart_->csrs[MCYCLE::ADDRESS] ||
+            dynamic_cast<UnimplementedCSR*>(hart_->csrs[MCYCLE::ADDRESS].get()))
+            std::terminate();
+    }
+
+    reg_t read_unchecked() const noexcept override {
+        return hart_->csrs[MCYCLE::ADDRESS]->read_unchecked();
+    }
+};
+
+class INSTRET final : public ConstCSR {
+public:
+    static constexpr size_t ADDRESS = 0xC02;
+
+    INSTRET(Hart* hart) : ConstCSR(hart, PrivilegeLevel::U, 0) {
+        if (!hart_->csrs[MINSTRET::ADDRESS] ||
+            dynamic_cast<UnimplementedCSR*>(
+                hart_->csrs[MINSTRET::ADDRESS].get()))
+            std::terminate();
+    }
+
+    reg_t read_unchecked() const noexcept override {
+        return hart_->csrs[MINSTRET::ADDRESS]->read_unchecked();
+    }
+};
+
+class HPMCOUNTERN final : public ConstCSR {
+public:
+    static constexpr size_t MIN_ADDRESS = 0xC03;
+    static constexpr size_t MAX_ADDRESS = 0xC1F;
+    static constexpr size_t DELTA_ADDRESS = 1;
+
+    HPMCOUNTERN(Hart* hart, size_t address)
+        : ConstCSR(hart, PrivilegeLevel::U, 0), address_(address) {
+        size_t mhpmcounter_address =
+            MHPMCOUNTERN::MIN_ADDRESS + address_ - HPMCOUNTERN::MIN_ADDRESS;
+        if (!hart_->csrs[mhpmcounter_address] ||
+            dynamic_cast<UnimplementedCSR*>(
+                hart_->csrs[mhpmcounter_address].get()))
+            std::terminate();
+    }
+
+    reg_t read_unchecked() const noexcept override {
+        return hart_
+            ->csrs[MHPMCOUNTERN::MIN_ADDRESS + address_ -
+                   HPMCOUNTERN::MIN_ADDRESS]
+            ->read_unchecked();
+    }
+
+private:
+    size_t address_;
+};
+
 } // namespace uemu::core
