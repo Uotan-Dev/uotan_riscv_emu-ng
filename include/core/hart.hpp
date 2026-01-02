@@ -964,6 +964,49 @@ private:
     MSTATUS* mstatus_;
 };
 
+class STIMECMP : public CSR {
+public:
+    static constexpr size_t ADDRESS = 0x14D;
+
+    STIMECMP(Hart* hart) : CSR(hart, PrivilegeLevel::S, 0) {
+        mcounteren_ =
+            dynamic_cast<MCOUNTEREN*>(hart_->csrs[MCOUNTEREN::ADDRESS].get());
+        menvcfg_ = dynamic_cast<MENVCFG*>(hart_->csrs[MENVCFG::ADDRESS].get());
+        assert(mcounteren_ && menvcfg_);
+    }
+
+    reg_t read_unchecked() const noexcept override {
+        return value_atomic_.load(std::memory_order_relaxed);
+    }
+
+    void write_unchecked(reg_t v) noexcept override {
+        value_atomic_.store(v, std::memory_order_relaxed);
+    }
+
+protected:
+    bool check_permissions() const noexcept override {
+        if (hart_->priv == PrivilegeLevel::M)
+            return true;
+
+        if (hart_->priv == PrivilegeLevel::U)
+            return false;
+
+        if (!(mcounteren_->read_unchecked() & core::MCOUNTEREN::TM))
+            return false;
+
+        if (!(menvcfg_->read_unchecked() & core::MENVCFG::STCE))
+            return false;
+
+        return true;
+    }
+
+private:
+    MCOUNTEREN* mcounteren_;
+    MENVCFG* menvcfg_;
+
+    std::atomic<reg_t> value_atomic_;
+};
+
 class UserCounterCSR : public ConstCSR {
 public:
     UserCounterCSR(Hart* hart, size_t address, size_t mirrored_address)
@@ -995,6 +1038,7 @@ protected:
         return true;
     }
 
+private:
     size_t address_;
     size_t mirrored_address_;
 
@@ -1007,6 +1051,52 @@ public:
     static constexpr size_t ADDRESS = 0xC00;
 
     CYCLE(Hart* hart) : UserCounterCSR(hart, ADDRESS, MCYCLE::ADDRESS) {}
+};
+
+class TIME final : public ConstCSR {
+public:
+    static constexpr size_t ADDRESS = 0xC01;
+
+    TIME(Hart* hart) : ConstCSR(hart, PrivilegeLevel::U, 0) {
+        mcounteren_ =
+            dynamic_cast<MCOUNTEREN*>(hart_->csrs[MCOUNTEREN::ADDRESS].get());
+        scounteren_ =
+            dynamic_cast<SCOUNTEREN*>(hart_->csrs[SCOUNTEREN::ADDRESS].get());
+        assert(mcounteren_ && scounteren_);
+    }
+
+    reg_t read_unchecked() const noexcept override {
+        return value_atomic_.load(std::memory_order_relaxed);
+    }
+
+    void write_unchecked(reg_t v) noexcept override {
+        value_atomic_.store(v, std::memory_order_relaxed);
+    }
+
+    void mirror_from_mtime(reg_t mtime_value) noexcept {
+        value_atomic_.store(mtime_value, std::memory_order_relaxed);
+    }
+
+protected:
+    bool check_permissions() const noexcept override {
+        if (hart_->priv == PrivilegeLevel::M)
+            return true;
+
+        if (!mcounteren_->hpm_available_to_supervisor_and_user(ADDRESS))
+            return false;
+
+        if (hart_->priv == PrivilegeLevel::U &&
+            !scounteren_->hpm_available_to_user(ADDRESS))
+            return false;
+
+        return true;
+    }
+
+private:
+    MCOUNTEREN* mcounteren_;
+    SCOUNTEREN* scounteren_;
+
+    std::atomic<reg_t> value_atomic_;
 };
 
 class INSTRET final : public UserCounterCSR {

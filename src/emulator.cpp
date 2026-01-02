@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#include <chrono>
 #include <iostream>
 
 #include "core/decoder.hpp"
+#include "device/clint.hpp"
 #include "device/sifive_test.hpp"
 #include "emulator.hpp"
 #include "utils/elfloader.hpp"
@@ -35,6 +35,8 @@ Emulator::Emulator(size_t dram_size) {
 
     shutdown_ = true;
     shutdown_code_ = shutdown_status_ = 0;
+
+    bus_->add_device(std::make_shared<device::Clint>(hart_));
 
     bus_->add_device(std::make_shared<device::SiFiveTest>(
         [this](uint16_t code, device::SiFiveTest::Status status) -> void {
@@ -76,9 +78,7 @@ void Emulator::run() {
                 break;
         }
 
-        // TODO: device simulation
-        // TODO: UI management
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        bus_->tick_devices();
     }
 
     stop();

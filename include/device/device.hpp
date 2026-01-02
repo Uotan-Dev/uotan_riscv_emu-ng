@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 Nuo Shen, Nanjing University
+ * Copyright 2025-2026 Nuo Shen, Nanjing University
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <cstring>
 #include <string>
 
 #include "common/types.hpp"
@@ -60,9 +61,36 @@ public:
         write_internal(addr, sizeof(T), static_cast<uint64_t>(value));
     }
 
+    virtual void tick() {}
+
 protected:
     virtual uint64_t read_internal(addr_t addr, size_t size) = 0;
     virtual void write_internal(addr_t addr, size_t size, uint64_t value) = 0;
+
+    static void read_little_endian(const void* src, addr_t offset, size_t size,
+                                   uint64_t* out_val) {
+        if (size == 0 || offset + size > 8)
+            return;
+
+        const uint8_t* base = static_cast<const uint8_t*>(src);
+
+        uint64_t val = 0;
+        for (size_t i = 0; i < size; i++)
+            val |= static_cast<uint64_t>(base[offset + i]) << (8 * i);
+
+        *out_val = val;
+    }
+
+    static void write_little_endian(void* dst, addr_t offset, size_t size,
+                                    uint64_t value) {
+        if (size == 0 || offset + size > 8)
+            return;
+
+        uint8_t* base = static_cast<uint8_t*>(dst);
+
+        for (size_t i = 0; i < size; i++)
+            base[offset + i] = static_cast<uint8_t>((value >> (8 * i)) & 0xFF);
+    }
 
     std::string name_;
 

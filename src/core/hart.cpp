@@ -136,8 +136,11 @@ Hart::Hart(addr_t reset_pc) : pc(reset_pc) {
 
     add_csr<SATP>();
 
+    add_csr<STIMECMP>();
+
     // User Level
     add_csr<CYCLE>();
+    add_csr<TIME>();
     add_csr<INSTRET>();
 
     for (size_t i = HPMCOUNTERN::MIN_ADDRESS; i <= HPMCOUNTERN::MAX_ADDRESS;

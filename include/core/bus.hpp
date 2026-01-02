@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 Nuo Shen, Nanjing University
+ * Copyright 2025-2026 Nuo Shen, Nanjing University
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -93,6 +93,11 @@ public:
         }
 
         return false;
+    }
+
+    void tick_devices() {
+        for (auto& dev : devices_)
+            dev->tick();
     }
 
 private:
