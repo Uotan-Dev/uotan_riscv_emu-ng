@@ -112,6 +112,7 @@ public:
 
     void handle_trap(const Trap& trap) noexcept;
     void check_interrupts() const;
+    void set_interrupt_pending(reg_t mip_mask, bool pending) noexcept;
 
     RegisterFile gprs;
     addr_t pc;
@@ -279,6 +280,50 @@ public:
         : ConstCSR(hart, PrivilegeLevel::M, value) {}
 };
 
+class MENVCFG final : public CSR {
+public:
+    static constexpr size_t ADDRESS = 0x30A;
+
+    enum Shift {
+        FIOM_SHIFT = 0,
+        LPE_SHIFT = 2,
+        SSE_SHIFT = 3,
+        CBIE_SHIFT = 4,
+        CBCFE_SHIFT = 6,
+        CBZE_SHIFT = 7,
+        PMM_SHIFT = 32,
+        DTE_SHIFT = 59,
+        CDE_SHIFT = 60,
+        ADUE_SHIFT = 61,
+        PBMTE_SHIFT = 62,
+        STCE_SHIFT = 63,
+    };
+
+    enum Field {
+        FIOM = 1ULL << FIOM_SHIFT,
+        LPE = 1ULL << LPE_SHIFT,
+        SSE = 1ULL << SSE_SHIFT,
+        CBIE = 3ULL << CBIE_SHIFT,
+        CBCFE = 1ULL << CBCFE_SHIFT,
+        CBZE = 1ULL << CBZE_SHIFT,
+        PMM = 3ULL << PMM_SHIFT,
+        DTE = 1ULL << DTE_SHIFT,
+        CDE = 1ULL << CDE_SHIFT,
+        ADUE = 1ULL << ADUE_SHIFT,
+        PBMTE = 1ULL << PBMTE_SHIFT,
+        STCE = 1ULL << STCE_SHIFT,
+    };
+
+    MENVCFG(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {}
+
+    reg_t read_unchecked() const noexcept override { return value_ & mask_; }
+
+    void write_unchecked(reg_t v) noexcept override { value_ = v & mask_; }
+
+private:
+    static constexpr reg_t mask_ = Field::FIOM | Field::ADUE | Field::STCE;
+};
+
 class MSTATUS final : public CSR {
 public:
     static constexpr size_t ADDRESS = 0x300;
@@ -389,6 +434,8 @@ public:
 };
 
 class MIP final : public CSR {
+    friend class Hart;
+
 public:
     static constexpr size_t ADDRESS = 0x344;
 
@@ -410,15 +457,39 @@ public:
         MEIP = 1ULL << MEIP_SHIFT
     };
 
-    MIP(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {}
+    MIP(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {
+        menvcfg_ = dynamic_cast<MENVCFG*>(hart_->csrs[MENVCFG::ADDRESS].get());
+        assert(menvcfg_);
+    }
 
-    reg_t read_unchecked() const noexcept override { return value_ & mask_; }
+    reg_t read_unchecked() const noexcept override {
+        return value_ & read_mask_;
+    }
 
-    void write_unchecked(reg_t v) noexcept override { value_ = v & mask_; }
+    // For csr instructions
+    void write_unchecked(reg_t v) noexcept override {
+        reg_t write_mask = write_mask_;
+
+        if (!(menvcfg_->read_unchecked() & MENVCFG::Field::STCE))
+            write_mask |= Field::STIP;
+
+        value_ = (value_ & ~write_mask) | (v & write_mask);
+    }
 
 private:
-    static constexpr reg_t mask_ = Field::SSIP | Field::MSIP | Field::STIP |
-                                   Field::MTIP | Field::SEIP | Field::MEIP;
+    // For devices
+    void write_unchecked_for_device(reg_t v) noexcept {
+        reg_t write_mask = read_mask_;
+        value_ = (value_ & ~write_mask) | (v & write_mask);
+    }
+
+    static constexpr reg_t read_mask_ = Field::SSIP | Field::MSIP |
+                                        Field::STIP | Field::MTIP |
+                                        Field::SEIP | Field::MEIP;
+
+    static constexpr reg_t write_mask_ = Field::SSIP | Field::SEIP;
+
+    MENVCFG* menvcfg_;
 };
 
 class MIE final : public CSR {
@@ -629,50 +700,6 @@ public:
     MCONFIGPTR(Hart* hart) : ConstCSR(hart, PrivilegeLevel::M, 0) {}
 };
 
-class MENVCFG final : public CSR {
-public:
-    static constexpr size_t ADDRESS = 0x30A;
-
-    enum Shift {
-        FIOM_SHIFT = 0,
-        LPE_SHIFT = 2,
-        SSE_SHIFT = 3,
-        CBIE_SHIFT = 4,
-        CBCFE_SHIFT = 6,
-        CBZE_SHIFT = 7,
-        PMM_SHIFT = 32,
-        DTE_SHIFT = 59,
-        CDE_SHIFT = 60,
-        ADUE_SHIFT = 61,
-        PBMTE_SHIFT = 62,
-        STCE_SHIFT = 63,
-    };
-
-    enum Field {
-        FIOM = 1ULL << FIOM_SHIFT,
-        LPE = 1ULL << LPE_SHIFT,
-        SSE = 1ULL << SSE_SHIFT,
-        CBIE = 3ULL << CBIE_SHIFT,
-        CBCFE = 1ULL << CBCFE_SHIFT,
-        CBZE = 1ULL << CBZE_SHIFT,
-        PMM = 3ULL << PMM_SHIFT,
-        DTE = 1ULL << DTE_SHIFT,
-        CDE = 1ULL << CDE_SHIFT,
-        ADUE = 1ULL << ADUE_SHIFT,
-        PBMTE = 1ULL << PBMTE_SHIFT,
-        STCE = 1ULL << STCE_SHIFT,
-    };
-
-    MENVCFG(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {}
-
-    reg_t read_unchecked() const noexcept override { return value_ & mask_; }
-
-    void write_unchecked(reg_t v) noexcept override { value_ = v & mask_; }
-
-private:
-    static constexpr reg_t mask_ = Field::FIOM | Field::ADUE | Field::STCE;
-};
-
 class PMPCFGN final : public HardwiredCSR {
 public:
     static constexpr size_t MIN_ADDRESS = 0x3A0;
@@ -757,21 +784,23 @@ public:
 
     SIP(Hart* hart) : CSR(hart, PrivilegeLevel::S, 0) {
         mip_ = dynamic_cast<MIP*>(hart->csrs[MIP::ADDRESS].get());
-        assert(mip_);
+        mideleg_ = dynamic_cast<MIDELEG*>(hart->csrs[MIDELEG::ADDRESS].get());
+        assert(mip_ && mideleg_);
     }
 
     reg_t read_unchecked() const noexcept override {
-        return mip_->read_unchecked() & mask_;
+        return mip_->read_unchecked() & mask_ & mideleg_->read_unchecked();
     }
 
     void write_unchecked(reg_t v) noexcept override {
-        mip_->write_unchecked(v & mask_);
+        mip_->write_unchecked(v & mask_ & mideleg_->read_unchecked());
     }
 
 private:
     static constexpr reg_t mask_ = Field::SSIP | Field::STIP | Field::SEIP;
 
     MIP* mip_;
+    MIDELEG* mideleg_;
 };
 
 class SIE final : public CSR {

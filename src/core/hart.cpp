@@ -93,6 +93,8 @@ Hart::Hart(addr_t reset_pc) : pc(reset_pc) {
     add_csr<MIMPID>(0x00000010);
     add_csr<MHARTID>(0);
 
+    add_csr<MENVCFG>();
+
     add_csr<MSTATUS>();
     add_csr<MTVEC>();
     add_csr<MEDELEG>();
@@ -111,7 +113,6 @@ Hart::Hart(addr_t reset_pc) : pc(reset_pc) {
     add_csr_ranged<MHPMEVENTN>();
 
     add_csr<MCONFIGPTR>();
-    add_csr<MENVCFG>();
 
     add_csr_ranged<PMPCFGN>();
     add_csr_ranged<PMPADDRN>();
@@ -279,6 +280,18 @@ void Hart::check_interrupts() const {
 
     if (selected_cause != TrapCause::None)
         throw Trap(pc, selected_cause, 0);
+}
+
+void Hart::set_interrupt_pending(reg_t mip_mask, bool pending) noexcept {
+    MIP* mip = dynamic_cast<MIP*>(csrs[MIP::ADDRESS].get());
+    assert(mip);
+
+    reg_t old_value = mip->read_unchecked();
+
+    if (pending)
+        mip->write_unchecked_for_device(old_value | mip_mask);
+    else
+        mip->write_unchecked_for_device(old_value & ~mip_mask);
 }
 
 } // namespace uemu::core
