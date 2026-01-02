@@ -286,12 +286,10 @@ void Hart::set_interrupt_pending(reg_t mip_mask, bool pending) noexcept {
     MIP* mip = dynamic_cast<MIP*>(csrs[MIP::ADDRESS].get());
     assert(mip);
 
-    reg_t old_value = mip->read_unchecked();
-
     if (pending)
-        mip->write_unchecked_for_device(old_value | mip_mask);
+        mip->set_pending(mip_mask);
     else
-        mip->write_unchecked_for_device(old_value & ~mip_mask);
+        mip->clear_pending(mip_mask);
 }
 
 } // namespace uemu::core

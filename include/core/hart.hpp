@@ -17,6 +17,7 @@
 #pragma once
 
 #include <array>
+#include <atomic>
 #include <cassert>
 #include <limits>
 #include <memory>
@@ -152,9 +153,9 @@ public:
 
     virtual void write_unchecked(reg_t v) noexcept { value_ = v; }
 
-    virtual void write_checked(const DecodedInsn& insn, reg_t v);
-
     virtual reg_t read_checked(const DecodedInsn& insn) const;
+
+    virtual void write_checked(const DecodedInsn& insn, reg_t v);
 
 protected:
     virtual bool check_permissions() const noexcept {
@@ -314,14 +315,22 @@ public:
         STCE = 1ULL << STCE_SHIFT,
     };
 
-    MENVCFG(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {}
+    MENVCFG(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {
+        value_atomic_.store(0, std::memory_order_relaxed);
+    }
 
-    reg_t read_unchecked() const noexcept override { return value_ & mask_; }
+    reg_t read_unchecked() const noexcept override {
+        return value_atomic_.load(std::memory_order_relaxed) & mask_;
+    }
 
-    void write_unchecked(reg_t v) noexcept override { value_ = v & mask_; }
+    void write_unchecked(reg_t v) noexcept override {
+        value_atomic_.store(v & mask_, std::memory_order_relaxed);
+    }
 
 private:
     static constexpr reg_t mask_ = Field::FIOM | Field::ADUE | Field::STCE;
+
+    std::atomic<reg_t> value_atomic_;
 };
 
 class MSTATUS final : public CSR {
@@ -430,12 +439,23 @@ class MIDELEG final : public CSR {
 public:
     static constexpr size_t ADDRESS = 0x303;
 
-    MIDELEG(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {}
+    MIDELEG(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {
+        value_atomic_.store(0, std::memory_order_relaxed);
+    }
+
+    reg_t read_unchecked() const noexcept override {
+        return value_atomic_.load(std::memory_order_relaxed);
+    }
+
+    void write_unchecked(reg_t v) noexcept override {
+        value_atomic_.store(v, std::memory_order_relaxed);
+    }
+
+private:
+    std::atomic<reg_t> value_atomic_;
 };
 
 class MIP final : public CSR {
-    friend class Hart;
-
 public:
     static constexpr size_t ADDRESS = 0x344;
 
@@ -458,37 +478,46 @@ public:
     };
 
     MIP(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {
+        value_atomic_.store(0, std::memory_order_relaxed);
         menvcfg_ = dynamic_cast<MENVCFG*>(hart_->csrs[MENVCFG::ADDRESS].get());
         assert(menvcfg_);
     }
 
     reg_t read_unchecked() const noexcept override {
-        return value_ & read_mask_;
+        return value_atomic_.load(std::memory_order_relaxed) & read_mask_;
     }
 
     // For csr instructions
     void write_unchecked(reg_t v) noexcept override {
-        reg_t write_mask = write_mask_;
+        reg_t old_val = value_atomic_.load(std::memory_order_relaxed);
+        reg_t new_val;
+        do {
+            reg_t write_mask = write_mask_;
 
-        if (!(menvcfg_->read_unchecked() & MENVCFG::Field::STCE))
-            write_mask |= Field::STIP;
+            if (!(menvcfg_->read_unchecked() & MENVCFG::Field::STCE))
+                write_mask |= Field::STIP;
 
-        value_ = (value_ & ~write_mask) | (v & write_mask);
+            new_val = (old_val & ~write_mask) | (v & write_mask);
+        } while (!value_atomic_.compare_exchange_weak(
+            old_val, new_val, std::memory_order_relaxed));
+    }
+
+    void set_pending(reg_t mask) noexcept {
+        value_atomic_.fetch_or(mask & read_mask_, std::memory_order_relaxed);
+    }
+
+    void clear_pending(reg_t mask) noexcept {
+        value_atomic_.fetch_and(~mask, std::memory_order_relaxed);
     }
 
 private:
-    // For devices
-    void write_unchecked_for_device(reg_t v) noexcept {
-        reg_t write_mask = read_mask_;
-        value_ = (value_ & ~write_mask) | (v & write_mask);
-    }
-
     static constexpr reg_t read_mask_ = Field::SSIP | Field::MSIP |
                                         Field::STIP | Field::MTIP |
                                         Field::SEIP | Field::MEIP;
 
     static constexpr reg_t write_mask_ = Field::SSIP | Field::SEIP;
 
+    std::atomic<reg_t> value_atomic_;
     MENVCFG* menvcfg_;
 };
 
