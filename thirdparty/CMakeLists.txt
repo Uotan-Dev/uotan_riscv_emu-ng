@@ -51,7 +51,7 @@ function(build_asm asm_glob out_dir target_name)
                 -T${RISCV_LINKER_SCRIPT}
                 -I${RISCV_TEST_ENV_DIR}/p
                 -I${RISCV_TESTS_DIR}/isa/macros/scalar
-                -nostdlib -ffreestanding -march=rv64im_zicsr_zifencei -g -mabi=lp64 -nostartfiles -O0
+                -nostdlib -ffreestanding -march=rv64ima_zicsr_zifencei -g -mabi=lp64 -nostartfiles -O0
                 -o ${temp_elf}
                 ${asmfile}
             DEPENDS ${asmfile} ${RISCV_LINKER_SCRIPT}
@@ -87,3 +87,4 @@ build_asm("${RISCV_TESTS_DIR}/isa/rv64mi/*.S" "${CMAKE_BINARY_DIR}/testbins/rv64
 build_asm("${RISCV_TESTS_DIR}/isa/rv64si/*.S" "${CMAKE_BINARY_DIR}/testbins/rv64si" "riscv_tests_rv64si")
 build_asm("${RISCV_TESTS_DIR}/isa/rv64ui/*.S" "${CMAKE_BINARY_DIR}/testbins/rv64ui" "riscv_tests_rv64ui")
 build_asm("${RISCV_TESTS_DIR}/isa/rv64um/*.S" "${CMAKE_BINARY_DIR}/testbins/rv64um" "riscv_tests_rv64um")
+build_asm("${RISCV_TESTS_DIR}/isa/rv64ua/*.S" "${CMAKE_BINARY_DIR}/testbins/rv64ua" "riscv_tests_rv64ua")

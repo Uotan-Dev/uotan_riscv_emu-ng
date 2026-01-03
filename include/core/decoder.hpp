@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 Nuo Shen, Nanjing University
+ * Copyright 2025-2026 Nuo Shen, Nanjing University
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -85,7 +85,7 @@
     ZICSR_INSTRUCTIONS(f)                                                      \
     PRIVILEGED_INSTRUCTIONS(f)                                                 \
     RV64M_INSTRUCTIONS(f)                                                      \
-    /* RV64A_INSTRUCTIONS(f) */                                                \
+    RV64A_INSTRUCTIONS(f)                                                      \
     /* RV64F_INSTRUCTIONS(f) */                                                \
     /* RV64D_INSTRUCTIONS(f) */                                                \
     /* RV64C_INSTRUCTIONS(f) */                                                \

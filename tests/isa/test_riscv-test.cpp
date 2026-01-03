@@ -181,4 +181,30 @@ TEST(RISCVTest, RV64UM) {
     test_files(files);
 }
 
+TEST(RISCVTest, RV64UA) {
+    std::vector<std::string> files = {
+        "riscv_test_riscv_tests_rv64ua_amoadd_d.elf",
+        "riscv_test_riscv_tests_rv64ua_amoadd_w.elf",
+        "riscv_test_riscv_tests_rv64ua_amoand_d.elf",
+        "riscv_test_riscv_tests_rv64ua_amoand_w.elf",
+        "riscv_test_riscv_tests_rv64ua_amomax_d.elf",
+        "riscv_test_riscv_tests_rv64ua_amomaxu_d.elf",
+        "riscv_test_riscv_tests_rv64ua_amomaxu_w.elf",
+        "riscv_test_riscv_tests_rv64ua_amomax_w.elf",
+        "riscv_test_riscv_tests_rv64ua_amomin_d.elf",
+        "riscv_test_riscv_tests_rv64ua_amominu_d.elf",
+        "riscv_test_riscv_tests_rv64ua_amominu_w.elf",
+        "riscv_test_riscv_tests_rv64ua_amomin_w.elf",
+        "riscv_test_riscv_tests_rv64ua_amoor_d.elf",
+        "riscv_test_riscv_tests_rv64ua_amoor_w.elf",
+        "riscv_test_riscv_tests_rv64ua_amoswap_d.elf",
+        "riscv_test_riscv_tests_rv64ua_amoswap_w.elf",
+        "riscv_test_riscv_tests_rv64ua_amoxor_d.elf",
+        "riscv_test_riscv_tests_rv64ua_amoxor_w.elf",
+        "riscv_test_riscv_tests_rv64ua_lrsc.elf",
+    };
+
+    test_files(files);
+}
+
 }; // namespace uemu::test

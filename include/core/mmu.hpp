@@ -28,7 +28,8 @@ public:
     enum class AccessType { Fetch, Load, Store };
 
     explicit MMU(std::shared_ptr<Hart> hart, std::shared_ptr<Bus> bus)
-        : hart_(std::move(hart)), bus_(std::move(bus)) {}
+        : reservation_address(0), reservation_valid(false),
+          hart_(std::move(hart)), bus_(std::move(bus)) {}
 
     // Read a value of type T from `addr` during instruction execution.
     // Only valid in the instruction execution stage; may throw Trap.
@@ -66,6 +67,9 @@ public:
 
         return *v;
     }
+
+    addr_t reservation_address;
+    bool reservation_valid;
 
 private:
     static constexpr reg_t PTE_V = 1 << 0;
