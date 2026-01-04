@@ -149,16 +149,14 @@ void Emulator::cpu_thread() {
         try {
             hart_->check_interrupts();
 
-            // FIXME: RV64C support
-
             // Fetch instruction
-            uint32_t insn = mmu_->ifetch();
+            const auto [insn, ilen] = mmu_->ifetch();
 
             // Decode instruction
             core::DecodedInsn decoded_insn =
-                core::Decoder::decode(insn, core::Ilen::Normal, hart_->pc);
+                core::Decoder::decode(insn, ilen, hart_->pc);
 
-            hart_->pc += static_cast<addr_t>(decoded_insn.len);
+            hart_->pc += static_cast<addr_t>(ilen);
 
             // Execute
             decoded_insn(*hart_, *mmu_);

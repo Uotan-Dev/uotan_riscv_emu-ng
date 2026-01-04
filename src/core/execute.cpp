@@ -18,7 +18,9 @@
 
 #include "common/bit.hpp"
 #include "common/float.hpp"
-#include "core/execute.hpp" // IWYU pragma: keep
+#include "core/execute.hpp"
+#include "core/hart.hpp"
+#include "core/mmu.hpp"
 
 namespace uemu::core {
 
@@ -99,74 +101,39 @@ IMPL(and, R.write(rd, R[rs1] & R[rs2]))
 IMPL(andi, R.write(rd, R[rs1] & imm))
 IMPL(auipc, R.write(rd, pc + imm))
 IMPL(beq, {
-    if (R[rs1] == R[rs2]) {
-        addr_t npc = pc + imm;
-        if (npc & 0x3) [[unlikely]]
-            Trap::raise_exception(pc, TrapCause::InstructionAddressMisaligned,
-                                  npc);
-        hart->pc = npc;
-    }
+    if (R[rs1] == R[rs2])
+        hart->pc = pc + imm;
 })
 IMPL(bge, {
-    if (static_cast<int64_t>(R[rs1]) >= static_cast<int64_t>(R[rs2])) {
-        addr_t npc = pc + imm;
-        if (npc & 0x3) [[unlikely]]
-            Trap::raise_exception(pc, TrapCause::InstructionAddressMisaligned,
-                                  npc);
-        hart->pc = npc;
-    }
+    if (static_cast<int64_t>(R[rs1]) >= static_cast<int64_t>(R[rs2]))
+        hart->pc = pc + imm;
 })
 IMPL(bgeu, {
-    if (R[rs1] >= R[rs2]) {
-        addr_t npc = pc + imm;
-        if (npc & 0x3) [[unlikely]]
-            Trap::raise_exception(pc, TrapCause::InstructionAddressMisaligned,
-                                  npc);
-        hart->pc = npc;
-    }
+    if (R[rs1] >= R[rs2])
+        hart->pc = pc + imm;
 })
 IMPL(blt, {
-    if (static_cast<int64_t>(R[rs1]) < static_cast<int64_t>(R[rs2])) {
-        addr_t npc = pc + imm;
-        if (npc & 0x3) [[unlikely]]
-            Trap::raise_exception(pc, TrapCause::InstructionAddressMisaligned,
-                                  npc);
-        hart->pc = npc;
-    }
+    if (static_cast<int64_t>(R[rs1]) < static_cast<int64_t>(R[rs2]))
+        hart->pc = pc + imm;
 })
 IMPL(bltu, {
-    if (R[rs1] < R[rs2]) {
-        addr_t npc = pc + imm;
-        if (npc & 0x3) [[unlikely]]
-            Trap::raise_exception(pc, TrapCause::InstructionAddressMisaligned,
-                                  npc);
-        hart->pc = npc;
-    }
+    if (R[rs1] < R[rs2])
+        hart->pc = pc + imm;
 })
 IMPL(bne, {
-    if (R[rs1] != R[rs2]) {
-        addr_t npc = pc + imm;
-        if (npc & 0x3) [[unlikely]]
-            Trap::raise_exception(pc, TrapCause::InstructionAddressMisaligned,
-                                  npc);
-        hart->pc = npc;
-    }
+    if (R[rs1] != R[rs2])
+        hart->pc = pc + imm;
 })
 IMPL(fence, /* nop */)
 IMPL(fence_i, /* nop */)
 IMPL(jal, {
     addr_t npc = pc + imm;
-    if (npc & 0x3) [[unlikely]]
-        Trap::raise_exception(pc, TrapCause::InstructionAddressMisaligned, npc);
     R.write(rd, pc + 4);
     hart->pc = npc;
 })
 IMPL(jalr, {
     uint64_t t = pc + 4;
-    addr_t npc = (R[rs1] + imm) & ~1ULL;
-    if (npc & 0x3) [[unlikely]]
-        Trap::raise_exception(pc, TrapCause::InstructionAddressMisaligned, npc);
-    hart->pc = npc;
+    hart->pc = (R[rs1] + imm) & ~1ULL;
     R.write(rd, t);
 })
 IMPL(lb, {
@@ -1019,5 +986,117 @@ IMPL(fnmadd_d, {
                        f64_neg(F[rs3].read_64()));
     fp_inst_end(hart);
 })
+
+// RV64C Extension
+IMPL(c_nop, )
+IMPL(c_addi, R.write(rd, R[rd] + imm))
+IMPL(c_addiw, R.write(rd, sext(bits(R[rd] + imm, 31, 0), 32)))
+IMPL(c_li, R.write(rd, imm))
+IMPL(c_addi16sp, {
+    if (imm == 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::IllegalInstruction, d->insn);
+    else
+        R.write(2, R[2] + imm);
+})
+IMPL(c_lui, {
+    if (rd == 2 || imm == 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::IllegalInstruction, d->insn);
+    else
+        R.write(rd, imm);
+})
+IMPL(c_srli, R.write(rd, R[rd] >> imm))
+IMPL(c_srai, R.write(rd, static_cast<int64_t>(R[rd]) >> imm))
+IMPL(c_andi, R.write(rd, R[rd] & imm))
+IMPL(c_sub, R.write(rd, R[rd] - R[rs2]))
+IMPL(c_xor, R.write(rd, R[rd] ^ R[rs2]))
+IMPL(c_or, R.write(rd, R[rd] | R[rs2]))
+IMPL(c_and, R.write(rd, R[rd] & R[rs2]))
+IMPL(c_subw, R.write(rd, sext(bits(R[rd] - R[rs2], 31, 0), 32)))
+IMPL(c_addw, R.write(rd, sext(bits(R[rd] + R[rs2], 31, 0), 32)))
+IMPL(c_j, hart->pc = pc + imm;)
+IMPL(c_beqz, {
+    if (R[rs1] == 0)
+        hart->pc = pc + imm;
+})
+IMPL(c_bnez, {
+    if (R[rs1] != 0)
+        hart->pc = pc + imm;
+})
+IMPL(c_addi4spn, {
+    if (imm == 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::IllegalInstruction, d->insn);
+    else
+        R.write(rd, R[2] + imm);
+})
+IMPL(c_fld, {
+    fp_inst_prep(hart, d);
+    uint64_t v = mmu->read<uint64_t>(pc, R[rs1] + imm);
+    F[rd] = float64_t{v};
+})
+IMPL(c_lw, {
+    uint32_t v = mmu->read<uint32_t>(pc, R[rs1] + imm);
+    R.write(rd, sext(v, 32));
+})
+IMPL(c_ld, {
+    uint64_t v = mmu->read<uint64_t>(pc, R[rs1] + imm);
+    R.write(rd, v);
+})
+IMPL(c_fsd, {
+    fp_inst_prep(hart, d);
+    mmu->write<uint64_t>(pc, R[rs1] + imm, F[rs2].read_64().v);
+})
+IMPL(c_sw, mmu->write<uint32_t>(pc, R[rs1] + imm, bits(R[rs2], 31, 0)))
+IMPL(c_sd, mmu->write<uint64_t>(pc, R[rs1] + imm, R[rs2]))
+IMPL(c_slli, R.write(rd, R[rd] << imm))
+IMPL(c_fldsp, {
+    fp_inst_prep(hart, d);
+    uint64_t v = mmu->read<uint64_t>(pc, R[2] + imm);
+    F[rd] = float64_t{v};
+})
+IMPL(c_lwsp, {
+    if (rd == 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::IllegalInstruction, d->insn);
+    else {
+        uint32_t v = mmu->read<uint32_t>(pc, R[2] + imm);
+        R.write(rd, sext(v, 32));
+    }
+})
+IMPL(c_ldsp, {
+    if (rd == 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::IllegalInstruction, d->insn);
+    else {
+        uint64_t v = mmu->read<uint64_t>(pc, R[2] + imm);
+        R.write(rd, v);
+    }
+})
+IMPL(c_jr, {
+    if (rs1 == 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::IllegalInstruction, d->insn);
+    else
+        hart->pc = R[rs1] & ~1ULL;
+})
+IMPL(c_mv, {
+    if (rs2 == 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::IllegalInstruction, d->insn);
+    else
+        R.write(rd, R[rs2]);
+})
+IMPL(c_ebreak, exec_ebreak(hart, mmu, d))
+IMPL(c_jalr, {
+    if (rs1 == 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::IllegalInstruction, d->insn);
+    else {
+        uint64_t t = pc + 2;
+        hart->pc = R[rs1] & ~1ULL;
+        R.write(1, t);
+    }
+})
+IMPL(c_add, R.write(rd, R[rd] + R[rs2]))
+IMPL(c_fsdsp, {
+    fp_inst_prep(hart, d);
+    mmu->write<uint64_t>(pc, R[2] + imm, F[rs2].read_64().v);
+})
+IMPL(c_swsp, mmu->write<uint32_t>(pc, R[2] + imm, bits(R[rs2], 31, 0)))
+IMPL(c_sdsp, mmu->write<uint64_t>(pc, R[2] + imm, R[rs2]))
 
 } // namespace uemu::core

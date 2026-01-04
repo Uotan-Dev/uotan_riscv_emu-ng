@@ -244,4 +244,12 @@ TEST(RISCVTest, RV64UD) {
     test_files(files);
 }
 
+TEST(RISCVTest, RV64UC) {
+    std::vector<std::string> files = {
+        "riscv_test_riscv_tests_rv64uc_rvc.elf",
+    };
+
+    test_files(files);
+}
+
 }; // namespace uemu::test

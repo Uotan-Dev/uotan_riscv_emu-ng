@@ -16,9 +16,9 @@
 
 #pragma once
 
-#include <exception>
+#include "common/types.hpp"
 
-#include "core/mmu.hpp"
+#include <exception>
 
 // RV64I Base Integer Instructions
 #define RV64I_INSTRUCTIONS(f)                                                  \
@@ -88,7 +88,7 @@
     RV64A_INSTRUCTIONS(f)                                                      \
     RV64F_INSTRUCTIONS(f)                                                      \
     RV64D_INSTRUCTIONS(f)                                                      \
-    /* RV64C_INSTRUCTIONS(f) */                                                \
+    RV64C_INSTRUCTIONS(f)                                                      \
     INVALID_INSTRUCTIONS(f)
 
 namespace uemu::core {
@@ -99,31 +99,34 @@ enum class Iname : uint16_t { RISCV_INSTRUCTIONS(macro) };
 
 #undef macro
 
+class Hart;
+class MMU;
 class DecodedInsn;
+
 using ExecFunc = void (*)(Hart* hart, MMU* mmu, const DecodedInsn* d);
 
 enum class Itype : uint8_t {
     // 32 bit
-    TYPE_I,
-    TYPE_U,
-    TYPE_S,
-    TYPE_J,
-    TYPE_R,
-    TYPE_B,
-    TYPE_R4,
+    I,
+    U,
+    S,
+    J,
+    R,
+    B,
+    R4,
 
     // 16 bit
-    TYPE_CR,
-    TYPE_CI,
-    TYPE_CSS,
-    TYPE_CIW,
-    TYPE_CL,
-    TYPE_CS,
-    TYPE_CA,
-    TYPE_CB,
-    TYPE_CJ,
+    CR,
+    CI,
+    CSS,
+    CIW,
+    CL,
+    CS,
+    CA,
+    CB,
+    CJ,
 
-    TYPE_N, // none
+    N, // none
 };
 
 enum class Ilen : uint8_t {
@@ -150,7 +153,7 @@ public:
     Iname iname = Iname::rv_inv;
 
     // type
-    Itype type = Itype::TYPE_N;
+    Itype type = Itype::N;
 
     ExecFunc exec = nullptr;
 
@@ -171,8 +174,13 @@ public:
 
     static DecodedInsn decode(uint32_t insn, Ilen len, addr_t pc);
 
+    static bool is_compressed(uint32_t insn) noexcept {
+        return (insn & 0x3) < 3;
+    }
+
 private:
-    static void decode_operand(DecodedInsn& s);
+    static void decode_operand_32(DecodedInsn& s);
+    static void decode_operand_16(DecodedInsn& s);
 };
 
 } // namespace uemu::core

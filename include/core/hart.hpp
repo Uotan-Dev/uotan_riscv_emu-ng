@@ -677,9 +677,7 @@ class EPCCSR : public CSR {
 public:
     EPCCSR(Hart* hart, PrivilegeLevel min_priv) : CSR(hart, min_priv, 0) {
         write_mask_ = ~1ULL;
-        read_mask_ = (hart_->csrs[MISA::ADDRESS]->read_unchecked() & MISA::C)
-                         ? ~1ULL
-                         : ~3ULL;
+        read_mask_ = ~1ULL;
     }
 
     reg_t read_unchecked() const noexcept override {

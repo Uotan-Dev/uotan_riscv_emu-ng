@@ -80,8 +80,8 @@ MSTATUS::MSTATUS(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {
 Hart::Hart(addr_t reset_pc) : pc(reset_pc) {
     // Machine Level
     add_csr<MISA>(MISA::Field::I | MISA::Field::M | MISA::Field::A |
-                  MISA::Field::F | MISA::Field::D | MISA::Field::S |
-                  MISA::Field::U |
+                  MISA::Field::F | MISA::Field::D | MISA::Field::C |
+                  MISA::Field::S | MISA::Field::U |
                   (MISA::Mxl::xlen_64 << MISA::Shift::MXL_SHIFT));
     add_csr<MVENDORID>(0);
     add_csr<MARCHID>(0);

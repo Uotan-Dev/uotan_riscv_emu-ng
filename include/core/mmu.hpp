@@ -19,6 +19,7 @@
 #include <utility>
 
 #include "core/bus.hpp"
+#include "core/decoder.hpp"
 #include "core/hart.hpp"
 
 namespace uemu::core {
@@ -112,17 +113,48 @@ public:
         }
     }
 
-    // Fetch a 32-bit instruction from the current PC.
+    // Fetch an instruction from the current PC.
     // Only valid in the instruction fetch stage; may throw Trap.
-    [[nodiscard]] uint32_t ifetch() {
-        addr_t paddr = translate(hart_->pc, hart_->pc, AccessType::Fetch);
-        std::optional<uint32_t> v = bus_->read<uint32_t>(paddr);
+    [[nodiscard]] std::pair<uint32_t, Ilen> ifetch() {
+        const addr_t pc = hart_->pc;
+
+        if (!may_cross_page(pc)) [[likely]] {
+            addr_t paddr = translate(pc, pc, AccessType::Fetch);
+            std::optional<uint32_t> v = bus_->read<uint32_t>(paddr);
+
+            if (!v.has_value()) [[unlikely]]
+                Trap::raise_exception(pc, TrapCause::InstructionAccessFault,
+                                      pc);
+
+            uint32_t insn = *v;
+
+            if (Decoder::is_compressed(insn))
+                return {insn & 0xFFFF, Ilen::Compressed};
+
+            return {insn, Ilen::Normal};
+        }
+
+        // For cross-page instructions, fetch once or twice
+        addr_t paddr = translate(pc, pc, AccessType::Fetch);
+        std::optional<uint16_t> v = bus_->read<uint16_t>(paddr);
 
         if (!v.has_value()) [[unlikely]]
-            Trap::raise_exception(hart_->pc, TrapCause::InstructionAccessFault,
-                                  hart_->pc);
+            Trap::raise_exception(pc, TrapCause::InstructionAccessFault, pc);
 
-        return *v;
+        uint32_t insn = *v;
+
+        if (Decoder::is_compressed(insn))
+            return {insn, Ilen::Compressed};
+
+        paddr = translate(pc, pc + 2, AccessType::Fetch);
+        v = bus_->read<uint16_t>(paddr);
+
+        if (!v.has_value()) [[unlikely]]
+            Trap::raise_exception(pc, TrapCause::InstructionAccessFault,
+                                  pc + 2);
+
+        insn = (insn & 0xFFFF) | (*v << 16);
+        return {insn, Ilen::Normal};
     }
 
     addr_t reservation_address;
@@ -148,6 +180,11 @@ private:
 
     std::shared_ptr<Hart> hart_;
     std::shared_ptr<Bus> bus_;
+
+    // Check if an instruction at pc may cross pages
+    static bool may_cross_page(addr_t pc) noexcept {
+        return (pc & (PGSIZE - 1)) == PGSIZE - 2;
+    }
 
     [[noreturn]] void raise_page_fault(addr_t pc, addr_t vaddr,
                                        AccessType type) {

@@ -17,7 +17,7 @@
 #pragma once
 
 extern "C" {
-#include "softfloat.h"  // IWYU pragma: keep
+#include "softfloat.h" // IWYU pragma: keep
 }
 
 #define F32_DEFAULT_NAN 0x7FC00000
