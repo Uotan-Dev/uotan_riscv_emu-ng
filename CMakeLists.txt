@@ -74,4 +74,4 @@ if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()
 
-add_subdirectory(thirdparty)
+include(${CMAKE_CURRENT_LIST_DIR}/thirdparty/riscv-tests.cmake)

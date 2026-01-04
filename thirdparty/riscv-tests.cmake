@@ -12,15 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.20)
-project(uemu-thirdparty ASM)
-
 find_program(RISCV_GCC NAMES riscv64-unknown-elf-gcc)
 find_program(RISCV_OBJCOPY NAMES riscv64-unknown-elf-objcopy)
 find_program(RISCV_OBJDUMP NAMES riscv64-unknown-elf-objdump)
 
-set(RISCV_TESTS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/riscv-tests)
-set(RISCV_TEST_ENV_DIR ${CMAKE_CURRENT_SOURCE_DIR}/riscv-test-env)
+set(RISCV_TESTS_DIR ${CMAKE_CURRENT_LIST_DIR}/riscv-tests)
+set(RISCV_TEST_ENV_DIR ${CMAKE_CURRENT_LIST_DIR}/riscv-test-env)
 set(RISCV_LINKER_SCRIPT ${RISCV_TEST_ENV_DIR}/p/link.ld)
 
 function(build_asm asm_glob out_dir target_name)
