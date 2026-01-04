@@ -40,6 +40,8 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 # Find CLI11
 find_package(CLI11 CONFIG REQUIRED)
 
+include(${CMAKE_CURRENT_LIST_DIR}/thirdparty/berkeley-softfloat-3.cmake)
+
 file(GLOB_RECURSE SOURCES 
     "src/*.cpp"
     "src/*.c"
@@ -62,6 +64,7 @@ target_link_libraries(uemu_core
     PUBLIC
         CLI11::CLI11
         Threads::Threads
+        softfloat
 )
 
 add_executable(uemu src/main.cpp)
