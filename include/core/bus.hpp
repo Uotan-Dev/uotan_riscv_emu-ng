@@ -95,6 +95,18 @@ public:
         return false;
     }
 
+    // Check if a byte at 'addr' is accessible.
+    bool accessible(addr_t addr) {
+        if (dram_->is_valid_addr(addr)) [[likely]]
+            return true;
+
+        for (const auto& dev : devices_)
+            if (dev->contains(addr))
+                return true;
+
+        return false;
+    }
+
     void tick_devices() {
         for (auto& dev : devices_)
             dev->tick();

@@ -31,28 +31,85 @@ public:
         : reservation_address(0), reservation_valid(false),
           hart_(std::move(hart)), bus_(std::move(bus)) {}
 
-    // Read a value of type T from `addr` during instruction execution.
-    // Only valid in the instruction execution stage; may throw Trap.
     template <typename T>
     [[nodiscard]] T read(addr_t pc, addr_t addr) {
-        addr_t paddr = translate(pc, addr, AccessType::Load);
-        std::optional<T> v = bus_->read<T>(paddr);
+        constexpr size_t size = sizeof(T);
 
-        if (!v.has_value()) [[unlikely]]
-            Trap::raise_exception(pc, TrapCause::LoadAccessFault, addr);
+        // Aligned access
+        if (addr % size == 0) [[likely]] {
+            addr_t paddr = translate(pc, addr, AccessType::Load);
+            std::optional<T> v = bus_->read<T>(paddr);
 
-        return *v;
+            if (!v.has_value()) [[unlikely]]
+                Trap::raise_exception(pc, TrapCause::LoadAccessFault, addr);
+
+            return *v;
+        }
+
+        addr_t paddrs[size];
+
+        for (size_t i = 0; i < size; i++) {
+            addr_t vaddr = addr + i;
+            paddrs[i] = translate(pc, vaddr, AccessType::Load);
+
+            if (!bus_->accessible(paddrs[i])) [[unlikely]]
+                Trap::raise_exception(pc, TrapCause::LoadAccessFault, addr);
+        }
+
+        uint8_t bytes[size];
+
+        for (size_t i = 0; i < size; i++) {
+            std::optional<uint8_t> v = bus_->read<uint8_t>(paddrs[i]);
+
+            if (!v.has_value()) [[unlikely]]
+                Trap::raise_exception(pc, TrapCause::LoadAccessFault, addr);
+
+            bytes[i] = *v;
+        }
+
+        T result;
+        std::memcpy(&result, bytes, size);
+        return result;
     }
 
     // Write a value of type T to `addr` during instruction execution.
     // Only valid in the instruction execution stage; may throw Trap.
     template <typename T>
     void write(addr_t pc, addr_t addr, T value) {
-        addr_t paddr = translate(pc, addr, AccessType::Store);
-        bool res = bus_->write<T>(paddr, value);
+        constexpr size_t size = sizeof(T);
 
-        if (!res) [[unlikely]]
-            Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+        // Aligned access
+        if (addr % size == 0) [[likely]] {
+            addr_t paddr = translate(pc, addr, AccessType::Store);
+            bool res = bus_->write<T>(paddr, value);
+
+            if (!res) [[unlikely]]
+                Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+
+            return;
+        }
+
+        // Unaligned access
+        addr_t paddrs[size];
+
+        for (size_t i = 0; i < size; i++) {
+            addr_t vaddr = addr + i;
+            paddrs[i] = translate(pc, vaddr, AccessType::Store);
+
+            if (!bus_->accessible(paddrs[i])) [[unlikely]]
+                Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+        }
+
+        // Write data
+        uint8_t bytes[size];
+        std::memcpy(bytes, &value, size);
+
+        for (size_t i = 0; i < size; i++) {
+            bool res = bus_->write<uint8_t>(paddrs[i], bytes[i]);
+
+            if (!res) [[unlikely]]
+                Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+        }
     }
 
     // Fetch a 32-bit instruction from the current PC.
