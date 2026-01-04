@@ -22,6 +22,7 @@
 #include <limits>
 #include <memory>
 
+#include "common/float.hpp"
 #include "core/dram.hpp"
 
 namespace uemu::core {
@@ -85,6 +86,31 @@ public:
 class DecodedInsn;
 class CSR;
 
+class FPR final {
+public:
+    FPR() : value_(float64_t{0}) {}
+
+    float32_t read_32() const noexcept {
+        if (is_boxed_f32(value_))
+            return unbox_f32(value_);
+
+        return float32_t{F32_DEFAULT_NAN};
+    }
+
+    float64_t read_64() const noexcept { return value_; }
+
+    void write_32(float32_t x) noexcept { value_ = box_f32(x); }
+
+    void write_64(float64_t x) noexcept { value_ = x; }
+
+    void operator=(float64_t x) noexcept { write_64(x); }
+
+    void operator=(float32_t x) noexcept { write_32(x); }
+
+private:
+    float64_t value_;
+};
+
 class RegisterFile {
 public:
     RegisterFile() noexcept { gprs_.fill(0); }
@@ -107,6 +133,7 @@ private:
 class Hart {
 public:
     static constexpr size_t GPR_COUNT = 32;
+    static constexpr size_t FPR_COUNT = 32;
     static constexpr size_t CSR_COUNT = 4096;
 
     explicit Hart(addr_t reset_pc = Dram::DRAM_BASE);
@@ -115,8 +142,9 @@ public:
     void check_interrupts() const;
     void set_interrupt_pending(reg_t mip_mask, bool pending) noexcept;
 
-    RegisterFile gprs;
     addr_t pc;
+    RegisterFile gprs;
+    std::array<FPR, FPR_COUNT> fprs;
     std::array<std::shared_ptr<CSR>, CSR_COUNT> csrs;
     PrivilegeLevel priv;
 
@@ -382,7 +410,14 @@ public:
     }
 
     void write_unchecked(reg_t v) noexcept override {
-        value_ = (value_ & ~write_mask_) | (v & write_mask_);
+        v = (value_ & ~write_mask_) | (v & write_mask_);
+
+        if (((v & Field::FS) >> Shift::FS_SHIFT) == 3)
+            v |= Field::SD;
+        else
+            v &= ~Field::SD;
+
+        value_ = v;
     }
 
 private:
@@ -1116,6 +1151,77 @@ public:
         : UserCounterCSR(hart, address,
                          MHPMCOUNTERN::MIN_ADDRESS + address -
                              HPMCOUNTERN::MIN_ADDRESS) {}
+};
+
+class FFLAGS final : public CSR {
+public:
+    static constexpr size_t ADDRESS = 0x001;
+
+    enum Shift : uint32_t {
+        NX_SHIFT = 0,
+        UF_SHIFT = 1,
+        OF_SHIFT = 2,
+        DZ_SHIFT = 3,
+        NV_SHIFT = 4
+    };
+
+    enum Field : reg_t {
+        NX = 1ULL << NX_SHIFT,
+        UF = 1ULL << UF_SHIFT,
+        OF = 1ULL << OF_SHIFT,
+        DZ = 1ULL << DZ_SHIFT,
+        NV = 1ULL << NV_SHIFT,
+    };
+
+    FFLAGS(Hart* hart) : CSR(hart, PrivilegeLevel::U, 0) {}
+
+    reg_t read_unchecked() const noexcept override { return value_ & 0b11111; }
+
+    void write_unchecked(reg_t v) noexcept override { value_ = v & 0b11111; }
+};
+
+class FRM final : public CSR {
+public:
+    static constexpr size_t ADDRESS = 0x002;
+
+    enum RoundingMode : uint8_t {
+        RNE = 0b000,
+        RTZ = 0b001,
+        RDN = 0b010,
+        RUP = 0b011,
+        RMM = 0b100,
+        DYN = 0b111, // In instruction’s rm field
+    };
+
+    FRM(Hart* hart) : CSR(hart, PrivilegeLevel::U, 0) {}
+
+    reg_t read_unchecked() const noexcept override { return value_ & 0b111; }
+
+    void write_unchecked(reg_t v) noexcept override { value_ = v & 0b111; }
+};
+
+class FCSR final : public CSR {
+public:
+    static constexpr size_t ADDRESS = 0x003;
+
+    FCSR(Hart* hart) : CSR(hart, PrivilegeLevel::U, 0) {
+        fflags_ = dynamic_cast<FFLAGS*>(hart->csrs[FFLAGS::ADDRESS].get());
+        frm_ = dynamic_cast<FRM*>(hart_->csrs[FRM::ADDRESS].get());
+        assert(fflags_ && frm_);
+    }
+
+    reg_t read_unchecked() const noexcept override {
+        return fflags_->read_unchecked() | (frm_->read_unchecked() << 5);
+    }
+
+    void write_unchecked(reg_t v) noexcept override {
+        fflags_->write_unchecked(v & 0b11111);
+        frm_->write_unchecked((v >> 5) & 0b111);
+    }
+
+private:
+    FFLAGS* fflags_;
+    FRM* frm_;
 };
 
 } // namespace uemu::core

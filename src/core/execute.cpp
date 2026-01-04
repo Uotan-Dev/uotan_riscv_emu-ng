@@ -17,6 +17,7 @@
 #include <utility>
 
 #include "common/bit.hpp"
+#include "common/float.hpp"
 #include "core/execute.hpp" // IWYU pragma: keep
 
 namespace uemu::core {
@@ -27,7 +28,8 @@ namespace uemu::core {
     [[maybe_unused]] const auto imm = d->imm;                                  \
     [[maybe_unused]] const size_t csr = imm & 0xFFF;                           \
     [[maybe_unused]] const auto pc = d->pc;                                    \
-    [[maybe_unused]] RegisterFile& R = hart->gprs;                             \
+    [[maybe_unused]] auto& R = hart->gprs;                                     \
+    [[maybe_unused]] auto& F = hart->fprs;                                     \
     [[maybe_unused]] auto& csrs = hart->csrs;
 
 #define IMPL(insn_name, execute_process)                                       \
@@ -37,6 +39,53 @@ namespace uemu::core {
         EXTRACT_OPRAND();                                                      \
         execute_process;                                                       \
     }
+
+namespace {
+
+inline void fp_inst_prep(Hart* hart, const DecodedInsn* d) {
+    assert(softfloat_exceptionFlags == 0);
+
+    if (!(hart->csrs[MSTATUS::ADDRESS]->read_unchecked() & MSTATUS::Field::FS))
+        [[unlikely]]
+        Trap::raise_exception(d->pc, TrapCause::IllegalInstruction, d->insn);
+}
+
+inline void fp_setup_rm(Hart* hart, const DecodedInsn* d) {
+    auto rm = bits(d->insn, 14, 12);
+
+    if (rm == FRM::RoundingMode::DYN)
+        rm = hart->csrs[FRM::ADDRESS]->read_unchecked();
+
+    if (rm > FRM::RoundingMode::RMM) [[unlikely]]
+        Trap::raise_exception(d->pc, TrapCause::IllegalInstruction, d->insn);
+    else
+        softfloat_roundingMode = rm;
+}
+
+inline void fp_set_dirty([[maybe_unused]] Hart* hart) {
+    CSR* mstatus = hart->csrs[MSTATUS::ADDRESS].get();
+    reg_t v = mstatus->read_unchecked();
+    mstatus->write_unchecked(v | MSTATUS::Field::FS);
+}
+
+inline void fp_update_exception_flags(Hart* hart) {
+    if (softfloat_exceptionFlags) {
+        fp_set_dirty(hart);
+
+        CSR* fflags = hart->csrs[FFLAGS::ADDRESS].get();
+        reg_t v = fflags->read_unchecked();
+        fflags->write_unchecked(v | softfloat_exceptionFlags);
+
+        softfloat_exceptionFlags = 0;
+    }
+}
+
+inline void fp_inst_end(Hart* hart) {
+    fp_set_dirty(hart);
+    fp_update_exception_flags(hart);
+}
+
+} // namespace
 
 IMPL(inv, Trap::raise_exception(pc, TrapCause::IllegalInstruction, d->insn));
 IMPL(c_inv, exec_inv(hart, mmu, d));
@@ -524,6 +573,451 @@ IMPL(amoswap_w, {
     uint32_t t = mmu->read<uint32_t>(pc, R[rs1]);
     mmu->write<uint32_t>(pc, R[rs1], R[rs2]);
     R.write(rd, sext(t, 32));
+})
+
+// RV64F Extension
+IMPL(flw, {
+    fp_inst_prep(hart, d);
+    uint32_t v = mmu->read<uint32_t>(pc, R[rs1] + imm);
+    F[rd] = float32_t{v};
+})
+IMPL(fsw, {
+    fp_inst_prep(hart, d);
+    mmu->write<uint32_t>(pc, R[rs1] + imm,
+                         static_cast<uint32_t>(F[rs2].read_64().v));
+})
+IMPL(fadd_s, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = f32_add(F[rs1].read_32(), F[rs2].read_32());
+    fp_inst_end(hart);
+})
+IMPL(fsub_s, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = f32_sub(F[rs1].read_32(), F[rs2].read_32());
+    fp_inst_end(hart);
+})
+IMPL(fmul_s, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = f32_mul(F[rs1].read_32(), F[rs2].read_32());
+    fp_inst_end(hart);
+})
+IMPL(fdiv_s, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = f32_div(F[rs1].read_32(), F[rs2].read_32());
+    fp_inst_end(hart);
+})
+IMPL(fsqrt_s, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = f32_sqrt(F[rs1].read_32());
+    fp_inst_end(hart);
+})
+IMPL(fsgnj_s, {
+    fp_inst_prep(hart, d);
+    float32_t f1 = F[rs1].read_32();
+    float32_t f2 = F[rs2].read_32();
+    F[rd] = float32_t{(f1.v & ~F32_SIGN) | (f2.v & F32_SIGN)};
+    fp_set_dirty(hart);
+})
+IMPL(fsgnjn_s, {
+    fp_inst_prep(hart, d);
+    float32_t f1 = F[rs1].read_32();
+    float32_t f2 = F[rs2].read_32();
+    F[rd] = float32_t{(f1.v & ~F32_SIGN) | (~f2.v & F32_SIGN)};
+    fp_set_dirty(hart);
+})
+IMPL(fsgnjx_s, {
+    fp_inst_prep(hart, d);
+    float32_t f1 = F[rs1].read_32();
+    float32_t f2 = F[rs2].read_32();
+    F[rd] = float32_t{f1.v ^ (f2.v & F32_SIGN)};
+    fp_set_dirty(hart);
+})
+IMPL(fmin_s, {
+    fp_inst_prep(hart, d);
+    float32_t f1 = F[rs1].read_32();
+    float32_t f2 = F[rs2].read_32();
+
+    if (f32_isSignalingNaN(f1) || f32_isSignalingNaN(f2)) {
+        CSR* fflags = csrs[FFLAGS::ADDRESS].get();
+        reg_t v = fflags->read_unchecked();
+        fflags->write_unchecked(v | FFLAGS::Field::NV);
+    }
+
+    bool smaller =
+        f32_lt_quiet(f1, f2) || (f32_eq(f1, f2) && f32_isNegative(f1));
+
+    if (f32_isNaN(f1) && f32_isNaN(f2)) {
+        F[rd] = float32_t{F32_DEFAULT_NAN};
+    } else {
+        if (smaller || f32_isNaN(f2))
+            F[rd] = f1;
+        else
+            F[rd] = f2;
+    }
+    fp_inst_end(hart);
+})
+IMPL(fmax_s, {
+    fp_inst_prep(hart, d);
+    float32_t f1 = F[rs1].read_32();
+    float32_t f2 = F[rs2].read_32();
+
+    if (f32_isSignalingNaN(f1) || f32_isSignalingNaN(f2)) {
+        CSR* fflags = csrs[FFLAGS::ADDRESS].get();
+        reg_t v = fflags->read_unchecked();
+        fflags->write_unchecked(v | FFLAGS::Field::NV);
+    }
+
+    bool greater =
+        f32_lt_quiet(f2, f1) || (f32_eq(f2, f1) && f32_isNegative(f2));
+
+    if (f32_isNaN(f1) && f32_isNaN(f2)) {
+        F[rd] = float32_t{F32_DEFAULT_NAN};
+    } else {
+        if (greater || f32_isNaN(f2))
+            F[rd] = f1;
+        else
+            F[rd] = f2;
+    }
+    fp_inst_end(hart);
+})
+IMPL(fcvt_w_s, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    R.write(rd, static_cast<int64_t>(f32_to_i32(F[rs1].read_32(),
+                                                softfloat_roundingMode, true)));
+    fp_inst_end(hart);
+})
+IMPL(fcvt_wu_s, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    R.write(rd, static_cast<int64_t>(static_cast<int32_t>(f32_to_ui32(
+                    F[rs1].read_32(), softfloat_roundingMode, true))));
+    fp_inst_end(hart);
+})
+IMPL(fcvt_l_s, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    R.write(rd, f32_to_i64(F[rs1].read_32(), softfloat_roundingMode, true));
+    fp_inst_end(hart);
+})
+IMPL(fcvt_lu_s, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    R.write(rd, f32_to_ui64(F[rs1].read_32(), softfloat_roundingMode, true));
+    fp_inst_end(hart);
+})
+IMPL(fcvt_s_w, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = i32_to_f32(static_cast<int32_t>(R[rs1]));
+    fp_inst_end(hart);
+})
+IMPL(fcvt_s_wu, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = ui32_to_f32(static_cast<uint32_t>(R[rs1]));
+    fp_inst_end(hart);
+})
+IMPL(fcvt_s_l, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = i64_to_f32(R[rs1]);
+    fp_inst_end(hart);
+})
+IMPL(fcvt_s_lu, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = ui64_to_f32(R[rs1]);
+    fp_inst_end(hart);
+})
+IMPL(fmv_x_w, {
+    fp_inst_prep(hart, d);
+    R.write(rd, static_cast<int64_t>(static_cast<int32_t>(
+                    static_cast<uint32_t>(F[rs1].read_64().v))));
+})
+IMPL(fmv_w_x, {
+    fp_inst_prep(hart, d);
+    F[rd] = float32_t{static_cast<uint32_t>(static_cast<int32_t>(R[rs1]))};
+    fp_set_dirty(hart);
+})
+IMPL(fclass_s, {
+    fp_inst_prep(hart, d);
+    R.write(rd, static_cast<int64_t>(
+                    static_cast<int32_t>(f32_classify(F[rs1].read_32()))));
+})
+IMPL(feq_s, {
+    fp_inst_prep(hart, d);
+    R.write(rd, f32_eq(F[rs1].read_32(), F[rs2].read_32()));
+    fp_update_exception_flags(hart);
+})
+IMPL(flt_s, {
+    fp_inst_prep(hart, d);
+    R.write(rd, f32_lt(F[rs1].read_32(), F[rs2].read_32()));
+    fp_update_exception_flags(hart);
+})
+IMPL(fle_s, {
+    fp_inst_prep(hart, d);
+    R.write(rd, f32_le(F[rs1].read_32(), F[rs2].read_32()));
+    fp_update_exception_flags(hart);
+})
+IMPL(fmadd_s, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = f32_mulAdd(F[rs1].read_32(), F[rs2].read_32(), F[rs3].read_32());
+    fp_inst_end(hart);
+})
+IMPL(fmsub_s, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = f32_mulAdd(F[rs1].read_32(), F[rs2].read_32(),
+                       f32_neg(F[rs3].read_32()));
+    fp_inst_end(hart);
+})
+IMPL(fnmsub_s, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = f32_mulAdd(f32_neg(F[rs1].read_32()), F[rs2].read_32(),
+                       F[rs3].read_32());
+    fp_inst_end(hart);
+})
+IMPL(fnmadd_s, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = f32_mulAdd(f32_neg(F[rs1].read_32()), F[rs2].read_32(),
+                       f32_neg(F[rs3].read_32()));
+    fp_inst_end(hart);
+})
+
+// RV64D Extension
+IMPL(fld, {
+    fp_inst_prep(hart, d);
+    uint64_t v = mmu->read<uint64_t>(pc, R[rs1] + imm);
+    F[rd] = float64_t{v};
+})
+IMPL(fsd, {
+    fp_inst_prep(hart, d);
+    mmu->write<uint64_t>(pc, R[rs1] + imm, F[rs2].read_64().v);
+})
+IMPL(fadd_d, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = f64_add(F[rs1].read_64(), F[rs2].read_64());
+    fp_inst_end(hart);
+})
+IMPL(fsub_d, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = f64_sub(F[rs1].read_64(), F[rs2].read_64());
+    fp_inst_end(hart);
+})
+IMPL(fmul_d, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = f64_mul(F[rs1].read_64(), F[rs2].read_64());
+    fp_inst_end(hart);
+})
+IMPL(fdiv_d, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = f64_div(F[rs1].read_64(), F[rs2].read_64());
+    fp_inst_end(hart);
+})
+IMPL(fsqrt_d, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = f64_sqrt(F[rs1].read_64());
+    fp_inst_end(hart);
+})
+IMPL(fsgnj_d, {
+    fp_inst_prep(hart, d);
+    float64_t f1 = F[rs1].read_64();
+    float64_t f2 = F[rs2].read_64();
+    F[rd] = float64_t{(f1.v & ~F64_SIGN) | (f2.v & F64_SIGN)};
+    fp_set_dirty(hart);
+})
+IMPL(fsgnjn_d, {
+    fp_inst_prep(hart, d);
+    float64_t f1 = F[rs1].read_64();
+    float64_t f2 = F[rs2].read_64();
+    F[rd] = float64_t{(f1.v & ~F64_SIGN) | (~f2.v & F64_SIGN)};
+    fp_set_dirty(hart);
+})
+IMPL(fsgnjx_d, {
+    fp_inst_prep(hart, d);
+    float64_t f1 = F[rs1].read_64();
+    float64_t f2 = F[rs2].read_64();
+    F[rd] = float64_t{f1.v ^ (f2.v & F64_SIGN)};
+    fp_set_dirty(hart);
+})
+IMPL(fmin_d, {
+    fp_inst_prep(hart, d);
+    float64_t f1 = F[rs1].read_64();
+    float64_t f2 = F[rs2].read_64();
+
+    if (f64_isSignalingNaN(f1) || f64_isSignalingNaN(f2)) {
+        CSR* fflags = csrs[FFLAGS::ADDRESS].get();
+        reg_t v = fflags->read_unchecked();
+        fflags->write_unchecked(v | FFLAGS::Field::NV);
+    }
+
+    bool smaller =
+        f64_lt_quiet(f1, f2) || (f64_eq(f1, f2) && f64_isNegative(f1));
+
+    if (f64_isNaN(f1) && f64_isNaN(f2)) {
+        F[rd] = float64_t{F64_DEFAULT_NAN};
+    } else {
+        if (smaller || f64_isNaN(f2))
+            F[rd] = f1;
+        else
+            F[rd] = f2;
+    }
+    fp_inst_end(hart);
+})
+IMPL(fmax_d, {
+    fp_inst_prep(hart, d);
+    float64_t f1 = F[rs1].read_64();
+    float64_t f2 = F[rs2].read_64();
+
+    if (f64_isSignalingNaN(f1) || f64_isSignalingNaN(f2)) {
+        CSR* fflags = csrs[FFLAGS::ADDRESS].get();
+        reg_t v = fflags->read_unchecked();
+        fflags->write_unchecked(v | FFLAGS::Field::NV);
+    }
+
+    bool greater =
+        f64_lt_quiet(f2, f1) || (f64_eq(f2, f1) && f64_isNegative(f2));
+
+    if (f64_isNaN(f1) && f64_isNaN(f2)) {
+        F[rd] = float64_t{F64_DEFAULT_NAN};
+    } else {
+        if (greater || f64_isNaN(f2))
+            F[rd] = f1;
+        else
+            F[rd] = f2;
+    }
+    fp_inst_end(hart);
+})
+IMPL(fcvt_w_d, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    R.write(rd, static_cast<int64_t>(f64_to_i32(F[rs1].read_64(),
+                                                softfloat_roundingMode, true)));
+    fp_inst_end(hart);
+})
+IMPL(fcvt_wu_d, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    R.write(rd, static_cast<int64_t>(static_cast<int32_t>(f64_to_ui32(
+                    F[rs1].read_64(), softfloat_roundingMode, true))));
+    fp_inst_end(hart);
+})
+IMPL(fcvt_l_d, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    R.write(rd, f64_to_i64(F[rs1].read_64(), softfloat_roundingMode, true));
+    fp_inst_end(hart);
+})
+IMPL(fcvt_lu_d, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    R.write(rd, f64_to_ui64(F[rs1].read_64(), softfloat_roundingMode, true));
+    fp_inst_end(hart);
+})
+IMPL(fcvt_d_w, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = i32_to_f64(static_cast<int32_t>(R[rs1]));
+    fp_inst_end(hart);
+})
+IMPL(fcvt_d_wu, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = ui32_to_f64(static_cast<uint32_t>(R[rs1]));
+    fp_inst_end(hart);
+})
+IMPL(fcvt_d_l, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = i64_to_f64(R[rs1]);
+    fp_inst_end(hart);
+})
+IMPL(fcvt_d_lu, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = ui64_to_f64(R[rs1]);
+    fp_inst_end(hart);
+})
+IMPL(fcvt_s_d, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = f64_to_f32(F[rs1].read_64());
+    fp_inst_end(hart);
+})
+IMPL(fcvt_d_s, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = f32_to_f64(F[rs1].read_32());
+    fp_inst_end(hart);
+})
+IMPL(fmv_x_d, {
+    fp_inst_prep(hart, d);
+    R.write(rd, F[rs1].read_64().v);
+})
+IMPL(fmv_d_x, {
+    fp_inst_prep(hart, d);
+    F[rd] = float64_t{R[rs1]};
+    fp_set_dirty(hart);
+})
+IMPL(fclass_d, {
+    fp_inst_prep(hart, d);
+    R.write(rd, static_cast<int64_t>(f64_classify(F[rs1].read_64())));
+})
+IMPL(feq_d, {
+    fp_inst_prep(hart, d);
+    R.write(rd, f64_eq(F[rs1].read_64(), F[rs2].read_64()));
+    fp_update_exception_flags(hart);
+})
+IMPL(flt_d, {
+    fp_inst_prep(hart, d);
+    R.write(rd, f64_lt(F[rs1].read_64(), F[rs2].read_64()));
+    fp_update_exception_flags(hart);
+})
+IMPL(fle_d, {
+    fp_inst_prep(hart, d);
+    R.write(rd, f64_le(F[rs1].read_64(), F[rs2].read_64()));
+    fp_update_exception_flags(hart);
+})
+IMPL(fmadd_d, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = f64_mulAdd(F[rs1].read_64(), F[rs2].read_64(), F[rs3].read_64());
+    fp_inst_end(hart);
+})
+IMPL(fmsub_d, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = f64_mulAdd(F[rs1].read_64(), F[rs2].read_64(),
+                       f64_neg(F[rs3].read_64()));
+    fp_inst_end(hart);
+})
+IMPL(fnmsub_d, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = f64_mulAdd(f64_neg(F[rs1].read_64()), F[rs2].read_64(),
+                       F[rs3].read_64());
+    fp_inst_end(hart);
+})
+IMPL(fnmadd_d, {
+    fp_inst_prep(hart, d);
+    fp_setup_rm(hart, d);
+    F[rd] = f64_mulAdd(f64_neg(F[rs1].read_64()), F[rs2].read_64(),
+                       f64_neg(F[rs3].read_64()));
+    fp_inst_end(hart);
 })
 
 } // namespace uemu::core

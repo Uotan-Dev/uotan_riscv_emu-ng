@@ -69,24 +69,19 @@ MSTATUS::MSTATUS(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {
                  F::MPRV | F::SUM | F::MXR | F::TVM | F::TW | F::TSR | F::UXL |
                  F::SXL | F::SD;
 
-    write_mask_ = F::MIE | F::MPIE | F::MPRV | F::MPP | F::SIE | F::SPIE |
-                  F::SPP | F::SUM | F::MXR | F::TVM | F::TW | F::TSR;
+    write_mask_ = F::MIE | F::MPIE | F::MPRV | F::MPP | F::FS | F::SIE |
+                  F::SPIE | F::SPP | F::SUM | F::MXR | F::TVM | F::TW | F::TSR;
 
-    reg_t misa = hart->csrs[MISA::ADDRESS]->read_unchecked();
-    reg_t mxl = (misa >> MISA::MXL_SHIFT) & 0x3;
-    assert(mxl == MISA::xlen_32 || mxl == MISA::xlen_64);
-
-    value_ = (mxl << S::SXL_SHIFT) | (mxl << S::UXL_SHIFT) |
-             static_cast<reg_t>(PrivilegeLevel::M) << S::MPP_SHIFT;
-
-    if (misa & (MISA::F | MISA::D))
-        value_ |= F::FS | F::SD;
+    value_ = (MISA::xlen_64 << S::SXL_SHIFT) | (MISA::xlen_64 << S::UXL_SHIFT) |
+             static_cast<reg_t>(PrivilegeLevel::M) << S::MPP_SHIFT |
+             (1ULL << S::FS_SHIFT);
 }
 
 Hart::Hart(addr_t reset_pc) : pc(reset_pc) {
     // Machine Level
     add_csr<MISA>(MISA::Field::I | MISA::Field::M | MISA::Field::A |
-                  MISA::Field::S | MISA::Field::U |
+                  MISA::Field::F | MISA::Field::D | MISA::Field::S |
+                  MISA::Field::U |
                   (MISA::Mxl::xlen_64 << MISA::Shift::MXL_SHIFT));
     add_csr<MVENDORID>(0);
     add_csr<MARCHID>(0);
@@ -142,6 +137,10 @@ Hart::Hart(addr_t reset_pc) : pc(reset_pc) {
     add_csr<CYCLE>();
     add_csr<TIME>();
     add_csr<INSTRET>();
+
+    add_csr<FFLAGS>();
+    add_csr<FRM>();
+    add_csr<FCSR>();
 
     for (size_t i = HPMCOUNTERN::MIN_ADDRESS; i <= HPMCOUNTERN::MAX_ADDRESS;
          i += HPMCOUNTERN::DELTA_ADDRESS)

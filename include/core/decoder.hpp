@@ -86,8 +86,8 @@
     PRIVILEGED_INSTRUCTIONS(f)                                                 \
     RV64M_INSTRUCTIONS(f)                                                      \
     RV64A_INSTRUCTIONS(f)                                                      \
-    /* RV64F_INSTRUCTIONS(f) */                                                \
-    /* RV64D_INSTRUCTIONS(f) */                                                \
+    RV64F_INSTRUCTIONS(f)                                                      \
+    RV64D_INSTRUCTIONS(f)                                                      \
     /* RV64C_INSTRUCTIONS(f) */                                                \
     INVALID_INSTRUCTIONS(f)
 

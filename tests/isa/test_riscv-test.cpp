@@ -207,4 +207,41 @@ TEST(RISCVTest, RV64UA) {
     test_files(files);
 }
 
+TEST(RISCVTest, RV64UF) {
+    std::vector<std::string> files = {
+        "riscv_test_riscv_tests_rv64uf_fadd.elf",
+        "riscv_test_riscv_tests_rv64uf_fclass.elf",
+        "riscv_test_riscv_tests_rv64uf_fcmp.elf",
+        "riscv_test_riscv_tests_rv64uf_fcvt.elf",
+        "riscv_test_riscv_tests_rv64uf_fcvt_w.elf",
+        "riscv_test_riscv_tests_rv64uf_fdiv.elf",
+        "riscv_test_riscv_tests_rv64uf_fmadd.elf",
+        "riscv_test_riscv_tests_rv64uf_fmin.elf",
+        "riscv_test_riscv_tests_rv64uf_ldst.elf",
+        "riscv_test_riscv_tests_rv64uf_move.elf",
+        "riscv_test_riscv_tests_rv64uf_recoding.elf",
+    };
+
+    test_files(files);
+}
+
+TEST(RISCVTest, RV64UD) {
+    std::vector<std::string> files = {
+        "riscv_test_riscv_tests_rv64ud_fadd.elf",
+        "riscv_test_riscv_tests_rv64ud_fclass.elf",
+        "riscv_test_riscv_tests_rv64ud_fcmp.elf",
+        "riscv_test_riscv_tests_rv64ud_fcvt.elf",
+        "riscv_test_riscv_tests_rv64ud_fcvt_w.elf",
+        "riscv_test_riscv_tests_rv64ud_fdiv.elf",
+        "riscv_test_riscv_tests_rv64ud_fmadd.elf",
+        "riscv_test_riscv_tests_rv64ud_fmin.elf",
+        "riscv_test_riscv_tests_rv64ud_ldst.elf",
+        "riscv_test_riscv_tests_rv64ud_move.elf",
+        "riscv_test_riscv_tests_rv64ud_recoding.elf",
+        "riscv_test_riscv_tests_rv64ud_structural.elf",
+    };
+
+    test_files(files);
+}
+
 }; // namespace uemu::test
