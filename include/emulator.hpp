@@ -16,18 +16,16 @@
 
 #pragma once
 
-#include <condition_variable>
 #include <filesystem>
-#include <thread>
 
-#include "core/mmu.hpp"
+#include "executionengine.hpp"
 
 namespace uemu {
 
 class Emulator {
 public:
     explicit Emulator(size_t dram_size);
-    ~Emulator();
+    ~Emulator() = default;
 
     Emulator(const Emulator&) = delete;
     Emulator& operator=(const Emulator&) = delete;
@@ -35,7 +33,6 @@ public:
     Emulator& operator=(Emulator&&) = delete;
 
     void run();
-    void stop();
 
     // Load an elf from path to DRAM
     void loadelf(const std::filesystem::path& path);
@@ -53,27 +50,14 @@ public:
             load(addr, data.data(), sizeof(T) * data.size());
     }
 
-    uint16_t shutdown_code() const noexcept { return shutdown_code_; }
+    uint16_t shutdown_code() const noexcept { return engine_->shutdown_code(); }
 
-    uint16_t shutdown_status() const noexcept { return shutdown_status_; }
+    uint16_t shutdown_status() const noexcept {
+        return engine_->shutdown_status();
+    }
 
 private:
-    void cpu_thread();
-
-    std::shared_ptr<core::Hart> hart_;
-    std::shared_ptr<core::Dram> dram_;
-    std::shared_ptr<core::Bus> bus_;
-    std::shared_ptr<core::MMU> mmu_;
-
-    bool cpu_thread_running_;
-    std::unique_ptr<std::thread> cpu_thread_;
-    std::mutex cpu_mutex_;
-    std::condition_variable cpu_cond_;
-    std::exception_ptr cpu_thread_exception_;
-
-    bool shutdown_;
-    uint16_t shutdown_code_;
-    uint16_t shutdown_status_;
+    std::unique_ptr<ExecutionEngine> engine_;
 };
 
 } // namespace uemu

@@ -17,6 +17,7 @@
 #include <iostream>
 
 #include "core/decoder.hpp"
+#include "core/mmu.hpp"
 #include "device/clint.hpp"
 #include "device/sifive_test.hpp"
 #include "emulator.hpp"
@@ -26,82 +27,33 @@
 namespace uemu {
 
 Emulator::Emulator(size_t dram_size) {
-    hart_ = std::make_shared<core::Hart>();
-    dram_ = std::make_shared<core::Dram>(dram_size);
-    bus_ = std::make_shared<core::Bus>(dram_);
-    mmu_ = std::make_shared<core::MMU>(hart_, bus_);
+    auto hart = std::make_shared<core::Hart>();
+    auto dram = std::make_shared<core::Dram>(dram_size);
+    auto bus = std::make_shared<core::Bus>(dram);
+    auto mmu = std::make_shared<core::MMU>(hart, bus);
 
-    cpu_thread_running_ = false;
+    engine_ = std::make_unique<ExecutionEngine>(hart, dram, bus, mmu);
 
-    shutdown_ = true;
-    shutdown_code_ = shutdown_status_ = 0;
+    bus->add_device(std::make_shared<device::Clint>(hart));
 
-    bus_->add_device(std::make_shared<device::Clint>(hart_));
-
-    bus_->add_device(std::make_shared<device::SiFiveTest>(
+    bus->add_device(std::make_shared<device::SiFiveTest>(
         [this](uint16_t code, device::SiFiveTest::Status status) -> void {
             std::cout << std::format(
                 "Emulator shutdown with code 0x{:x} and status 0x{:x}\n", code,
                 static_cast<uint16_t>(status));
-            shutdown_ = true;
-            shutdown_code_ = code;
-            shutdown_status_ = static_cast<uint16_t>(status);
+            engine_->request_shutdown(code, static_cast<uint16_t>(status));
         }));
 }
 
-Emulator::~Emulator() { stop(); }
-
-void Emulator::run() {
-    std::unique_lock<std::mutex> lock(cpu_mutex_);
-
-    if (cpu_thread_running_)
-        return;
-
-    shutdown_ = false;
-
-    cpu_thread_ = std::make_unique<std::thread>(&Emulator::cpu_thread, this);
-    cpu_cond_.wait(
-        lock, [this]() -> bool { return cpu_thread_running_ || shutdown_; });
-
-    if (!cpu_thread_running_) {
-        lock.unlock();
-        stop();
-        return;
-    }
-
-    lock.unlock();
-
-    while (true) {
-        {
-            std::lock_guard<std::mutex> lock(cpu_mutex_);
-            if (!cpu_thread_running_)
-                break;
-        }
-
-        bus_->tick_devices();
-    }
-
-    stop();
-
-    if (cpu_thread_exception_)
-        std::rethrow_exception(cpu_thread_exception_);
-}
-
-void Emulator::stop() {
-    shutdown_ = true;
-
-    if (cpu_thread_ && cpu_thread_->joinable()) {
-        cpu_thread_->join();
-        cpu_thread_.reset();
-    }
-}
+void Emulator::run() { engine_->execute_until_halt(); }
 
 void Emulator::loadelf(const std::filesystem::path& path) {
-    hart_->pc = utils::ElfLoader::load(path, *dram_);
+    addr_t pc = utils::ElfLoader::load(path, engine_->get_dram());
 
+    engine_->get_hart().pc = pc;
     std::cout << std::format("ELF loaded: {}\n"
                              "      entry PC = 0x{:016x}\n",
-                             path.string(), hart_->pc)
+                             path.string(), pc)
               << std::endl;
 }
 
@@ -109,13 +61,10 @@ void Emulator::load(addr_t addr, const void* p, size_t n) {
     if (!p)
         throw std::invalid_argument("p is nullptr");
 
-    if (!dram_)
-        throw std::runtime_error("DRAM not initialized");
-
     if (n == 0)
         return;
 
-    dram_->write_bytes(addr, p, n);
+    engine_->get_dram().write_bytes(addr, p, n);
 }
 
 void Emulator::load(addr_t addr, const std::filesystem::path& path) {
@@ -123,61 +72,6 @@ void Emulator::load(addr_t addr, const std::filesystem::path& path) {
 
     if (!data.empty())
         load(addr, data.data(), data.size());
-}
-
-void Emulator::cpu_thread() {
-    {
-        std::lock_guard<std::mutex> lock(cpu_mutex_);
-        cpu_thread_running_ = true;
-    }
-    cpu_cond_.notify_all();
-
-    core::MCYCLE* mcycle =
-        dynamic_cast<core::MCYCLE*>(hart_->csrs[core::MCYCLE::ADDRESS].get());
-    core::MINSTRET* minstret = dynamic_cast<core::MINSTRET*>(
-        hart_->csrs[core::MINSTRET::ADDRESS].get());
-
-    // dynamic_cast() should always succeed.
-    if (!mcycle || !minstret)
-        std::terminate();
-
-    std::cout << std::hex << hart_->pc << std::endl;
-
-    while (!shutdown_) {
-        mcycle->advance();
-
-        try {
-            hart_->check_interrupts();
-
-            // Fetch instruction
-            const auto [insn, ilen] = mmu_->ifetch();
-
-            // Decode instruction
-            core::DecodedInsn decoded_insn =
-                core::Decoder::decode(insn, ilen, hart_->pc);
-
-            hart_->pc += static_cast<addr_t>(ilen);
-
-            // Execute
-            decoded_insn(*hart_, *mmu_);
-
-            minstret->advance();
-        } catch (const core::Trap& trap) {
-            // RISC-V Trap
-            hart_->handle_trap(trap);
-            continue;
-        } catch (...) {
-            cpu_thread_exception_ = std::current_exception();
-            shutdown_ = true;
-            break;
-        }
-    }
-
-    {
-        std::lock_guard<std::mutex> lock(cpu_mutex_);
-        cpu_thread_running_ = false;
-    }
-    cpu_cond_.notify_all();
 }
 
 } // namespace uemu
