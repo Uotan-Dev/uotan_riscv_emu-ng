@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <iostream>
+#include <print>
 
 #include "core/decoder.hpp"
 #include "core/mmu.hpp"
@@ -38,9 +38,8 @@ Emulator::Emulator(size_t dram_size) {
 
     bus->add_device(std::make_shared<device::SiFiveTest>(
         [this](uint16_t code, device::SiFiveTest::Status status) -> void {
-            std::cout << std::format(
-                "Emulator shutdown with code 0x{:x} and status 0x{:x}\n", code,
-                static_cast<uint16_t>(status));
+            std::println("Emulator shutdown with code 0x{:x} and status 0x{:x}",
+                         code, static_cast<uint16_t>(status));
             engine_->request_shutdown(code, static_cast<uint16_t>(status));
         }));
 }
@@ -51,10 +50,9 @@ void Emulator::loadelf(const std::filesystem::path& path) {
     addr_t pc = utils::ElfLoader::load(path, engine_->get_dram());
 
     engine_->get_hart().pc = pc;
-    std::cout << std::format("ELF loaded: {}\n"
-                             "      entry PC = 0x{:016x}\n",
-                             path.string(), pc)
-              << std::endl;
+    std::println("ELF loaded: {}\n"
+                 "      entry PC = 0x{:016x}",
+                 path.string(), pc);
 }
 
 void Emulator::load(addr_t addr, const void* p, size_t n) {

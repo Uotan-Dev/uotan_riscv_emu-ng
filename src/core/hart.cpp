@@ -16,7 +16,7 @@
 
 #include <cassert>
 #include <exception>
-#include <iostream>
+#include <print>
 
 #include "core/decoder.hpp"
 #include "core/hart.hpp"
@@ -42,7 +42,7 @@ void CSR::write_checked(const DecodedInsn& insn, reg_t v) {
 [[noreturn]] reg_t
 UnimplementedCSR::read_checked(const DecodedInsn& insn) const {
     if (trace_)
-        std::cout << "Unimplemented CSR: " << address_ << std::endl;
+        std::println(stderr, "Unimplemented CSR: {:#010x}", address_);
 
     Trap::raise_exception(insn.pc, TrapCause::IllegalInstruction, insn.insn);
 }
@@ -50,7 +50,7 @@ UnimplementedCSR::read_checked(const DecodedInsn& insn) const {
 [[noreturn]] void UnimplementedCSR::write_checked(const DecodedInsn& insn,
                                                   [[maybe_unused]] reg_t v) {
     if (trace_)
-        std::cout << "Unimplemented CSR: " << address_ << std::endl;
+        std::println(stderr, "Unimplemented CSR: {:#010x}", address_);
 
     Trap::raise_exception(insn.pc, TrapCause::IllegalInstruction, insn.insn);
 }

@@ -15,7 +15,7 @@
  */
 
 #include <cstring>
-#include <iostream>
+#include <print>
 
 #include "utils/elfloader.hpp"
 #include "utils/fileloader.hpp"
@@ -89,14 +89,14 @@ void ElfLoader::dump_signature(const std::filesystem::path& elf_path,
         throw std::runtime_error("Cannot open signature output file: " +
                                  sig_file_path.string());
 
-    std::cout << "Dumping signature from [0x" << std::hex << std::setw(8)
-              << std::setfill('0') << start_addr << ", 0x" << end_addr << ")\n";
+    std::println("Dumping signature from [{:#010x}, {:#010x})", start_addr,
+                 end_addr);
 
     for (uint64_t addr = start_addr; addr < end_addr; addr += 4)
         out << std::hex << std::setw(8) << std::setfill('0')
             << dram.read<uint32_t>(addr) << '\n';
 
-    std::cout << "Signature dumped to " << sig_file_path << std::endl;
+    std::println("Signature dumped to {}", sig_file_path.string());
 }
 
 const Elf64_Shdr* ElfLoader::get_section_header(const uint8_t* file_data,

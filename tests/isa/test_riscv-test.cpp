@@ -16,6 +16,7 @@
 
 #include <filesystem>
 #include <gtest/gtest.h>
+#include <print>
 #include <string>
 #include <vector>
 
@@ -34,8 +35,8 @@ void test_file(const std::string& file, std::vector<std::string>& failed) {
         test_path = test_path.parent_path() / file;
         emulator.loadelf(test_path.string());
     } catch (...) {
-        std::cerr << "Exception happened while loading ELF. Skipping the test."
-                  << std::endl;
+        std::println(
+            "Exception happened while loading ELF. Skipping the test.");
         EXPECT_TRUE(false);
         return;
     }
@@ -57,9 +58,9 @@ void test_files(const std::vector<std::string>& files) {
         test_file(f, failed);
 
     if (!failed.empty()) {
-        std::cerr << "Failed tests:\n";
+        std::println("Failed tests:");
         for (auto& f : failed)
-            std::cerr << f << std::endl;
+            std::println("{}", f);
     }
 }
 

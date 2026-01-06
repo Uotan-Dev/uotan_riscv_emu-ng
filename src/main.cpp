@@ -15,7 +15,7 @@
  */
 
 #include <cstdlib>
-#include <iostream>
+#include <print>
 #include <string>
 
 #include <CLI/CLI.hpp>
@@ -43,20 +43,22 @@ int main(int argc, char* argv[]) {
     try {
         size_t dram_size = dram_size_mb * 1024 * 1024;
 
-        std::cout << "Initializing emulator...\n"
-                  << "  DRAM size: " << dram_size_mb << " MB (" << dram_size
-                  << " bytes)\n"
-                  << "  ELF file: " << elf_file << std::endl;
+        std::println("Initializing emulator...");
+        std::println("  DRAM size: {} MB ({} bytes)", dram_size_mb, dram_size);
+        std::println("  ELF file: {}", elf_file);
 
         uemu::Emulator emulator(dram_size);
 
         emulator.loadelf(elf_file);
         emulator.run();
     } catch (const std::runtime_error& e) {
-        std::cerr << "Runtime error: " << e.what() << std::endl;
+        std::println(stderr, "Runtime error: {}", e.what());
         return EXIT_FAILURE;
     } catch (const std::exception& e) {
-        std::cerr << "Exception: " << e.what() << std::endl;
+        std::println(stderr, "Exception: {}", e.what());
+        return EXIT_FAILURE;
+    } catch (...) {
+        std::println("Unknown Error");
         return EXIT_FAILURE;
     }
 
