@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <format>
+#include <print>
 #include <stdexcept>
 #include <vector>
 
@@ -56,6 +57,9 @@ public:
                     existing->start(), existing->end()));
             }
         }
+
+        std::println("Bus: Add device '{}' [{:#x}-{:#x}]", dev->name(),
+                     dev->start(), dev->end());
 
         devices_.push_back(std::move(dev));
     }
