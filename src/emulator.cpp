@@ -19,6 +19,7 @@
 #include "core/decoder.hpp"
 #include "core/mmu.hpp"
 #include "device/clint.hpp"
+#include "device/nemu_console.hpp"
 #include "device/sifive_test.hpp"
 #include "emulator.hpp"
 #include "utils/elfloader.hpp"
@@ -42,6 +43,8 @@ Emulator::Emulator(size_t dram_size) {
                          code, static_cast<uint16_t>(status));
             engine_->request_shutdown(code, static_cast<uint16_t>(status));
         }));
+
+    bus->add_device(std::make_shared<device::NemuConsole>());
 }
 
 void Emulator::run() { engine_->execute_until_halt(); }

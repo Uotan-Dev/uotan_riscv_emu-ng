@@ -1,0 +1,38 @@
+/*
+ * Copyright 2026 Nuo Shen, Nanjing University
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include <print>
+
+#include "device/nemu_console.hpp"
+
+namespace uemu::device {
+
+uint64_t NemuConsole::read_internal([[maybe_unused]] addr_t addr,
+                                    [[maybe_unused]] size_t size) {
+    return 0;
+}
+
+void NemuConsole::write_internal(addr_t addr, [[maybe_unused]] size_t size,
+                                 uint64_t value) {
+    uint64_t offset = addr - DEFAULT_BASE;
+
+    if (offset == 0) {
+        char ch = static_cast<char>(value & 0xFF);
+        std::print(out_, "{}", ch);
+    }
+}
+
+} // namespace uemu::device
