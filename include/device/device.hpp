@@ -53,19 +53,19 @@ public:
 
     template <typename T>
     [[nodiscard]] T read(addr_t addr) noexcept {
-        return read_internal(addr, sizeof(T));
+        return read_internal(addr - start_, sizeof(T));
     }
 
     template <typename T>
     void write(addr_t addr, T value) noexcept {
-        write_internal(addr, sizeof(T), static_cast<uint64_t>(value));
+        write_internal(addr - start_, sizeof(T), static_cast<uint64_t>(value));
     }
 
     virtual void tick() {}
 
 protected:
-    virtual uint64_t read_internal(addr_t addr, size_t size) = 0;
-    virtual void write_internal(addr_t addr, size_t size, uint64_t value) = 0;
+    virtual uint64_t read_internal(addr_t offset, size_t size) = 0;
+    virtual void write_internal(addr_t offset, size_t size, uint64_t value) = 0;
 
     static void read_little_endian(const void* src, addr_t offset, size_t size,
                                    uint64_t* out_val) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 Nuo Shen, Nanjing University
+ * Copyright 2025-2026 Nuo Shen, Nanjing University
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,15 +18,13 @@
 
 namespace uemu::device {
 
-uint64_t SiFiveTest::read_internal([[maybe_unused]] addr_t addr,
+uint64_t SiFiveTest::read_internal([[maybe_unused]] addr_t offset,
                                    [[maybe_unused]] size_t size) {
     return 0;
 }
 
-void SiFiveTest::write_internal(addr_t addr, [[maybe_unused]] size_t size,
+void SiFiveTest::write_internal(addr_t offset, [[maybe_unused]] size_t size,
                                 uint64_t value) {
-    addr_t offset = addr - start_;
-
     if (offset == 0) {
         uint16_t status = value & 0xFFFF;
         uint16_t code = (value >> 16) & 0xFFFF;

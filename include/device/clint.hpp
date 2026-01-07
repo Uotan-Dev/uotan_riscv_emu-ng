@@ -38,8 +38,8 @@ public:
     void tick() override;
 
 private:
-    uint64_t read_internal(addr_t addr, size_t size) override;
-    void write_internal(addr_t addr, size_t size, uint64_t value) override;
+    uint64_t read_internal(addr_t offset, size_t size) override;
+    void write_internal(addr_t offset, size_t size, uint64_t value) override;
 
     inline void handle_mtimecmp();
     inline void handle_stimecmp();

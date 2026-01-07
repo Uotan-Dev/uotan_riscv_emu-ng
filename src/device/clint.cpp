@@ -38,8 +38,7 @@ void Clint::tick() {
     }
 }
 
-uint64_t Clint::read_internal(addr_t addr, size_t size) {
-    addr_t offset = addr - start_;
+uint64_t Clint::read_internal(addr_t offset, size_t size) {
     uint64_t result = 0;
 
     if (offset >= MSIP_OFFSET && offset < MSIP_OFFSET + 4) {
@@ -62,9 +61,7 @@ uint64_t Clint::read_internal(addr_t addr, size_t size) {
     return result;
 }
 
-void Clint::write_internal(addr_t addr, size_t size, uint64_t value) {
-    addr_t offset = addr - start_;
-
+void Clint::write_internal(addr_t offset, size_t size, uint64_t value) {
     if (offset >= MSIP_OFFSET && offset < MSIP_OFFSET + 4) {
         // MSIP
         uint64_t msip_val = 0;

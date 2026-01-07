@@ -20,15 +20,13 @@
 
 namespace uemu::device {
 
-uint64_t NemuConsole::read_internal([[maybe_unused]] addr_t addr,
+uint64_t NemuConsole::read_internal([[maybe_unused]] addr_t offset,
                                     [[maybe_unused]] size_t size) {
     return 0;
 }
 
-void NemuConsole::write_internal(addr_t addr, [[maybe_unused]] size_t size,
+void NemuConsole::write_internal(addr_t offset, [[maybe_unused]] size_t size,
                                  uint64_t value) {
-    uint64_t offset = addr - DEFAULT_BASE;
-
     if (offset == 0) {
         char ch = static_cast<char>(value & 0xFF);
         std::print(out_, "{}", ch);
