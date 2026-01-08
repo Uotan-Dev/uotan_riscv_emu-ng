@@ -20,6 +20,7 @@
 #include "core/mmu.hpp"
 #include "device/clint.hpp"
 #include "device/nemu_console.hpp"
+#include "device/plic.hpp"
 #include "device/sifive_test.hpp"
 #include "emulator.hpp"
 #include "utils/elfloader.hpp"
@@ -36,6 +37,8 @@ Emulator::Emulator(size_t dram_size) {
     engine_ = std::make_unique<ExecutionEngine>(hart, dram, bus, mmu);
 
     bus->add_device(std::make_shared<device::Clint>(hart));
+
+    bus->add_device(std::make_shared<device::Plic>(hart));
 
     bus->add_device(std::make_shared<device::SiFiveTest>(
         [this](uint16_t code, device::SiFiveTest::Status status) -> void {
