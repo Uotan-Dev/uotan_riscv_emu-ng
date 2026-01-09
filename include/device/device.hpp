@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstring>
+#include <functional>
 #include <string>
 
 #include "common/types.hpp"
@@ -96,6 +97,22 @@ protected:
 
     addr_t start_;
     addr_t end_;
+};
+
+class IrqDevice : public Device {
+public:
+    using IrqCallback = std::function<void(uint32_t id, int lvl)>;
+
+    explicit IrqDevice(const std::string& name, addr_t start, size_t size,
+                       IrqCallback irq_callback, uint32_t interrupt_id)
+        : Device(name, start, size), irq_callback_(irq_callback),
+          interrupt_id_(interrupt_id) {}
+
+    void update_irq(bool lvl) { irq_callback_(interrupt_id_, lvl); }
+
+private:
+    IrqCallback irq_callback_;
+    uint32_t interrupt_id_;
 };
 
 }; // namespace uemu::device
