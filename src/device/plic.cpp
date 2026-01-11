@@ -66,12 +66,23 @@ void Plic::set_interrupt_level(uint32_t id, bool lvl) {
     }
 }
 
-uint64_t Plic::read_internal(addr_t offset, size_t size) {
-    if (size == 8)
-        return read_internal(offset, 4) | (read_internal(offset + 4, 4) << 32);
+std::optional<uint64_t> Plic::read_internal(addr_t offset, size_t size) {
+    if (size == 8) {
+        std::optional<uint64_t> lo = read_internal(offset, 4);
+
+        if (lo == std::nullopt) [[unlikely]]
+            return std::nullopt;
+
+        std::optional<uint64_t> hi = read_internal(offset + 4, 4);
+
+        if (hi == std::nullopt) [[unlikely]]
+            return std::nullopt;
+
+        return *lo | (*hi << 32);
+    }
 
     if (size != 4)
-        return 0;
+        return std::nullopt;
 
     std::lock_guard<std::mutex> lock(plic_mutex_);
 
@@ -91,34 +102,37 @@ uint64_t Plic::read_internal(addr_t offset, size_t size) {
             return context_read(&contexts_[cntx], offset);
     }
 
-    return 0;
+    return std::nullopt;
 }
 
-void Plic::write_internal(addr_t offset, size_t size, uint64_t value) {
-    if (size == 8) {
-        write_internal(offset, 4, value & 0xFFFFFFFF);
-        write_internal(offset + 4, 4, value >> 32);
-        return;
-    }
+bool Plic::write_internal(addr_t offset, size_t size, uint64_t value) {
+    if (size == 8)
+        return write_internal(offset, 4, value & 0xFFFFFFFF) &&
+               write_internal(offset + 4, 4, value >> 32);
 
     if (size != 4)
-        return;
+        return false;
 
     std::lock_guard<std::mutex> lock(plic_mutex_);
 
     if (PRIORITY_BASE <= offset && offset < ENABLE_BASE) {
         priority_write(offset, value);
+        return true;
     } else if (ENABLE_BASE <= offset && offset < CONTEXT_BASE) {
         uint32_t cntx = (offset - ENABLE_BASE) / ENABLE_PER_HART;
         offset -= cntx * ENABLE_PER_HART + ENABLE_BASE;
-        if (cntx < contexts_.size())
+        if (cntx < contexts_.size()) {
             context_enable_write(&contexts_[cntx], offset, value);
+            return true;
+        }
     } else if (CONTEXT_BASE <= offset && offset < SIZE) {
         uint32_t cntx = (offset - CONTEXT_BASE) / CONTEXT_PER_HART;
         offset -= cntx * CONTEXT_PER_HART + CONTEXT_BASE;
         if (cntx < contexts_.size())
-            context_write(&contexts_[cntx], offset, value);
+            return context_write(&contexts_[cntx], offset, value);
     }
+
+    return false;
 }
 
 uint32_t Plic::context_best_pending(const Context* ctx) {
@@ -246,8 +260,9 @@ uint32_t Plic::context_read(Context* ctx, reg_t offset) {
     };
 }
 
-void Plic::context_write(Context* ctx, reg_t offset, uint32_t val) {
+bool Plic::context_write(Context* ctx, reg_t offset, uint32_t val) {
     bool update = false;
+    bool ret = true;
 
     switch (offset) {
         case CONTEXT_THRESHOLD:
@@ -255,6 +270,8 @@ void Plic::context_write(Context* ctx, reg_t offset, uint32_t val) {
             if (val <= max_prio_) {
                 ctx->priority_threshold = val;
                 update = true;
+            } else {
+                ret = false;
             }
             break;
         case CONTEXT_CLAIM: {
@@ -266,11 +283,13 @@ void Plic::context_write(Context* ctx, reg_t offset, uint32_t val) {
             }
             break;
         }
-        default: break;
+        default: ret = false; break;
     }
 
     if (update)
         context_update(ctx);
+
+    return ret;
 }
 
 } // namespace uemu::device

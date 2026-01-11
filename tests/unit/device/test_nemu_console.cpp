@@ -27,8 +27,10 @@ TEST(NemuConsoleTest, BasicTest) {
     device::NemuConsole console(ss);
 
     std::string in = "Hello, uemu-ng";
-    for (char c : in)
-        console.write(device::NemuConsole::DEFAULT_BASE, c);
+    for (char c : in) {
+        bool r = console.write(device::NemuConsole::DEFAULT_BASE, c);
+        ASSERT_TRUE(r);
+    }
 
     EXPECT_EQ(ss.str(), in);
 }

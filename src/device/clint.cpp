@@ -38,8 +38,9 @@ void Clint::tick() {
     }
 }
 
-uint64_t Clint::read_internal(addr_t offset, size_t size) {
-    uint64_t result = 0;
+std::optional<uint64_t> Clint::read_internal(addr_t offset, size_t size) {
+    if (size > 8) [[unlikely]]
+        return std::nullopt;
 
     if (offset >= MSIP_OFFSET && offset < MSIP_OFFSET + 4) {
         // MSIP
@@ -47,21 +48,27 @@ uint64_t Clint::read_internal(addr_t offset, size_t size) {
                              core::MIP::Field::MSIP)
                                 ? 1
                                 : 0;
+        uint64_t result = 0;
         read_little_endian(&msip_val, offset - MSIP_OFFSET, size, &result);
+        return result;
     } else if (offset >= MTIMECMP_OFFSET && offset < MTIMECMP_OFFSET + 8) {
         // MTIMECMP
+        uint64_t result = 0;
         std::lock_guard<std::mutex> lock(clint_mutex_);
         read_little_endian(&mtimecmp_, offset - MTIMECMP_OFFSET, size, &result);
+        return result;
     } else if (offset >= MTIME_OFFSET && offset < MTIME_OFFSET + 8) {
         // MTIME
+        uint64_t result = 0;
         std::lock_guard<std::mutex> lock(clint_mutex_);
         read_little_endian(&mtime_, offset - MTIME_OFFSET, size, &result);
+        return result;
     }
 
-    return result;
+    return std::nullopt;
 }
 
-void Clint::write_internal(addr_t offset, size_t size, uint64_t value) {
+bool Clint::write_internal(addr_t offset, size_t size, uint64_t value) {
     if (offset >= MSIP_OFFSET && offset < MSIP_OFFSET + 4) {
         // MSIP
         uint64_t msip_val = 0;
@@ -92,7 +99,11 @@ void Clint::write_internal(addr_t offset, size_t size, uint64_t value) {
 
         handle_mtimecmp();
         handle_stimecmp();
+    } else {
+        return false;
     }
+
+    return true;
 }
 
 void Clint::handle_mtimecmp() {

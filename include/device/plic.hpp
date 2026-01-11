@@ -81,8 +81,8 @@ private:
         uint32_t claimed[MAX_DEVICES / 32]{};
     };
 
-    uint64_t read_internal(addr_t offset, size_t size) override;
-    void write_internal(addr_t offset, size_t size, uint64_t value) override;
+    std::optional<uint64_t> read_internal(addr_t offset, size_t size) override;
+    bool write_internal(addr_t offset, size_t size, uint64_t value) override;
 
     uint32_t context_best_pending(const Context* ctx);
     void context_update(const Context* ctx);
@@ -93,7 +93,7 @@ private:
     uint32_t context_enable_read(const Context* ctx, reg_t offset);
     void context_enable_write(Context* ctx, reg_t offset, uint32_t val);
     uint32_t context_read(Context* ctx, reg_t offset);
-    void context_write(Context* ctx, reg_t offset, uint32_t val);
+    bool context_write(Context* ctx, reg_t offset, uint32_t val);
 
     std::shared_ptr<core::Hart> hart_;
 

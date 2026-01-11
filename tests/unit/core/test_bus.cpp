@@ -25,10 +25,13 @@ class MockDevice : public uemu::device::Device {
 public:
     MockDevice(addr_t start, size_t size) : Device("Mock", start, size) {}
 
-    uint64_t read_internal(addr_t, size_t) override { return 0x42; }
+    std::optional<uint64_t> read_internal(addr_t, size_t) override {
+        return 0x42;
+    }
 
-    void write_internal(addr_t, size_t, uint64_t val) override {
+    bool write_internal(addr_t, size_t, uint64_t val) override {
         last_val = val;
+        return true;
     }
 
     uint64_t last_val = 0;

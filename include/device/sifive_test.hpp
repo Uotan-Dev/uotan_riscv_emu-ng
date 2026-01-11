@@ -35,8 +35,8 @@ public:
         : Device("SiFiveTest", DEFAULT_BASE, SIZE), on_shutdown_(on_shutdown) {}
 
 private:
-    uint64_t read_internal(addr_t offset, size_t size) override;
-    void write_internal(addr_t offset, size_t size, uint64_t value) override;
+    std::optional<uint64_t> read_internal(addr_t offset, size_t size) override;
+    bool write_internal(addr_t offset, size_t size, uint64_t value) override;
 
     ShutdownCallback on_shutdown_;
 };

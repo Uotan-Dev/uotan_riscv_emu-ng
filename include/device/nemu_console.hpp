@@ -31,8 +31,8 @@ public:
         : Device("NemuConsole", DEFAULT_BASE, SIZE), out_(out) {}
 
 private:
-    uint64_t read_internal(addr_t offset, size_t size) override;
-    void write_internal(addr_t offset, size_t size, uint64_t value) override;
+    std::optional<uint64_t> read_internal(addr_t offset, size_t size) override;
+    bool write_internal(addr_t offset, size_t size, uint64_t value) override;
 
     std::ostream& out_;
 };

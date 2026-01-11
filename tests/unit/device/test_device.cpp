@@ -24,9 +24,9 @@ class TestDevice : public device::Device {
 public:
     TestDevice() : Device("Test", 0x1000, 0x100) {}
 
-    uint64_t read_internal(addr_t, size_t) override { return 0; }
+    std::optional<uint64_t> read_internal(addr_t, size_t) override { return 0; }
 
-    void write_internal(addr_t, size_t, uint64_t) override {}
+    bool write_internal(addr_t, size_t, uint64_t) override { return true; }
 
     static void test_read_le(const void* src, addr_t off, size_t sz,
                              uint64_t* out) {

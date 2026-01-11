@@ -18,6 +18,7 @@
 
 #include <cstring>
 #include <functional>
+#include <optional>
 #include <string>
 
 #include "common/types.hpp"
@@ -53,20 +54,27 @@ public:
     }
 
     template <typename T>
-    [[nodiscard]] T read(addr_t addr) noexcept {
-        return read_internal(addr - start_, sizeof(T));
+    [[nodiscard]] std::optional<T> read(addr_t addr) noexcept {
+        std::optional<uint64_t> v = read_internal(addr - start_, sizeof(T));
+
+        if (v == std::nullopt) [[unlikely]]
+            return std::nullopt;
+
+        return static_cast<T>(*v);
     }
 
     template <typename T>
-    void write(addr_t addr, T value) noexcept {
-        write_internal(addr - start_, sizeof(T), static_cast<uint64_t>(value));
+    [[nodiscard]] bool write(addr_t addr, T value) noexcept {
+        return write_internal(addr - start_, sizeof(T),
+                              static_cast<uint64_t>(value));
     }
 
     virtual void tick() {}
 
 protected:
-    virtual uint64_t read_internal(addr_t offset, size_t size) = 0;
-    virtual void write_internal(addr_t offset, size_t size, uint64_t value) = 0;
+    virtual std::optional<uint64_t> read_internal(addr_t offset,
+                                                  size_t size) = 0;
+    virtual bool write_internal(addr_t offset, size_t size, uint64_t value) = 0;
 
     static void read_little_endian(const void* src, addr_t offset, size_t size,
                                    uint64_t* out_val) {

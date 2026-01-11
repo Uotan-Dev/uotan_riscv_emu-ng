@@ -89,12 +89,9 @@ public:
             return true;
         }
 
-        for (const auto& dev : devices_) {
-            if (dev->contains(addr, sizeof(T))) {
-                dev->write<T>(addr, value);
-                return true;
-            }
-        }
+        for (const auto& dev : devices_)
+            if (dev->contains(addr, sizeof(T)))
+                return dev->write<T>(addr, value);
 
         return false;
     }

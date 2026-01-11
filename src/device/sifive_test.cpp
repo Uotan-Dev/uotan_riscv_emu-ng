@@ -18,12 +18,13 @@
 
 namespace uemu::device {
 
-uint64_t SiFiveTest::read_internal([[maybe_unused]] addr_t offset,
-                                   [[maybe_unused]] size_t size) {
+std::optional<uint64_t>
+SiFiveTest::read_internal([[maybe_unused]] addr_t offset,
+                          [[maybe_unused]] size_t size) {
     return 0;
 }
 
-void SiFiveTest::write_internal(addr_t offset, [[maybe_unused]] size_t size,
+bool SiFiveTest::write_internal(addr_t offset, [[maybe_unused]] size_t size,
                                 uint64_t value) {
     if (offset == 0) {
         uint16_t status = value & 0xFFFF;
@@ -38,6 +39,8 @@ void SiFiveTest::write_internal(addr_t offset, [[maybe_unused]] size_t size,
             default: [[unlikely]] break;
         }
     }
+
+    return true;
 }
 
 }; // namespace uemu::device

@@ -35,12 +35,14 @@ TEST(ClintTest, MTIMECMPTrigger) {
     clint.tick();
     EXPECT_FALSE(mip->read_unchecked() & core::MIP::MTIP);
 
-    clint.write<uint64_t>(MTIMECMP_ADDR, 0ull);
+    bool r = clint.write<uint64_t>(MTIMECMP_ADDR, 0ull);
     std::this_thread::sleep_for(std::chrono::milliseconds(64));
     clint.tick();
+    EXPECT_TRUE(r);
     EXPECT_TRUE(mip->read_unchecked() & core::MIP::MTIP);
 
-    clint.write<uint64_t>(MTIMECMP_ADDR, 1145141919810ull);
+    r = clint.write<uint64_t>(MTIMECMP_ADDR, 1145141919810ull);
+    EXPECT_TRUE(r);
     EXPECT_FALSE(mip->read_unchecked() & core::MIP::MTIP);
 }
 
@@ -56,11 +58,13 @@ TEST(ClintTest, MSIPWrite) {
     device::Clint clint(hart, 1000);
 
     // Write 1 to MSIP
-    clint.write<uint32_t>(MSIP_ADDR, 1);
+    bool r = clint.write<uint32_t>(MSIP_ADDR, 1);
+    EXPECT_TRUE(r);
     EXPECT_TRUE(mip->read_unchecked() & core::MIP::MSIP);
 
     // Write 0 to MSIP
-    clint.write<uint32_t>(MSIP_ADDR, 0);
+    r = clint.write<uint32_t>(MSIP_ADDR, 0);
+    EXPECT_TRUE(r);
     EXPECT_FALSE(mip->read_unchecked() & core::MIP::MSIP);
 }
 

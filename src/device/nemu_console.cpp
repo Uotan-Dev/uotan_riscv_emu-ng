@@ -20,17 +20,21 @@
 
 namespace uemu::device {
 
-uint64_t NemuConsole::read_internal([[maybe_unused]] addr_t offset,
-                                    [[maybe_unused]] size_t size) {
+std::optional<uint64_t>
+NemuConsole::read_internal([[maybe_unused]] addr_t offset,
+                           [[maybe_unused]] size_t size) {
     return 0;
 }
 
-void NemuConsole::write_internal(addr_t offset, [[maybe_unused]] size_t size,
+bool NemuConsole::write_internal(addr_t offset, [[maybe_unused]] size_t size,
                                  uint64_t value) {
     if (offset == 0) {
         char ch = static_cast<char>(value & 0xFF);
         std::print(out_, "{}", ch);
+        return true;
     }
+
+    return false;
 }
 
 } // namespace uemu::device
