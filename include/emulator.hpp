@@ -19,6 +19,7 @@
 #include <filesystem>
 
 #include "executionengine.hpp"
+#include "host/console.hpp"
 
 namespace uemu {
 
@@ -57,6 +58,7 @@ public:
     }
 
 private:
+    std::shared_ptr<host::HostConsole> hostconsole_;
     std::unique_ptr<ExecutionEngine> engine_;
 };
 

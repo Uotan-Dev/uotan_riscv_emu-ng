@@ -20,6 +20,7 @@
 #include "core/mmu.hpp"
 #include "device/clint.hpp"
 #include "device/nemu_console.hpp"
+#include "device/ns16550.hpp"
 #include "device/plic.hpp"
 #include "device/sifive_test.hpp"
 #include "emulator.hpp"
@@ -34,11 +35,17 @@ Emulator::Emulator(size_t dram_size) {
     auto bus = std::make_shared<core::Bus>(dram);
     auto mmu = std::make_shared<core::MMU>(hart, bus);
 
+    hostconsole_ = std::make_shared<host::HostConsole>();
+
     engine_ = std::make_unique<ExecutionEngine>(hart, dram, bus, mmu);
 
     bus->add_device(std::make_shared<device::Clint>(hart));
 
-    bus->add_device(std::make_shared<device::Plic>(hart));
+    auto plic = std::make_shared<device::Plic>(hart);
+    bus->add_device(plic);
+    auto request_irq = [plic](uint32_t id, bool lvl) -> void {
+        plic->set_interrupt_level(id, lvl);
+    };
 
     bus->add_device(std::make_shared<device::SiFiveTest>(
         [this](uint16_t code, device::SiFiveTest::Status status) -> void {
@@ -46,6 +53,9 @@ Emulator::Emulator(size_t dram_size) {
                          code, static_cast<uint16_t>(status));
             engine_->request_shutdown(code, static_cast<uint16_t>(status));
         }));
+
+    bus->add_device(
+        std::make_shared<device::NS16550>(hostconsole_, request_irq));
 
     bus->add_device(std::make_shared<device::NemuConsole>());
 }

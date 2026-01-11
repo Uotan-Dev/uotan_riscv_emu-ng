@@ -26,6 +26,10 @@ namespace uemu::core {
 
 class MMU {
 public:
+    static constexpr size_t PGSHIFT = 12;
+    static constexpr addr_t PGSIZE = 1ULL << PGSHIFT;
+    static constexpr addr_t PGMASK = PGSIZE - 1;
+
     enum class AccessType { Fetch, Load, Store };
 
     explicit MMU(std::shared_ptr<Hart> hart, std::shared_ptr<Bus> bus)
@@ -173,10 +177,7 @@ private:
 
     static constexpr size_t LEVELS = 3;
     static constexpr size_t PTESIZE = 8;
-    static constexpr size_t PGSHIFT = 12;
     static constexpr size_t VPNBITS = 9;
-    static constexpr addr_t PGSIZE = 1ULL << PGSHIFT;
-    static constexpr addr_t PGMASK = PGSIZE - 1;
 
     std::shared_ptr<Hart> hart_;
     std::shared_ptr<Bus> bus_;

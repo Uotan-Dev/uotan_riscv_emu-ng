@@ -109,7 +109,7 @@ protected:
 
 class IrqDevice : public Device {
 public:
-    using IrqCallback = std::function<void(uint32_t id, int lvl)>;
+    using IrqCallback = std::function<void(uint32_t id, bool lvl)>;
 
     explicit IrqDevice(const std::string& name, addr_t start, size_t size,
                        IrqCallback irq_callback, uint32_t interrupt_id)
