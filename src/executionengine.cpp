@@ -18,16 +18,17 @@
 
 namespace uemu {
 
-ExecutionEngine::ExecutionEngine(std::shared_ptr<core::Hart> hart,
-                                 std::shared_ptr<core::Dram> dram,
-                                 std::shared_ptr<core::Bus> bus,
-                                 std::shared_ptr<core::MMU> mmu)
+ExecutionEngine::ExecutionEngine(
+    std::shared_ptr<core::Hart> hart, std::shared_ptr<core::Dram> dram,
+    std::shared_ptr<core::Bus> bus, std::shared_ptr<core::MMU> mmu,
+    std::shared_ptr<host::ui::UIBackend> ui_backend)
     : hart_(std::move(hart)), dram_(std::move(dram)), bus_(std::move(bus)),
-      mmu_(std::move(mmu)) {
+      mmu_(std::move(mmu)), ui_backend_(std::move(ui_backend)) {
     cpu_thread_running_ = false;
 
     shutdown_ = true;
     shutdown_code_ = shutdown_status_ = 0;
+    host_halt_ = false;
 
     // cache the pointers for faster emulation
     mcycle_ =
@@ -45,9 +46,6 @@ ExecutionEngine::~ExecutionEngine() {
 }
 
 void ExecutionEngine::execute_once() {
-    if (shutdown_) [[unlikely]]
-        return;
-
     mcycle_->advance();
 
     try {
@@ -97,6 +95,7 @@ void ExecutionEngine::execute_until_halt() {
         }
 
         bus_->tick_devices();
+        ui_backend_->update();
     }
 
     if (cpu_thread_exception_)
@@ -110,6 +109,10 @@ void ExecutionEngine::request_shutdown(uint16_t code,
     shutdown_status_ = status;
 }
 
+void ExecutionEngine::request_halt_host() noexcept {
+    host_halt_.store(true, std::memory_order::relaxed);
+}
+
 void ExecutionEngine::cpu_thread() {
     {
         std::lock_guard<std::mutex> lock(cpu_mutex_);
@@ -117,7 +120,13 @@ void ExecutionEngine::cpu_thread() {
     }
     cpu_cond_.notify_all();
 
-    while (!shutdown_) {
+    for (uint16_t i = 0;; i++) {
+        if (shutdown_) [[unlikely]]
+            break;
+
+        if (i == 0 && host_halt_.load(std::memory_order::relaxed)) [[unlikely]]
+            break;
+
         try {
             execute_once();
         } catch (...) {

@@ -20,12 +20,13 @@
 
 #include "executionengine.hpp"
 #include "host/console.hpp"
+#include "host/ui/backend.hpp"
 
 namespace uemu {
 
 class Emulator {
 public:
-    explicit Emulator(size_t dram_size);
+    explicit Emulator(size_t dram_size, bool headless = true);
     ~Emulator() = default;
 
     Emulator(const Emulator&) = delete;
@@ -57,9 +58,15 @@ public:
         return engine_->shutdown_status();
     }
 
+    void halt() {
+        if (engine_)
+            engine_->request_halt_host();
+    }
+
 private:
     std::shared_ptr<host::HostConsole> hostconsole_;
     std::unique_ptr<ExecutionEngine> engine_;
+    std::shared_ptr<host::ui::UIBackend> ui_backend_;
 };
 
 } // namespace uemu

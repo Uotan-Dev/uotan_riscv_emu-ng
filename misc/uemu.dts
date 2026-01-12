@@ -7,7 +7,7 @@
     model = "uemu-ng";
 
     chosen {
-        // bootargs = "systemd.mask=systemd-resolved.service";
+        bootargs = "systemd.mask=systemd-resolved.service";
         stdout-path = "/soc/uart@10000000";
     };
 
@@ -85,6 +85,17 @@
             phandle = <0x04>;
             reg = <0x0 0x00100000 0x0 0x1000>;
             compatible = "sifive,test1", "sifive,test0", "syscon";
+        };
+
+        simplefb: frame-buffer@50000000 {
+            compatible = "simple-framebuffer";
+            reg = <0x0 0x50000000 0x0 0x300000>;
+            width = <1024>;
+            height = <768>;
+            stride = <4096>;
+            format = "x8r8g8b8";
+            status = "okay";
+            linux,fb-type = "simple";
         };
     };
 

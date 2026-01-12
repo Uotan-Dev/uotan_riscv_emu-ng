@@ -19,6 +19,7 @@
 #include <thread>
 
 #include "core/mmu.hpp"
+#include "host/ui/backend.hpp"
 
 namespace uemu {
 
@@ -29,7 +30,8 @@ public:
     ExecutionEngine(std::shared_ptr<core::Hart> hart,
                     std::shared_ptr<core::Dram> dram,
                     std::shared_ptr<core::Bus> bus,
-                    std::shared_ptr<core::MMU> mmu);
+                    std::shared_ptr<core::MMU> mmu,
+                    std::shared_ptr<host::ui::UIBackend> ui_backend);
 
     ~ExecutionEngine();
 
@@ -38,10 +40,10 @@ public:
     ExecutionEngine(ExecutionEngine&&) = delete;
     ExecutionEngine& operator=(ExecutionEngine&&) = delete;
 
-    inline void execute_once();
     void execute_until_halt();
 
     void request_shutdown(uint16_t code, uint16_t status) noexcept;
+    void request_halt_host() noexcept;
 
     uint16_t shutdown_code() const noexcept { return shutdown_code_; }
 
@@ -53,11 +55,14 @@ public:
 
 private:
     void cpu_thread();
+    inline void execute_once();
 
     std::shared_ptr<core::Hart> hart_;
     std::shared_ptr<core::Dram> dram_;
     std::shared_ptr<core::Bus> bus_;
     std::shared_ptr<core::MMU> mmu_;
+
+    std::shared_ptr<host::ui::UIBackend> ui_backend_;
 
     bool cpu_thread_running_;
     std::unique_ptr<std::thread> cpu_thread_;
@@ -68,6 +73,7 @@ private:
     bool shutdown_;
     uint16_t shutdown_code_;
     uint16_t shutdown_status_;
+    std::atomic_bool host_halt_;
 
     core::MCYCLE* mcycle_;
     core::MINSTRET* minstret_;

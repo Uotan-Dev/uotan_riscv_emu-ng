@@ -31,7 +31,10 @@ public:
     static constexpr addr_t DEFAULT_BASE = 0x50000000;
     static constexpr size_t SIZE = DEFAULT_WIDTH * DEFAULT_HEIGHT * BPP;
 
-    SimpleFB() : Device("SimpleFB", DEFAULT_BASE, SIZE) { vram_.resize(SIZE); }
+    SimpleFB() : Device("SimpleFB", DEFAULT_BASE, SIZE) {
+        vram_.resize(SIZE);
+        std::fill(vram_.begin(), vram_.end(), 0xFF);
+    }
 
     const std::vector<uint8_t>& get_vram() const noexcept { return vram_; }
 

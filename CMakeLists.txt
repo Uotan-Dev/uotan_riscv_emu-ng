@@ -19,13 +19,11 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED ON)
-
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
-
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 if(MSVC)
@@ -37,8 +35,10 @@ endif()
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 
-# Find CLI11
+# Find required packages
 find_package(CLI11 CONFIG REQUIRED)
+find_package(SDL3 REQUIRED CONFIG)
+find_package(Threads REQUIRED)
 
 include(${CMAKE_CURRENT_LIST_DIR}/thirdparty/berkeley-softfloat-3.cmake)
 
@@ -53,18 +53,17 @@ file(GLOB_RECURSE HEADERS
 )
 
 add_library(uemu_core STATIC ${SOURCES} ${HEADERS})
-
 target_include_directories(uemu_core
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 # Link libraries that the core needs
-find_package(Threads REQUIRED)
 target_link_libraries(uemu_core
     PUBLIC
         CLI11::CLI11
         Threads::Threads
         softfloat
+        SDL3::SDL3
 )
 
 add_executable(uemu src/main.cpp)
