@@ -23,6 +23,7 @@
 #include "device/ns16550.hpp"
 #include "device/plic.hpp"
 #include "device/sifive_test.hpp"
+#include "device/simple_fb.hpp"
 #include "emulator.hpp"
 #include "utils/elfloader.hpp"
 #include "utils/fileloader.hpp"
@@ -56,6 +57,8 @@ Emulator::Emulator(size_t dram_size) {
 
     bus->add_device(
         std::make_shared<device::NS16550>(hostconsole_, request_irq));
+
+    bus->add_device(std::make_shared<device::SimpleFB>());
 
     bus->add_device(std::make_shared<device::NemuConsole>());
 }
