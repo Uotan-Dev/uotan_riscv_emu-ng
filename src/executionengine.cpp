@@ -26,8 +26,10 @@ ExecutionEngine::ExecutionEngine(std::shared_ptr<core::Hart> hart,
       mmu_(std::move(mmu)) {
     cpu_thread_running_ = false;
 
-    shutdown_ = true;
+    shutdown_from_guest_ = true;
     shutdown_code_ = shutdown_status_ = 0;
+
+    shutdown_from_host_.store(false, std::memory_order::relaxed);
 
     // cache the pointers for faster emulation
     mcycle_ =
@@ -45,9 +47,6 @@ ExecutionEngine::~ExecutionEngine() {
 }
 
 void ExecutionEngine::execute_once() {
-    if (shutdown_) [[unlikely]]
-        return;
-
     mcycle_->advance();
 
     try {
@@ -76,11 +75,13 @@ void ExecutionEngine::execute_until_halt() {
     if (cpu_thread_running_)
         return;
 
-    shutdown_ = false;
+    shutdown_from_guest_ = false;
     cpu_thread_ =
         std::make_unique<std::thread>(&ExecutionEngine::cpu_thread, this);
-    cpu_cond_.wait(
-        lock, [this]() -> bool { return cpu_thread_running_ || shutdown_; });
+    cpu_cond_.wait(lock, [this]() -> bool {
+        return cpu_thread_running_ || shutdown_from_guest_ ||
+               shutdown_from_host_.load(std::memory_order::relaxed);
+    });
 
     if (!cpu_thread_running_) {
         lock.unlock();
@@ -103,11 +104,15 @@ void ExecutionEngine::execute_until_halt() {
         std::rethrow_exception(cpu_thread_exception_);
 }
 
-void ExecutionEngine::request_shutdown(uint16_t code,
-                                       uint16_t status) noexcept {
-    shutdown_ = true;
+void ExecutionEngine::request_shutdown_from_guest(uint16_t code,
+                                                  uint16_t status) noexcept {
+    shutdown_from_guest_ = true;
     shutdown_code_ = code;
     shutdown_status_ = status;
+}
+
+void ExecutionEngine::request_shutdown_from_host() noexcept {
+    shutdown_from_host_.store(true, std::memory_order::relaxed);
 }
 
 void ExecutionEngine::cpu_thread() {
@@ -117,12 +122,19 @@ void ExecutionEngine::cpu_thread() {
     }
     cpu_cond_.notify_all();
 
-    while (!shutdown_) {
+    for (uint16_t i = 0;; i++) {
+        if (shutdown_from_guest_) [[unlikely]]
+            break;
+
+        if (i == 0 && shutdown_from_host_.load(std::memory_order::relaxed))
+            [[unlikely]]
+            break;
+
         try {
             execute_once();
         } catch (...) {
             cpu_thread_exception_ = std::current_exception();
-            shutdown_ = true;
+            shutdown_from_guest_ = true;
             break;
         }
     }

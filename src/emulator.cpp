@@ -52,7 +52,8 @@ Emulator::Emulator(size_t dram_size) {
         [this](uint16_t code, device::SiFiveTest::Status status) -> void {
             std::println("Emulator shutdown with code 0x{:x} and status 0x{:x}",
                          code, static_cast<uint16_t>(status));
-            engine_->request_shutdown(code, static_cast<uint16_t>(status));
+            engine_->request_shutdown_from_guest(code,
+                                                 static_cast<uint16_t>(status));
         }));
 
     bus->add_device(

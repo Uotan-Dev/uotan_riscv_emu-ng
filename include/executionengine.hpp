@@ -41,7 +41,8 @@ public:
     inline void execute_once();
     void execute_until_halt();
 
-    void request_shutdown(uint16_t code, uint16_t status) noexcept;
+    void request_shutdown_from_guest(uint16_t code, uint16_t status) noexcept;
+    void request_shutdown_from_host() noexcept;
 
     uint16_t shutdown_code() const noexcept { return shutdown_code_; }
 
@@ -65,9 +66,11 @@ private:
     std::condition_variable cpu_cond_;
     std::exception_ptr cpu_thread_exception_;
 
-    bool shutdown_;
+    bool shutdown_from_guest_;
     uint16_t shutdown_code_;
     uint16_t shutdown_status_;
+
+    std::atomic_bool shutdown_from_host_;
 
     core::MCYCLE* mcycle_;
     core::MINSTRET* minstret_;
