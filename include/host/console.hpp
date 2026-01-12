@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <iostream>
 #include <optional>
 #include <print>
 
@@ -37,7 +38,7 @@ public:
 
     ~HostConsole() { restore_mode(); }
 
-    std::optional<char> read_char() {
+    std::optional<char> read_char() noexcept {
 #ifdef _WIN32
         if (_kbhit())
             return static_cast<char>(_getch());
@@ -54,26 +55,23 @@ public:
 #endif
     }
 
-    void write_char(char ch) { std::print("{}", ch); }
+    void write_char(char ch) {
+        std::print("{}", ch);
+        std::cout.flush();
+    }
 
 private:
+    void enable_raw_mode() noexcept {
 #ifdef _WIN32
-    HANDLE hStdin;
-    DWORD originalMode;
+        hStdin_ = GetStdHandle(STD_INPUT_HANDLE);
+        GetConsoleMode(hStdin_, &originalMode_);
+        DWORD rawMode =
+            originalMode_ &
+            ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT);
+        SetConsoleMode(hStdin_, rawMode);
 #else
-    struct termios originalTermios;
-#endif
-
-    void enable_raw_mode() {
-#ifdef _WIN32
-        hStdin = GetStdHandle(STD_INPUT_HANDLE);
-        GetConsoleMode(hStdin, &originalMode);
-        DWORD rawMode = originalMode & ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT |
-                                         ENABLE_PROCESSED_INPUT);
-        SetConsoleMode(hStdin, rawMode);
-#else
-        tcgetattr(STDIN_FILENO, &originalTermios);
-        struct termios raw = originalTermios;
+        tcgetattr(STDIN_FILENO, &originalTermios_);
+        struct termios raw = originalTermios_;
 
         raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
         raw.c_cflag |= (CS8);
@@ -82,16 +80,28 @@ private:
         raw.c_cc[VTIME] = 0;
 
         tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+
+        originalFlags_ = fcntl(STDIN_FILENO, F_GETFL, 0);
+        fcntl(STDIN_FILENO, F_SETFL, originalFlags_ | O_NONBLOCK);
 #endif
     }
 
-    void restore_mode() {
+    void restore_mode() noexcept {
 #ifdef _WIN32
-        SetConsoleMode(hStdin, originalMode);
+        SetConsoleMode(hStdin_, originalMode_);
 #else
-        tcsetattr(STDIN_FILENO, TCSAFLUSH, &originalTermios);
+        tcsetattr(STDIN_FILENO, TCSAFLUSH, &originalTermios_);
+        fcntl(STDIN_FILENO, F_SETFL, originalFlags_);
 #endif
     }
+
+#ifdef _WIN32
+    HANDLE hStdin_;
+    DWORD originalMode_;
+#else
+    struct termios originalTermios_;
+    int originalFlags_;
+#endif
 };
 
 } // namespace uemu::host
