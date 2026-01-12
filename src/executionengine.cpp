@@ -98,6 +98,8 @@ void ExecutionEngine::execute_until_halt() {
         }
 
         bus_->tick_devices();
+
+        std::this_thread::yield();
     }
 
     if (cpu_thread_exception_)
