@@ -37,17 +37,19 @@ endif()
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 
-# Find CLI11
+# Find required packages
 find_package(CLI11 CONFIG REQUIRED)
+find_package(Threads REQUIRED)
+find_package(SFML 3 REQUIRED COMPONENTS Graphics)
 
 include(${CMAKE_CURRENT_LIST_DIR}/thirdparty/berkeley-softfloat-3.cmake)
 
-file(GLOB_RECURSE SOURCES 
+file(GLOB_RECURSE SOURCES
     "src/*.cpp"
     "src/*.c"
 )
 
-file(GLOB_RECURSE HEADERS 
+file(GLOB_RECURSE HEADERS
     "include/*.h"
     "include/*.hpp"
 )
@@ -59,12 +61,12 @@ target_include_directories(uemu_core
 )
 
 # Link libraries that the core needs
-find_package(Threads REQUIRED)
 target_link_libraries(uemu_core
     PUBLIC
         CLI11::CLI11
         Threads::Threads
         softfloat
+        SFML::Graphics
 )
 
 add_executable(uemu src/main.cpp)

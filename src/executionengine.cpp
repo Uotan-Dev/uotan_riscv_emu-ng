@@ -99,6 +99,9 @@ void ExecutionEngine::execute_until_halt() {
 
         bus_->tick_devices();
 
+        if (ui_backend_) [[likely]]
+            ui_backend_->update();
+
         std::this_thread::yield();
     }
 

@@ -47,7 +47,7 @@ int main(int argc, char* argv[]) {
         std::println("  DRAM size: {} MB ({} bytes)", dram_size_mb, dram_size);
         std::println("  ELF file: {}", elf_file);
 
-        uemu::Emulator emulator(dram_size);
+        uemu::Emulator emulator(dram_size, false);
 
         emulator.loadelf(elf_file);
         emulator.run();

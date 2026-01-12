@@ -25,7 +25,7 @@ namespace uemu {
 
 class Emulator {
 public:
-    explicit Emulator(size_t dram_size);
+    explicit Emulator(size_t dram_size, bool headless = true);
     ~Emulator() = default;
 
     Emulator(const Emulator&) = delete;
