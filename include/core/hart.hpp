@@ -589,13 +589,49 @@ private:
                                    Field::MTIE | Field::SEIE | Field::MEIE;
 };
 
+class MCOUNTINHIBIT final : public CSR {
+public:
+    static constexpr size_t ADDRESS = 0x320;
+
+    enum Shift : uint32_t {
+        CY_SHIFT = 0,
+        IR_SHIFT = 2,
+    };
+
+    enum Field : reg_t {
+        CY = 1ULL << CY_SHIFT,
+        IR = 1ULL << IR_SHIFT,
+    };
+
+    MCOUNTINHIBIT(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {}
+
+    reg_t read_unchecked() const noexcept override { return value_ & mask_; }
+
+    void write_unchecked(reg_t v) noexcept override { value_ = v & mask_; }
+
+private:
+    static constexpr reg_t mask_ = ~2ULL;
+};
+
 class MCYCLE final : public CSR {
 public:
     static constexpr size_t ADDRESS = 0xB00;
 
-    MCYCLE(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {}
+    MCYCLE(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {
+        mcountinhibit_ = dynamic_cast<MCOUNTINHIBIT*>(
+            hart_->csrs[MCOUNTINHIBIT::ADDRESS].get());
+        assert(mcountinhibit_);
+    }
 
-    void advance() noexcept { value_++; }
+    void advance() noexcept {
+        if (mcountinhibit_->read_unchecked() & MCOUNTINHIBIT::Field::CY)
+            return;
+
+        value_++;
+    }
+
+private:
+    MCOUNTINHIBIT* mcountinhibit_;
 };
 
 class MINSTRET final : public CSR {
@@ -603,7 +639,11 @@ public:
     static constexpr size_t ADDRESS = 0xB02;
 
     MINSTRET(Hart* hart)
-        : CSR(hart, PrivilegeLevel::M, 0), increase_suppressed_(false) {}
+        : CSR(hart, PrivilegeLevel::M, 0), increase_suppressed_(false) {
+        mcountinhibit_ = dynamic_cast<MCOUNTINHIBIT*>(
+            hart_->csrs[MCOUNTINHIBIT::ADDRESS].get());
+        assert(mcountinhibit_);
+    }
 
     void write_checked(const DecodedInsn& insn, reg_t v) override {
         CSR::write_checked(insn, v);
@@ -611,13 +651,15 @@ public:
     }
 
     void advance() noexcept {
-        if (!increase_suppressed_) [[likely]]
+        if (!increase_suppressed_ && !(mcountinhibit_->read_unchecked() &
+                                       MCOUNTINHIBIT::Field::IR)) [[likely]]
             value_++;
-        else
-            increase_suppressed_ = false;
+
+        increase_suppressed_ = false;
     }
 
 private:
+    MCOUNTINHIBIT* mcountinhibit_;
     bool increase_suppressed_;
 };
 

@@ -102,6 +102,7 @@ Hart::Hart(addr_t reset_pc) : pc(reset_pc) {
     add_csr<MTVAL>();
 
     add_csr<MCOUNTEREN>();
+    add_csr<MCOUNTINHIBIT>();
     add_csr<MCYCLE>();
     add_csr<MINSTRET>();
     add_csr_ranged<MHPMCOUNTERN>();
