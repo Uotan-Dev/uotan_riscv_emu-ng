@@ -20,6 +20,8 @@
 
 #include "ui/sfml3_backend.hpp"
 
+#include "local-include/uotan_rgba.hpp"
+
 namespace uemu::ui {
 
 bool SFML3Backend::initialized_ = false;
@@ -43,14 +45,18 @@ SFML3Backend::SFML3Backend(std::shared_ptr<ui::PixelSource> pixel_source,
     if (!window_->isOpen())
         throw std::runtime_error("Failed to create window");
 
+    static_assert(uotan_rgba_len == 16384);
+    static constexpr sf::Vector2u ICON_SIZE{64, 64};
+    window_->setIcon(ICON_SIZE, reinterpret_cast<const uint8_t*>(uotan_rgba));
+
     texture_ = std::make_unique<sf::Texture>();
 
     if (!texture_->resize(sf::Vector2u(display_width_, display_height_)))
         throw std::runtime_error("Failed to create texture");
 
-    sprite_ = std::make_unique<sf::Sprite>(*texture_);
-
     texture_->setSmooth(true);
+
+    sprite_ = std::make_unique<sf::Sprite>(*texture_);
 }
 
 SFML3Backend::~SFML3Backend() { initialized_ = false; }
