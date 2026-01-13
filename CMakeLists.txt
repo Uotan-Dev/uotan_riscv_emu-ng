@@ -58,6 +58,8 @@ add_library(uemu_core STATIC ${SOURCES} ${HEADERS})
 
 target_include_directories(uemu_core
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+    SYSTEM PRIVATE 
+        ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/kernel-headers/generic/include
 )
 
 # Link libraries that the core needs
