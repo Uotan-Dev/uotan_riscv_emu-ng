@@ -19,6 +19,7 @@
 #include <functional>
 #include <memory>
 
+#include "ui/input_sink.hpp"
 #include "ui/pixel_source.hpp"
 
 namespace uemu::ui {
@@ -28,9 +29,10 @@ public:
     using ExitCallback = std::function<void(void)>;
 
     UIBackend(std::shared_ptr<ui::PixelSource> pixel_source,
+              std::shared_ptr<ui::InputSink> input_sink,
               ExitCallback exit_callback)
         : pixel_source_(std::move(pixel_source)),
-          exit_callback_(exit_callback) {}
+          input_sink_(std::move(input_sink)), exit_callback_(exit_callback) {}
 
     virtual ~UIBackend() = default;
     virtual void update() = 0;
@@ -42,6 +44,7 @@ protected:
     }
 
     std::shared_ptr<ui::PixelSource> pixel_source_;
+    std::shared_ptr<ui::InputSink> input_sink_;
 
 private:
     ExitCallback exit_callback_;

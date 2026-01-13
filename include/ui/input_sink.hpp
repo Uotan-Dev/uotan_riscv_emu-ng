@@ -16,18 +16,27 @@
 
 #pragma once
 
-#include "ui/ui_backend.hpp"
+#include <cstdint>
+
+extern "C" {
+#include "linux/input-event-codes.h" // IWYU pragma: keep
+}
 
 namespace uemu::ui {
 
-class HeadlessBackend : public UIBackend {
+class InputSink {
 public:
-    HeadlessBackend(std::shared_ptr<ui::PixelSource> pixel_source,
-                    std::shared_ptr<ui::InputSink> input_sink,
-                    ExitCallback exit_callback)
-        : UIBackend(pixel_source, input_sink, exit_callback) {}
+    using linux_event_code_t = uint32_t;
 
-    void update() override {}
+    enum class KeyAction : uint8_t { Press, Release };
+
+    struct KeyEvent {
+        linux_event_code_t input_event_code;
+        KeyAction action;
+    };
+
+    virtual ~InputSink() = default;
+    virtual void push_key_event(KeyEvent event) = 0;
 };
 
 } // namespace uemu::ui

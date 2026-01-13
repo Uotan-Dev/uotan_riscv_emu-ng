@@ -7,7 +7,7 @@
     model = "uemu-ng";
 
     chosen {
-        bootargs = "systemd.mask=systemd-resolved.service";
+        bootargs = "console=ttyS0 console=tty0 systemd.mask=systemd-resolved.service";
         stdout-path = "/soc/uart@10000000";
     };
 
@@ -85,6 +85,15 @@
             phandle = <0x04>;
             reg = <0x0 0x00100000 0x0 0x1000>;
             compatible = "sifive,test1", "sifive,test0", "syscon";
+        };
+
+        goldfish_events: events@10002000 {
+            compatible = "google,goldfish-events-keypad";
+            reg = <0x0 0x10002000 0x0 0x1000>;
+            interrupts = <2>;
+            interrupt-parent = <&plic0>;
+            label = "goldfish-events";
+            status = "okay";
         };
 
         simplefb: frame-buffer@50000000 {

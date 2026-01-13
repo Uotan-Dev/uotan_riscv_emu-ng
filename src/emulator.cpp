@@ -19,6 +19,7 @@
 #include "core/decoder.hpp"
 #include "core/mmu.hpp"
 #include "device/clint.hpp"
+#include "device/goldfish_events.hpp"
 #include "device/nemu_console.hpp"
 #include "device/ns16550.hpp"
 #include "device/plic.hpp"
@@ -66,6 +67,11 @@ Emulator::Emulator(size_t dram_size, bool headless) {
     auto simple_fb = std::make_shared<device::SimpleFB>();
     bus->add_device(simple_fb);
 
+    // GoldfishEvents
+    auto goldfish_events =
+        std::make_shared<device::GoldfishEvents>(request_irq);
+    bus->add_device(goldfish_events);
+
     // NemuConsole
     bus->add_device(std::make_shared<device::NemuConsole>());
 
@@ -78,10 +84,11 @@ Emulator::Emulator(size_t dram_size, bool headless) {
     };
     std::shared_ptr<ui::UIBackend> ui_backend;
     if (headless)
-        ui_backend =
-            std::make_shared<ui::HeadlessBackend>(simple_fb, host_exit);
+        ui_backend = std::make_shared<ui::HeadlessBackend>(
+            simple_fb, goldfish_events, host_exit);
     else
-        ui_backend = std::make_shared<ui::SFML3Backend>(simple_fb, host_exit);
+        ui_backend = std::make_shared<ui::SFML3Backend>(
+            simple_fb, goldfish_events, host_exit);
 
     engine_->set_ui_backend(ui_backend);
 }

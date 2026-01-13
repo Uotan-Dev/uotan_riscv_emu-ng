@@ -25,12 +25,16 @@ namespace uemu::ui {
 class SFML3Backend : public UIBackend {
 public:
     SFML3Backend(std::shared_ptr<ui::PixelSource> pixel_source,
+                 std::shared_ptr<ui::InputSink> input_sink,
                  ExitCallback exit_callback);
     ~SFML3Backend() override;
 
     void update() override;
 
 private:
+    static constexpr InputSink::linux_event_code_t
+    sfml_scancode_to_linux(sf::Keyboard::Scancode code) noexcept;
+
     static bool initialized_;
 
     std::unique_ptr<sf::RenderWindow> window_;
