@@ -116,6 +116,7 @@ public:
         : Device(name, start, size), irq_callback_(irq_callback),
           interrupt_id_(interrupt_id) {}
 
+protected:
     void update_irq(bool lvl) { irq_callback_(interrupt_id_, lvl); }
 
 private:

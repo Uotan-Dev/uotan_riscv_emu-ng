@@ -87,6 +87,13 @@
             compatible = "sifive,test1", "sifive,test0", "syscon";
         };
 
+        rtc@10000100 {
+            compatible = "google,goldfish-rtc";
+            reg = <0x0 0x10000100 0x0 0x100>;
+            interrupts = <11>;
+            interrupt-parent = <&plic0>;
+        };
+
         goldfish_events: events@10002000 {
             compatible = "google,goldfish-events-keypad";
             reg = <0x0 0x10002000 0x0 0x1000>;

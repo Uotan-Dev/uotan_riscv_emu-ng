@@ -20,6 +20,7 @@
 #include "core/mmu.hpp"
 #include "device/clint.hpp"
 #include "device/goldfish_events.hpp"
+#include "device/goldfish_rtc.hpp"
 #include "device/nemu_console.hpp"
 #include "device/ns16550.hpp"
 #include "device/plic.hpp"
@@ -71,6 +72,9 @@ Emulator::Emulator(size_t dram_size, bool headless) {
     auto goldfish_events =
         std::make_shared<device::GoldfishEvents>(request_irq);
     bus->add_device(goldfish_events);
+
+    // GoldfishRTC
+    bus->add_device(std::make_shared<device::GoldfishRTC>(request_irq));
 
     // NemuConsole
     bus->add_device(std::make_shared<device::NemuConsole>());
