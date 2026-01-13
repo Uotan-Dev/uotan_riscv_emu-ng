@@ -32,6 +32,8 @@ public:
     void update() override;
 
 private:
+    void update_view();
+
     static constexpr InputSink::linux_event_code_t
     sfml_scancode_to_linux(sf::Keyboard::Scancode code) noexcept;
 

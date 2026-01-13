@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <algorithm>
 #include <cstring>
 #include <stdexcept>
 
@@ -28,7 +29,7 @@ SFML3Backend::SFML3Backend(std::shared_ptr<ui::PixelSource> pixel_source,
                            ExitCallback exit_callback)
     : UIBackend(pixel_source, input_sink, exit_callback) {
     if (initialized_)
-        throw std::runtime_error("Double SFMLBackend instances.");
+        throw std::runtime_error("Double SFML3Backend instances.");
 
     initialized_ = true;
 
@@ -37,7 +38,7 @@ SFML3Backend::SFML3Backend(std::shared_ptr<ui::PixelSource> pixel_source,
 
     window_ = std::make_unique<sf::RenderWindow>(
         sf::VideoMode(sf::Vector2u(display_width_, display_height_)),
-        "Uotan RISCV Emulator (Next Generation)");
+        "Uotan RISC-V Emulator (Next Generation)");
 
     if (!window_->isOpen())
         throw std::runtime_error("Failed to create window");
@@ -48,6 +49,8 @@ SFML3Backend::SFML3Backend(std::shared_ptr<ui::PixelSource> pixel_source,
         throw std::runtime_error("Failed to create texture");
 
     sprite_ = std::make_unique<sf::Sprite>(*texture_);
+
+    texture_->setSmooth(true);
 }
 
 SFML3Backend::~SFML3Backend() { initialized_ = false; }
@@ -61,6 +64,9 @@ void SFML3Backend::update() {
             request_exit();
             return;
         }
+
+        if (event->is<sf::Event::Resized>())
+            update_view();
 
         if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
             auto linux_event_code =
@@ -116,11 +122,29 @@ void SFML3Backend::update() {
 
     texture_->update(buffer.get());
 
-    window_->clear();
+    window_->clear(sf::Color(64, 64, 64));
     window_->draw(*sprite_);
     window_->display();
 
     last_update = now;
+}
+
+void SFML3Backend::update_view() {
+    sf::Vector2u window_size = window_->getSize();
+
+    float scale_x = static_cast<float>(window_size.x) / display_width_;
+    float scale_y = static_cast<float>(window_size.y) / display_height_;
+    float scale = std::min(scale_x, scale_y);
+
+    float x_offset = (window_size.x - (display_width_ * scale)) / 2.0f;
+    float y_offset = (window_size.y - (display_height_ * scale)) / 2.0f;
+
+    sprite_->setPosition({x_offset, y_offset});
+    sprite_->setScale({scale, scale});
+
+    window_->setView(sf::View(
+        sf::FloatRect({0.f, 0.f}, {static_cast<float>(window_size.x),
+                                   static_cast<float>(window_size.y)})));
 }
 
 constexpr InputSink::linux_event_code_t
