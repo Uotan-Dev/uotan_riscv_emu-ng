@@ -7,7 +7,6 @@
     model = "uemu-ng";
 
     chosen {
-        bootargs = "console=ttyS0 console=tty0 systemd.mask=systemd-resolved.service";
         stdout-path = "/soc/uart@10000000";
     };
 
