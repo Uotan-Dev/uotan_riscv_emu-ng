@@ -103,6 +103,11 @@
             status = "okay";
         };
 
+        rng@10004000 {
+            compatible = "brcm,bcm2835-rng";
+            reg = <0x00 0x10004000 0x00 0x1000>;
+        };
+
         simplefb: frame-buffer@50000000 {
             compatible = "simple-framebuffer";
             reg = <0x0 0x50000000 0x0 0x300000>;
