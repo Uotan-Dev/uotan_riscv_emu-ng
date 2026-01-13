@@ -20,6 +20,7 @@
 #include "core/mmu.hpp"
 #include "device/bcm2835_rng.hpp"
 #include "device/clint.hpp"
+#include "device/goldfish_battery.hpp"
 #include "device/goldfish_events.hpp"
 #include "device/goldfish_rtc.hpp"
 #include "device/nemu_console.hpp"
@@ -76,6 +77,9 @@ Emulator::Emulator(size_t dram_size, bool headless) {
 
     // GoldfishRTC
     bus->add_device(std::make_shared<device::GoldfishRTC>(request_irq));
+
+    // GoldfishBattery
+    bus->add_device(std::make_shared<device::GoldfishBattery>(request_irq));
 
     // BCM2835Rng
     bus->add_device(std::make_shared<device::BCM2835Rng>());

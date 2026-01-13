@@ -103,6 +103,14 @@
             status = "okay";
         };
 
+        goldfish_battery@10003000 {
+            compatible = "google,goldfish-battery";
+            reg = <0x0 0x10003000 0x0 0x1000>;
+            interrupts = <3>;
+            interrupt-parent = <&plic0>;
+            status = "okay";
+        };
+
         rng@10004000 {
             compatible = "brcm,bcm2835-rng";
             reg = <0x00 0x10004000 0x00 0x1000>;
