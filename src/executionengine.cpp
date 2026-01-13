@@ -46,29 +46,6 @@ ExecutionEngine::~ExecutionEngine() {
     }
 }
 
-void ExecutionEngine::execute_once() {
-    mcycle_->advance();
-
-    try {
-        // Normal execution
-        hart_->check_interrupts();
-
-        const auto [insn, ilen] = mmu_->ifetch();
-        core::DecodedInsn decoded_insn =
-            core::Decoder::decode(insn, ilen, hart_->pc);
-
-        hart_->pc += static_cast<addr_t>(ilen);
-        decoded_insn(*hart_, *mmu_);
-        minstret_->advance();
-    } catch (const core::Trap& trap) {
-        // RISC-V Traps
-        hart_->handle_trap(trap);
-    } catch (...) {
-        // Other exceptions
-        throw;
-    }
-}
-
 void ExecutionEngine::execute_until_halt() {
     std::unique_lock<std::mutex> lock(cpu_mutex_);
 
@@ -135,8 +112,23 @@ void ExecutionEngine::cpu_thread() {
             [[unlikely]]
             break;
 
+        mcycle_->advance();
+
         try {
-            execute_once();
+            // Normal execution
+            if ((i & 0x1F) == 0) [[unlikely]]
+                hart_->check_interrupts();
+
+            const auto [insn, ilen] = mmu_->ifetch();
+            core::DecodedInsn decoded_insn =
+                core::Decoder::decode(insn, ilen, hart_->pc);
+
+            hart_->pc += static_cast<addr_t>(ilen);
+            decoded_insn(*hart_, *mmu_);
+            minstret_->advance();
+        } catch (const core::Trap& trap) {
+            // RISC-V Traps
+            hart_->handle_trap(trap);
         } catch (...) {
             cpu_thread_exception_ = std::current_exception();
             shutdown_from_guest_ = true;

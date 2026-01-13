@@ -39,7 +39,6 @@ public:
     ExecutionEngine(ExecutionEngine&&) = delete;
     ExecutionEngine& operator=(ExecutionEngine&&) = delete;
 
-    inline void execute_once();
     void execute_until_halt();
 
     void request_shutdown_from_guest(uint16_t code, uint16_t status) noexcept;
