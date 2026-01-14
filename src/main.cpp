@@ -15,8 +15,8 @@
  */
 
 #include <cstdlib>
+#include <filesystem>
 #include <print>
-#include <string>
 
 #include <CLI/CLI.hpp>
 
@@ -26,7 +26,8 @@ int main(int argc, char* argv[]) {
     CLI::App app{"uemu-ng: RISC-V Emulator"};
     app.set_version_flag("-v,--version", "1.0.0");
 
-    std::string elf_file;
+    std::filesystem::path elf_file;
+    std::filesystem::path signature_file;
     size_t dram_size_mb = 512;
 
     // Configure command line options
@@ -36,6 +37,8 @@ int main(int argc, char* argv[]) {
     app.add_option("-m,--memory", dram_size_mb, "DRAM size in MB")
         ->default_val(512)
         ->check(CLI::Range(64, 16384));
+    app.add_option("-s,--signature", signature_file,
+                   "Dump signature to file (for riscv-arch-test)");
 
     // Parse command line
     CLI11_PARSE(app, argc, argv);
@@ -45,12 +48,16 @@ int main(int argc, char* argv[]) {
 
         std::println("Initializing emulator...");
         std::println("  DRAM size: {} MB ({} bytes)", dram_size_mb, dram_size);
-        std::println("  ELF file: {}", elf_file);
+        std::println("  ELF file: {}", elf_file.string());
 
         uemu::Emulator emulator(dram_size, false);
 
         emulator.loadelf(elf_file);
         emulator.run();
+
+        // Dump signature if requested
+        if (!signature_file.empty())
+            emulator.dump_signature(elf_file, signature_file);
     } catch (const std::runtime_error& e) {
         std::println(stderr, "Runtime error: {}", e.what());
         return EXIT_FAILURE;

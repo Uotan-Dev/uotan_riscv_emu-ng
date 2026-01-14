@@ -51,6 +51,10 @@ public:
             load(addr, data.data(), sizeof(T) * data.size());
     }
 
+    // Dump signature to file (for riscv-arch-test)
+    void dump_signature(const std::filesystem::path& elf_file,
+                        const std::filesystem::path& signature_file);
+
     uint16_t shutdown_code() const noexcept { return engine_->shutdown_code(); }
 
     uint16_t shutdown_status() const noexcept {

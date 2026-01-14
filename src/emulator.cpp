@@ -133,4 +133,10 @@ void Emulator::load(addr_t addr, const std::filesystem::path& path) {
         load(addr, data.data(), data.size());
 }
 
+void Emulator::dump_signature(const std::filesystem::path& elf_file,
+                              const std::filesystem::path& signature_file) {
+    utils::ElfLoader::dump_signature(elf_file, signature_file,
+                                     engine_->get_dram());
+}
+
 } // namespace uemu
