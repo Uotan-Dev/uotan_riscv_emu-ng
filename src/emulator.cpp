@@ -105,7 +105,9 @@ Emulator::Emulator(size_t dram_size, bool headless) {
     engine_->set_ui_backend(ui_backend);
 }
 
-void Emulator::run() { engine_->execute_until_halt(); }
+void Emulator::run(std::chrono::milliseconds timeout) {
+    engine_->execute_until_halt(timeout);
+}
 
 void Emulator::loadelf(const std::filesystem::path& path) {
     addr_t pc = utils::ElfLoader::load(path, engine_->get_dram());

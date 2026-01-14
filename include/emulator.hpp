@@ -33,7 +33,8 @@ public:
     Emulator(Emulator&&) = delete;
     Emulator& operator=(Emulator&&) = delete;
 
-    void run();
+    void
+    run(std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
 
     // Load an elf from path to DRAM
     void loadelf(const std::filesystem::path& path);

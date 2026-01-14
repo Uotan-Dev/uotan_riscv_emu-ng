@@ -46,7 +46,7 @@ ExecutionEngine::~ExecutionEngine() {
     }
 }
 
-void ExecutionEngine::execute_until_halt() {
+void ExecutionEngine::execute_until_halt(std::chrono::milliseconds timeout) {
     std::unique_lock<std::mutex> lock(cpu_mutex_);
 
     if (cpu_thread_running_)
@@ -67,6 +67,9 @@ void ExecutionEngine::execute_until_halt() {
 
     lock.unlock();
 
+    auto start_time = std::chrono::steady_clock::now();
+    bool timeout_enabled = timeout.count() > 0;
+
     while (true) {
         {
             std::lock_guard<std::mutex> lock(cpu_mutex_);
@@ -74,8 +77,23 @@ void ExecutionEngine::execute_until_halt() {
                 break;
         }
 
+        // Check timeout
+        if (timeout_enabled) {
+            auto elapsed = std::chrono::steady_clock::now() - start_time;
+
+            if (elapsed >= timeout) {
+                request_shutdown_from_host();
+                std::println(
+                    "Execution timeout reached ({} ms), shutting down...",
+                    timeout.count());
+                break;
+            }
+        }
+
+        // Tick devices
         bus_->tick_devices();
 
+        // Update UI
         if (ui_backend_) [[likely]]
             ui_backend_->update();
 

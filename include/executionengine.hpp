@@ -39,7 +39,8 @@ public:
     ExecutionEngine(ExecutionEngine&&) = delete;
     ExecutionEngine& operator=(ExecutionEngine&&) = delete;
 
-    void execute_until_halt();
+    void execute_until_halt(
+        std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
 
     void request_shutdown_from_guest(uint16_t code, uint16_t status) noexcept;
     void request_shutdown_from_host() noexcept;
