@@ -30,6 +30,7 @@ int main(int argc, char* argv[]) {
     std::filesystem::path signature_file;
     size_t dram_size_mb = 512;
     uint64_t timeout_ms = 0;
+    bool headless = false;
 
     // Configure command line options
     app.add_option("-f,--file", elf_file, "ELF file to load")
@@ -43,6 +44,7 @@ int main(int argc, char* argv[]) {
     app.add_option("-t,--timeout", timeout_ms,
                    "Execution timeout in milliseconds (0 = no timeout)")
         ->default_val(0);
+    app.add_flag("--headless", headless, "Run in headless mode (no UI window)");
 
     // Parse command line
     CLI11_PARSE(app, argc, argv);
@@ -57,7 +59,7 @@ int main(int argc, char* argv[]) {
         if (timeout_ms > 0)
             std::println("  Timeout: {} ms", timeout_ms);
 
-        uemu::Emulator emulator(dram_size, false);
+        uemu::Emulator emulator(dram_size, headless);
 
         emulator.loadelf(elf_file);
         emulator.run(std::chrono::milliseconds(timeout_ms));
