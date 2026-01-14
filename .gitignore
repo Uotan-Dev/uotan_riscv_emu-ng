@@ -58,6 +58,7 @@ build
 testbins
 __pycache__
 riscof_work
-config.ini
 test.dump
 .cache
+config.ini
+thirdparty/riscof-plugins/sail_cSim/env/sail_config.json

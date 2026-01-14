@@ -7,3 +7,9 @@
 [submodule "thirdparty/kernel-headers"]
 	path = thirdparty/kernel-headers
 	url = https://github.com/sabotage-linux/kernel-headers.git
+[submodule "thirdparty/riscv-arch-test"]
+	path = thirdparty/riscv-arch-test
+	url = https://github.com/riscv-non-isa/riscv-arch-test.git
+[submodule "thirdparty/riscof"]
+	path = thirdparty/riscof
+	url = https://github.com/snnbyyds/riscof.git
