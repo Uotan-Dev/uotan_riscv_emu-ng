@@ -45,6 +45,7 @@ private:
 
     size_t display_width_;
     size_t display_height_;
+    std::vector<uint8_t> pixel_buffer_;
 };
 
 } // namespace uemu::ui

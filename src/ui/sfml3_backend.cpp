@@ -37,6 +37,7 @@ SFML3Backend::SFML3Backend(std::shared_ptr<ui::PixelSource> pixel_source,
 
     display_width_ = pixel_source_->get_width();
     display_height_ = pixel_source_->get_height();
+    pixel_buffer_.resize(pixel_source->get_size());
 
     window_ = std::make_unique<sf::RenderWindow>(
         sf::VideoMode(sf::Vector2u(display_width_, display_height_)),
@@ -106,15 +107,15 @@ void SFML3Backend::update() {
         return;
 
     const size_t size = pixel_source_->get_size();
-    auto buffer = std::make_unique<uint8_t[]>(size);
+    uint8_t* buffer = pixel_buffer_.data();
 
     {
         std::unique_lock<std::mutex> lock = pixel_source_->acquire_lock();
         const uint8_t* pixels = pixel_source_->get_pixels();
-        std::memcpy(buffer.get(), pixels, sizeof(uint8_t) * size);
+        std::memcpy(buffer, pixels, sizeof(uint8_t) * size);
     }
 
-    uint32_t* p = reinterpret_cast<uint32_t*>(buffer.get());
+    uint32_t* p = reinterpret_cast<uint32_t*>(buffer);
     const size_t pixel_count = size / 4;
 
     // xrgb->rgba
@@ -126,7 +127,7 @@ void SFML3Backend::update() {
         p[i] = (0xFF << 24) | (b << 16) | (g << 8) | r;
     }
 
-    texture_->update(buffer.get());
+    texture_->update(buffer);
 
     window_->clear(sf::Color(64, 64, 64));
     window_->draw(*sprite_);
