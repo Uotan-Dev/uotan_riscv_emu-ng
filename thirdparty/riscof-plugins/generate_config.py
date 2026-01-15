@@ -27,8 +27,10 @@ target_run=1
 pluginpath={1}
 """
 
+
 def make_abs(p):
     return os.path.abspath(os.path.expanduser(p))
+
 
 def main():
     dutpath = make_abs(os.path.join(script_dir, dutname))
@@ -46,6 +48,7 @@ def main():
     print("----- config.ini begin -----")
     print(content.rstrip())
     print("----- config.ini end -----\n")
+
 
 if __name__ == "__main__":
     main()
