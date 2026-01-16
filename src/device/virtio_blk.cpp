@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 
-#include <iostream>
-#include <print> // IWYU pragma: keep
-
 #include "device/virtio_blk.hpp"
 
 namespace uemu::device {
@@ -407,22 +404,32 @@ bool VirtioBlk::write_internal(addr_t offset, size_t size, uint64_t value) {
                         dram_->read<uint16_t>(avail_idx_addr);
             }
             break;
-        case VIRTIO_QueueDescLow: queues_[queue_sel_].queue_desc = val; break;
+        case VIRTIO_QueueDescLow:
+            queues_[queue_sel_].queue_desc =
+                (queues_[queue_sel_].queue_desc & 0xFFFFFFFF00000000ULL) | val;
+            break;
         case VIRTIO_QueueDescHigh:
-            if (val != 0)
-                set_fail(); // 64-bit addresses not supported
+            queues_[queue_sel_].queue_desc =
+                (queues_[queue_sel_].queue_desc & 0x00000000FFFFFFFFULL) |
+                (static_cast<uint64_t>(val) << 32);
             break;
         case VIRTIO_QueueDriverLow:
-            queues_[queue_sel_].queue_avail = val;
+            queues_[queue_sel_].queue_avail =
+                (queues_[queue_sel_].queue_avail & 0xFFFFFFFF00000000ULL) | val;
             break;
         case VIRTIO_QueueDriverHigh:
-            if (val != 0)
-                set_fail();
+            queues_[queue_sel_].queue_avail =
+                (queues_[queue_sel_].queue_avail & 0x00000000FFFFFFFFULL) |
+                (static_cast<uint64_t>(val) << 32);
             break;
-        case VIRTIO_QueueDeviceLow: queues_[queue_sel_].queue_used = val; break;
+        case VIRTIO_QueueDeviceLow:
+            queues_[queue_sel_].queue_used =
+                (queues_[queue_sel_].queue_used & 0xFFFFFFFF00000000ULL) | val;
+            break;
         case VIRTIO_QueueDeviceHigh:
-            if (val != 0)
-                set_fail();
+            queues_[queue_sel_].queue_used =
+                (queues_[queue_sel_].queue_used & 0x00000000FFFFFFFFULL) |
+                (static_cast<uint64_t>(val) << 32);
             break;
         case VIRTIO_QueueNotify: queue_notify_handler(val); break;
         case VIRTIO_InterruptACK:

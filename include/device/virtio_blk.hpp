@@ -131,9 +131,9 @@ struct VblkReqHeader {
 
 struct VirtioBlkQueue {
     uint32_t queue_num = 0;
-    uint32_t queue_desc = 0;
-    uint32_t queue_avail = 0;
-    uint32_t queue_used = 0;
+    uint64_t queue_desc = 0;
+    uint64_t queue_avail = 0;
+    uint64_t queue_used = 0;
     uint16_t last_avail = 0;
     bool ready = false;
 };
