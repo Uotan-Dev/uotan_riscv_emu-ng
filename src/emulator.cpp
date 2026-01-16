@@ -28,6 +28,7 @@
 #include "device/plic.hpp"
 #include "device/sifive_test.hpp"
 #include "device/simple_fb.hpp"
+#include "device/virtio_blk.hpp"
 #include "emulator.hpp"
 #include "ui/headless_backend.hpp"
 #include "ui/sfml3_backend.hpp"
@@ -36,7 +37,8 @@
 
 namespace uemu {
 
-Emulator::Emulator(size_t dram_size, bool headless) {
+Emulator::Emulator(size_t dram_size, bool headless,
+                   const std::filesystem::path& disk) {
     auto hart = std::make_shared<core::Hart>();
     auto dram = std::make_shared<core::Dram>(dram_size);
     auto bus = std::make_shared<core::Bus>(dram);
@@ -69,6 +71,11 @@ Emulator::Emulator(size_t dram_size, bool headless) {
     // SimpleFB
     auto simple_fb = std::make_shared<device::SimpleFB>();
     bus->add_device(simple_fb);
+
+    // VirtioBLK
+    if (!disk.empty())
+        bus->add_device(
+            std::make_shared<device::VirtioBlk>(dram, disk, request_irq));
 
     // GoldfishEvents
     auto goldfish_events =

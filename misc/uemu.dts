@@ -93,6 +93,13 @@
             interrupt-parent = <&plic0>;
         };
 
+        virtio_blk@10001000 {
+            compatible = "virtio,mmio";
+            reg = <0x0 0x10001000 0x0 0x1000>;
+            interrupts = <12>;
+            interrupt-parent = <&plic0>;
+        };
+
         goldfish_events: events@10002000 {
             compatible = "google,goldfish-events-keypad";
             reg = <0x0 0x10002000 0x0 0x1000>;

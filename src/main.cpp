@@ -28,6 +28,7 @@ int main(int argc, char* argv[]) {
 
     std::filesystem::path elf_file;
     std::filesystem::path signature_file;
+    std::filesystem::path disk_file;
     size_t dram_size_mb = 512;
     uint64_t timeout_ms = 0;
     bool headless = false;
@@ -39,6 +40,7 @@ int main(int argc, char* argv[]) {
     app.add_option("-m,--memory", dram_size_mb, "DRAM size in MB")
         ->default_val(512)
         ->check(CLI::Range(64, 16384));
+    app.add_option("-d,--disk", disk_file, "Disk file to use");
     app.add_option("-s,--signature", signature_file,
                    "Dump signature to file (for riscv-arch-test)");
     app.add_option("-t,--timeout", timeout_ms,
@@ -59,7 +61,7 @@ int main(int argc, char* argv[]) {
         if (timeout_ms > 0)
             std::println("  Timeout: {} ms", timeout_ms);
 
-        uemu::Emulator emulator(dram_size, headless);
+        uemu::Emulator emulator(dram_size, headless, disk_file);
 
         emulator.loadelf(elf_file);
         emulator.run(std::chrono::milliseconds(timeout_ms));
