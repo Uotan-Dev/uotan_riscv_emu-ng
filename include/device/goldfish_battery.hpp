@@ -46,7 +46,7 @@ public:
 
     GoldfishBattery(IrqCallback irq_callback,
                     uint32_t interrupt_id = DEFAULT_INTERRUPT_ID,
-                    uint32_t init_capacity = 32);
+                    uint32_t init_capacity = 96);
 
 private:
     std::optional<uint64_t> read_internal(addr_t offset, size_t size) override;
