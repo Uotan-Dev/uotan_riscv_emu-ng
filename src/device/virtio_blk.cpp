@@ -326,9 +326,6 @@ std::optional<uint64_t> VirtioBlk::read_internal(addr_t offset, size_t size) {
         return *lo | (*hi << 32);
     }
 
-    if (size != 4)
-        return std::nullopt;
-
     uint32_t reg = offset >> 2;
 
     switch (reg) {
