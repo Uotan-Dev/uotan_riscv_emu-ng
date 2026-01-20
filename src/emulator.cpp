@@ -25,6 +25,7 @@
 #include "device/goldfish_rtc.hpp"
 #include "device/nemu_console.hpp"
 #include "device/ns16550.hpp"
+#include "device/pflash_cfi01.hpp"
 #include "device/plic.hpp"
 #include "device/sifive_test.hpp"
 #include "device/simple_fb.hpp"
@@ -38,7 +39,9 @@
 namespace uemu {
 
 Emulator::Emulator(size_t dram_size, bool headless,
-                   const std::filesystem::path& disk) {
+                   const std::filesystem::path& disk,
+                   const std::filesystem::path& flash0_path,
+                   const std::filesystem::path& flash1_path) {
     auto hart = std::make_shared<core::Hart>();
     auto dram = std::make_shared<core::Dram>(dram_size);
     auto bus = std::make_shared<core::Bus>(dram);
@@ -76,6 +79,17 @@ Emulator::Emulator(size_t dram_size, bool headless,
     if (!disk.empty())
         bus->add_device(
             std::make_shared<device::VirtioBlk>(dram, disk, request_irq));
+
+    // pflash_cfi01
+    auto flash =
+        std::make_shared<device::PFlashCFI01>(0x20000000, 0x10000, 1024);
+
+    if (!flash0_path.empty())
+        flash->load(flash0_path, 0x0000000);
+    if (!flash1_path.empty())
+        flash->load(flash1_path, 0x2000000);
+
+    bus->add_device(flash);
 
     // GoldfishEvents
     auto goldfish_events =

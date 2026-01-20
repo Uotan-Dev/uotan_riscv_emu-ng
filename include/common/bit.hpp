@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 Nuo Shen, Nanjing University
+ * Copyright 2025-2026 Nuo Shen, Nanjing University
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <cassert>
 #include <cstdint>
 #include <limits>
 #include <type_traits>
@@ -48,6 +49,50 @@ constexpr int64_t sext(uint64_t x, int len) {
 
     int shift = 64 - len;
     return static_cast<int64_t>(x << shift) >> shift;
+}
+
+template <typename T>
+constexpr unsigned ctz(T val) {
+    static_assert(std::is_integral_v<T>, "ctz requires integral type");
+    using U = std::make_unsigned_t<T>;
+
+    if (static_cast<U>(val) == 0)
+        return sizeof(U) * 8u;
+
+    if constexpr (sizeof(U) <= 4)
+        return static_cast<unsigned>(__builtin_ctz(static_cast<unsigned>(val)));
+    else
+        return static_cast<unsigned>(
+            __builtin_ctzll(static_cast<unsigned long long>(val)));
+}
+
+template <typename T, typename V>
+constexpr std::make_unsigned_t<T> deposit(T value, int start, int length,
+                                          V fieldval) {
+    static_assert(std::is_integral_v<T>,
+                  "deposit requires integral type for value");
+    static_assert(std::is_integral_v<V>,
+                  "deposit requires integral type for fieldval");
+
+    using U = std::make_unsigned_t<T>;
+    using FV = std::make_unsigned_t<V>;
+    constexpr int W [[maybe_unused]] = static_cast<int>(sizeof(U) * 8);
+
+    assert(start >= 0 && length >= 0 && (start + length) <= W);
+
+    U uvalue = static_cast<U>(value);
+    FV fval = static_cast<FV>(fieldval);
+
+    if (length == 0)
+        return uvalue;
+
+    U low_mask = static_cast<U>(bitmask<U>(length));
+    U mask = static_cast<U>(low_mask << start);
+
+    U field_shifted =
+        static_cast<U>((static_cast<U>(fval) & low_mask) << start);
+
+    return (uvalue & ~mask) | (field_shifted & mask);
 }
 
 }; // namespace uemu

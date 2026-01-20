@@ -26,7 +26,9 @@ namespace uemu {
 class Emulator {
 public:
     explicit Emulator(size_t dram_size, bool headless = true,
-                      const std::filesystem::path& disk = "");
+                      const std::filesystem::path& disk_path = "",
+                      const std::filesystem::path& flash0_path = "",
+                      const std::filesystem::path& flash1_path = "");
     ~Emulator() = default;
 
     Emulator(const Emulator&) = delete;
