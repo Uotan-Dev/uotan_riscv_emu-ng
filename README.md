@@ -3,6 +3,7 @@
 **Uotan RISC-V Emulator - Next Generation** (*uemu-ng*) is a small rv64gc system emulator. It is a refactored version of [uemu](https://github.com/Uotan-Dev/uotan_riscv_emu). While **uemu** served as a proof-of-concept, the **NG** version focuses on strict architectural compliance and robust device emulation.
 
 ![Uotan](./assets/uotan.png)
+![EDK2](./assets/edk2.png)
 
 **uemu-ng** supports the following RISC-V ISA features:
 * RV64I base ISAs, v2.1
@@ -29,6 +30,7 @@
 | NS16550 UART | 0x10000000-0x100000ff | Serial console |
 | SimpleFB | 0x50000000-0x502fffff | Framebuffer (3MB, 1024x768) |
 | VirtIO-Block | 0x10001000-0x10001fff | Block device interface |
+| pflash-cfi01 | 0x20000000-0x23ffffff | CFI parallel flash with Intel command set |
 | GoldfishEvents | 0x10002000-0x10002fff | Input event device |
 | GoldfishRTC | 0x10000100-0x100001ff | Real-time clock |
 | GoldfishBattery | 0x10003000-0x10003fff | Battery status |
@@ -40,7 +42,7 @@
 
 ### [Alpine Linux v3.22](https://www.alpinelinux.org/)
 ![Booting Alpine on uemu-ng](./assets/alpine.png)
-### [Debian trixie](https://www.debian.org/)
+### [Debian forky](https://www.debian.org/)
 ![Booting Debian on uemu-ng](./assets/debian.png)
 ### [Ubuntu 22.04 LTS](https://ubuntu.com/)
 ![Booting Ubuntu on uemu-ng](./assets/ubuntu.png)
@@ -91,15 +93,17 @@ OPTIONS:
   -m,     --memory UINT:INT in [64 - 16384] [512]  
                               DRAM size in MB 
   -d,     --disk TEXT         Disk file to use 
+          --flash0 TEXT       Flash0 file to use 
+          --flash1 TEXT       Flash1 file to use 
   -s,     --signature TEXT    Dump signature to file (for riscv-arch-test) 
   -t,     --timeout UINT [0]  Execution timeout in milliseconds (0 = no timeout) 
           --headless          Run in headless mode (no UI window) 
-
 ```
 
 ## Known Issues
 
 * **No JIT**: It lacks Just-In-Time compilation; every instruction is fetched and decoded individually, so it is slower than **uemu**.
+* **EDK2/UEFI Compatibility**: The `virtio-blk` device currently cannot be successfully probed or initialized by **edk2**, making it unavailable as a boot or storage device in UEFI environments.
 
 ## TODO
 
