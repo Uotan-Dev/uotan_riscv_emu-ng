@@ -31,8 +31,11 @@
             reg = <0x00>;
             status = "okay";
             compatible = "riscv";
-            riscv,isa = "rv64imafdc_zicntr_zihpm_zicsr_zifencei_zca_zcd_sstc_svadu";
             mmu-type = "riscv,sv39";
+			riscv,isa = "rv64imafdc";
+			riscv,isa-base = "rv64i";
+			riscv,isa-extensions = "i", "m", "a", "f", "d", "c", "zicntr", "zicsr",
+					       "zifencei", "zihpm";
 
             cpu0_intc: interrupt-controller {
                 #interrupt-cells = <0x01>;
