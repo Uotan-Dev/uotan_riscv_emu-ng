@@ -37,6 +37,12 @@
 | BCM2835Rng | 0x10004000-0x1000400f | Random number generator |
 | NemuConsole | 0x10008000-0x10008007 | Debug console from [NEMU](https://github.com/NJU-ProjectN/nemu) |
 
+## Continuous Integration Status
+
+| Status (main) | Description |
+| :-----------: | :---------: |
+| [![build status](https://github.com/Uotan-Dev/uotan_riscv_emu-ng/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Uotan-Dev/uotan_riscv_emu-ng/actions/workflows/ci.yml?query=branch%3Amain) | Build and Test |
+
 
 ## Boot Demo
 
