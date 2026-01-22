@@ -50,7 +50,7 @@
 ![Booting Alpine on uemu-ng](./assets/alpine.png)
 ### [Debian forky](https://www.debian.org/)
 ![Booting Debian on uemu-ng](./assets/debian.png)
-### [Ubuntu 22.04 LTS](https://ubuntu.com/)
+### [Ubuntu 24.04 LTS](https://ubuntu.com/)
 ![Booting Ubuntu on uemu-ng](./assets/ubuntu.png)
 
 ## Building
