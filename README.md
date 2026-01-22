@@ -109,7 +109,7 @@ OPTIONS:
 ## Known Issues
 
 * **No JIT**: It lacks Just-In-Time compilation; every instruction is fetched and decoded individually, so it is slower than **uemu**.
-* **EDK2/UEFI Compatibility**: The `virtio-blk` device currently cannot be successfully probed or initialized by **edk2**, making it unavailable as a boot or storage device in UEFI environments.
+* ~~**EDK2/UEFI Compatibility**: The `virtio-blk` device currently cannot be successfully probed or initialized by **edk2**, making it unavailable as a boot or storage device in UEFI environments.~~
 
 ## TODO
 

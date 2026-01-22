@@ -24,6 +24,7 @@ VirtioBlk::VirtioBlk(std::shared_ptr<core::Dram> dram,
     : IrqDevice("VirtIO-Block", DEFAULT_BASE, SIZE, irq_callback, interrupt_id),
       dram_(std::move(dram)), disk_path_(disk_path) {
     std::memset(&config_, 0, sizeof(config_));
+    config_.blk_size = DISK_BLK_SIZE;
 
     if (!open_disk(disk_path_))
         throw std::runtime_error("Failed to open disk: " + disk_path_);
@@ -109,6 +110,7 @@ void VirtioBlk::update_status(uint32_t status) {
 
         device_features_ = saved_device_features;
         config_.capacity = saved_capacity;
+        config_.blk_size = DISK_BLK_SIZE;
     }
 }
 
@@ -326,9 +328,10 @@ std::optional<uint64_t> VirtioBlk::read_internal(addr_t offset, size_t size) {
         return *lo | (*hi << 32);
     }
 
-    uint32_t reg = offset >> 2;
+    if (offset < VIRTIO_Config && size != 4) [[unlikely]]
+        return std::nullopt;
 
-    switch (reg) {
+    switch (offset) {
         case VIRTIO_MagicValue: return VIRTIO_MAGIC_NUMBER;
         case VIRTIO_Version: return VIRTIO_VERSION;
         case VIRTIO_DeviceID: return VIRTIO_BLK_DEV_ID;
@@ -345,17 +348,19 @@ std::optional<uint64_t> VirtioBlk::read_internal(addr_t offset, size_t size) {
         case VIRTIO_Status: return status_;
         case VIRTIO_ConfigGeneration: return VIRTIO_CONFIG_GENERATE;
         default:
-            if (reg >= VIRTIO_Config) {
-                uint32_t config_offset = (reg - VIRTIO_Config) * 4;
-                if (config_offset + 4 <= sizeof(config_)) {
-                    uint32_t value;
+            if (offset >= VIRTIO_Config) {
+                uint32_t config_offset = offset - VIRTIO_Config;
+
+                if (config_offset + size <= sizeof(config_)) {
+                    uint32_t value = 0;
                     std::memcpy(&value,
                                 reinterpret_cast<const uint8_t*>(&config_) +
                                     config_offset,
-                                4);
+                                size);
                     return value;
                 }
             }
+
             return 0;
     }
 
@@ -367,13 +372,12 @@ bool VirtioBlk::write_internal(addr_t offset, size_t size, uint64_t value) {
         return write_internal(offset, 4, value & 0xFFFFFFFF) &&
                write_internal(offset + 4, 4, value >> 32);
 
-    if (size != 4)
+    if (offset < VIRTIO_Config && size != 4) [[unlikely]]
         return false;
 
-    uint32_t reg = offset >> 2;
     uint32_t val = static_cast<uint32_t>(value);
 
-    switch (reg) {
+    switch (offset) {
         case VIRTIO_DeviceFeaturesSel: device_features_sel_ = val; break;
         case VIRTIO_DriverFeatures:
             if (driver_features_sel_ == 0)
@@ -436,15 +440,15 @@ bool VirtioBlk::write_internal(addr_t offset, size_t size, uint64_t value) {
             break;
         case VIRTIO_Status: update_status(val); break;
         default:
-            // Configuration space writes
-            if (reg >= VIRTIO_Config) {
-                uint32_t config_offset = (reg - VIRTIO_Config) * 4;
-                if (config_offset + 4 <= sizeof(config_)) {
+            if (offset >= VIRTIO_Config) {
+                uint32_t config_offset = offset - VIRTIO_Config;
+
+                if (config_offset + size <= sizeof(config_))
                     std::memcpy(reinterpret_cast<uint8_t*>(&config_) +
                                     config_offset,
-                                &val, 4);
-                }
+                                &val, size);
             }
+
             break;
     }
 
