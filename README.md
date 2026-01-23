@@ -1,9 +1,8 @@
 # uemu-ng — tiny RISC-V system emulator
 
-**Uotan RISC-V Emulator - Next Generation** (*uemu-ng*) is a small rv64gc system emulator. It is a refactored version of [uemu](https://github.com/Uotan-Dev/uotan_riscv_emu). While **uemu** served as a proof-of-concept, the **NG** version focuses on strict architectural compliance and robust device emulation.
-
-![Uotan](./assets/uotan.png)
 ![EDK2](./assets/edk2.png)
+
+**Uotan RISC-V Emulator - Next Generation** (*uemu-ng*) is a small rv64gc system emulator. It is a refactored version of [uemu](https://github.com/Uotan-Dev/uotan_riscv_emu). While **uemu** served as a proof-of-concept, the **NG** version focuses on strict architectural compliance and robust device emulation.
 
 **uemu-ng** supports the following RISC-V ISA features:
 * RV64I base ISAs, v2.1
@@ -50,15 +49,14 @@
 ![Booting Alpine on uemu-ng](./assets/alpine.png)
 ### [Debian forky](https://www.debian.org/)
 ![Booting Debian on uemu-ng](./assets/debian.png)
-### [Ubuntu 24.04 LTS](https://ubuntu.com/)
-![Booting Ubuntu on uemu-ng](./assets/ubuntu.png)
 
 ## Building
-### Prerequisites
+## Prerequisites
 
-* CMake 3.20 or later
-* C++23 compatible compiler
-* C17 compatible compiler
+* **CMake**: 3.20 or later
+* **C++ Compiler**: C++23 compatible
+* **C Compiler**: C17 compatible
+* **Platform Note**: If you are on **Windows**, you must use the **MSYS2 Clang64** environment. Standard MSVC (Visual Studio) is not supported.
 
 ### Required dependencies:
 
@@ -79,7 +77,7 @@ git submodule update --init --recursive
 mkdir build && cd build
 
 # Configure and build
-cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
 cmake --build . --config Release -j$(nproc)
 ```
 
