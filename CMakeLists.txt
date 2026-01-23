@@ -15,11 +15,15 @@
 cmake_minimum_required(VERSION 3.20)
 project(uemu-ng LANGUAGES C CXX)
 
+# Check for MSVC and reject it
+if(MSVC)
+    message(FATAL_ERROR "MSVC is not supported. Please use GCC or Clang (MinGW-w64 or LLVM on Windows).")
+endif()
+
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED ON)
-
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -27,11 +31,21 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 
-if(MSVC)
-    add_compile_options(/W4)
-else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+# Compiler flags for GCC/Clang
+add_compile_options(-Wall -Wextra)
+
+# Platform-specific settings
+if(WIN32)
+    message(STATUS "Building for Windows with ${CMAKE_CXX_COMPILER_ID}")
+    # Ensure we're using MinGW or Clang on Windows
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        message(WARNING "Unknown compiler on Windows. GCC (MinGW-w64) or Clang recommended.")
+    endif()
+    
+    # Windows-specific flags
+    add_compile_definitions(_WIN32_WINNT=0x0A00)  # Windows 10+
 endif()
 
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3")
@@ -58,7 +72,7 @@ add_library(uemu_core STATIC ${SOURCES} ${HEADERS})
 
 target_include_directories(uemu_core
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
-    SYSTEM PRIVATE 
+    PUBLIC 
         ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/kernel-headers/generic/include
 )
 
@@ -75,10 +89,15 @@ add_executable(uemu src/main.cpp)
 target_link_libraries(uemu PRIVATE uemu_core)
 target_include_directories(uemu PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-option(BUILD_TESTING "Build tests" ON)
-if(BUILD_TESTING)
-    enable_testing()
-    add_subdirectory(tests)
-endif()
+if(WIN32)
+    set(BUILD_TESTING OFF)
+    message(STATUS "Windows detected: Testing and riscv-tests are disabled.")
+else()
+    option(BUILD_TESTING "Build tests" ON)
+    if(BUILD_TESTING)
+        enable_testing()
+        add_subdirectory(tests)
+    endif()
 
-include(${CMAKE_CURRENT_LIST_DIR}/thirdparty/riscv-tests.cmake)
+    include(${CMAKE_CURRENT_LIST_DIR}/thirdparty/riscv-tests.cmake)
+endif()

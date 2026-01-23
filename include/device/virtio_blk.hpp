@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <filesystem>
 #include <fstream>
 
 #include "core/dram.hpp"
@@ -144,8 +145,8 @@ public:
     static constexpr size_t SIZE = 0x1000;
     static constexpr uint32_t DEFAULT_INTERRUPT_ID = 12;
 
-    VirtioBlk(std::shared_ptr<core::Dram> dram, const std::string& disk_path,
-              IrqCallback irq_callback,
+    VirtioBlk(std::shared_ptr<core::Dram> dram,
+              const std::filesystem::path& disk_path, IrqCallback irq_callback,
               uint32_t interrupt_id = DEFAULT_INTERRUPT_ID);
 
     VirtioBlk(const VirtioBlk&) = delete;
@@ -167,7 +168,7 @@ private:
     void read_handler(uint64_t sector, uint64_t desc_addr, uint32_t len);
     void write_handler(uint64_t sector, uint64_t desc_addr, uint32_t len);
 
-    bool open_disk(const std::string& disk_path);
+    bool open_disk(const std::filesystem::path& disk_path);
     void close_disk();
 
     std::shared_ptr<core::Dram> dram_;
@@ -187,7 +188,7 @@ private:
     size_t disk_size_;
     VirtioBlkConfig config_;
 
-    std::string disk_path_;
+    std::filesystem::path disk_path_;
 };
 
 }; // namespace uemu::device

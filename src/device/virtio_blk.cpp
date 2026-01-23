@@ -19,20 +19,20 @@
 namespace uemu::device {
 
 VirtioBlk::VirtioBlk(std::shared_ptr<core::Dram> dram,
-                     const std::string& disk_path, IrqCallback irq_callback,
-                     uint32_t interrupt_id)
+                     const std::filesystem::path& disk_path,
+                     IrqCallback irq_callback, uint32_t interrupt_id)
     : IrqDevice("VirtIO-Block", DEFAULT_BASE, SIZE, irq_callback, interrupt_id),
       dram_(std::move(dram)), disk_path_(disk_path) {
     std::memset(&config_, 0, sizeof(config_));
     config_.blk_size = DISK_BLK_SIZE;
 
     if (!open_disk(disk_path_))
-        throw std::runtime_error("Failed to open disk: " + disk_path_);
+        throw std::runtime_error("Failed to open disk: " + disk_path_.string());
 }
 
 VirtioBlk::~VirtioBlk() { close_disk(); }
 
-bool VirtioBlk::open_disk(const std::string& disk_path) {
+bool VirtioBlk::open_disk(const std::filesystem::path& disk_path) {
     std::ifstream test_file(disk_path, std::ios::binary);
     bool file_exists = test_file.good();
     test_file.close();

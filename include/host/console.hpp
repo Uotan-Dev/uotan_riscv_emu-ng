@@ -46,7 +46,7 @@ public:
         return std::nullopt;
 #else
         unsigned char c;
-        int nread = ::read(STDIN_FILENO, &c, 1);
+        ssize_t nread = ::read(STDIN_FILENO, &c, 1);
 
         if (nread > 0)
             return static_cast<char>(c);
@@ -73,9 +73,10 @@ private:
         tcgetattr(STDIN_FILENO, &originalTermios_);
         struct termios raw = originalTermios_;
 
-        raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+        raw.c_iflag &=
+            ~static_cast<tcflag_t>(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
         raw.c_cflag |= (CS8);
-        raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
+        raw.c_lflag &= ~static_cast<tcflag_t>(ECHO | ICANON | IEXTEN | ISIG);
         raw.c_cc[VMIN] = 0;
         raw.c_cc[VTIME] = 0;
 

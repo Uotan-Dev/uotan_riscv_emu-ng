@@ -24,6 +24,7 @@
  */
 
 #include <memory>
+#include <mutex>
 #include <queue>
 
 #include "device/device.hpp"

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <string_view>
 #include <utility>
 
 #include "common/bit.hpp"

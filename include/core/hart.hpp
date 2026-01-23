@@ -19,6 +19,7 @@
 #include <array>
 #include <atomic>
 #include <cassert>
+#include <exception>
 #include <limits>
 #include <memory>
 
