@@ -92,9 +92,9 @@ void ElfLoader::dump_signature(const std::filesystem::path& elf_path,
     std::println("Dumping signature from [{:#010x}, {:#010x})", start_addr,
                  end_addr);
 
-    for (uint64_t addr = start_addr; addr < end_addr; addr += 4)
-        out << std::hex << std::setw(8) << std::setfill('0')
-            << dram.read<uint32_t>(addr) << '\n';
+    for (uint64_t addr = start_addr; addr < end_addr; addr += 8)
+        out << std::hex << std::setw(16) << std::setfill('0')
+            << dram.read<uint64_t>(addr) << '\n';
 
     std::println("Signature dumped to {}", sig_file_path.string());
 }

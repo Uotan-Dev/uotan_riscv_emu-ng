@@ -227,7 +227,7 @@ class sail_cSim(pluginTemplate):
 
             execute += (
                 self.sail_exe
-                + " --config={0} --trace-all --signature-granularity=4  --test-signature={1} {2} > {3}.log 2>&1;".format(
+                + " --config={0} --trace-all --signature-granularity=8  --test-signature={1} {2} > {3}.log 2>&1;".format(
                     sail_config_path, sig_file, elf, test_name
                 )
             )
