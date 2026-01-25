@@ -73,8 +73,7 @@ MSTATUS::MSTATUS(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {
                   F::SPIE | F::SPP | F::SUM | F::MXR | F::TVM | F::TW | F::TSR;
 
     value_ = (MISA::xlen_64 << S::SXL_SHIFT) | (MISA::xlen_64 << S::UXL_SHIFT) |
-             static_cast<reg_t>(PrivilegeLevel::M) << S::MPP_SHIFT |
-             (1ULL << S::FS_SHIFT);
+             static_cast<reg_t>(PrivilegeLevel::U) << S::MPP_SHIFT;
 }
 
 Hart::Hart(addr_t reset_pc) : pc(reset_pc) {
