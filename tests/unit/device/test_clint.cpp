@@ -32,10 +32,11 @@ TEST(ClintTest, MTIMECMPTrigger) {
 
     device::Clint clint(hart, 1000);
 
+    bool r = clint.write(MTIMECMP_ADDR, 1145141919810ull);
     clint.tick();
     EXPECT_FALSE(mip->read_unchecked() & core::MIP::MTIP);
 
-    bool r = clint.write<uint64_t>(MTIMECMP_ADDR, 0ull);
+    r = clint.write<uint64_t>(MTIMECMP_ADDR, 0ull);
     std::this_thread::sleep_for(std::chrono::milliseconds(64));
     clint.tick();
     EXPECT_TRUE(r);

@@ -14,16 +14,15 @@
  * limitations under the License.
  */
 
-#include <limits>
-
 #include "device/clint.hpp"
 
 namespace uemu::device {
 
 Clint::Clint(std::shared_ptr<core::Hart> hart, uint64_t freq_hz)
     : Device("CLINT", DEFAULT_BASE, SIZE), hart_(std::move(hart)), mtime_(0),
-      mtimecmp_(std::numeric_limits<reg_t>::max()), freq_hz_(freq_hz) {
+      mtimecmp_(0), freq_hz_(freq_hz) {
     start_time_ = std::chrono::steady_clock::now();
+    tick();
 }
 
 void Clint::tick() {
