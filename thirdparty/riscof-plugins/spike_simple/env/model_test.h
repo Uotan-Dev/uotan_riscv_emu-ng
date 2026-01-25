@@ -1,6 +1,5 @@
 #ifndef _COMPLIANCE_MODEL_H
 #define _COMPLIANCE_MODEL_H
-
 #define RVMODEL_DATA_SECTION \
         .pushsection .tohost,"aw",@progbits;                            \
         .align 8; .global tohost; tohost: .dword 0;                     \
@@ -11,7 +10,6 @@
         .align 8; .global end_regstate; end_regstate:                   \
         .word 4;
 
-
 #ifndef RVMODEL_PMP_GRAIN
   #define RVMODEL_PMP_GRAIN   0
 #endif
@@ -19,6 +17,7 @@
 #ifndef RVMODEL_NUM_PMPS
   #define RVMODEL_NUM_PMPS    16
 #endif
+
 
 //RV_COMPLIANCE_HALT
 #define RVMODEL_HALT    ;\
@@ -37,7 +36,8 @@ li x1, 1                ;\
 
 //RV_COMPLIANCE_DATA_END
 #define RVMODEL_DATA_END                                                      \
-  .align 4; .global end_signature; end_signature:
+  .align 4;\
+  .global end_signature; end_signature:  
 
 //RVTEST_IO_INIT
 #define RVMODEL_IO_INIT
@@ -52,15 +52,18 @@ li x1, 1                ;\
 //RVTEST_IO_ASSERT_DFPR_EQ
 #define RVMODEL_IO_ASSERT_DFPR_EQ(_D, _R, _I)
 
-#define RVMODEL_SET_MSW_INT
+#define RVMODEL_SET_MSW_INT       \
+ li t1, 1;                         \
+ li t2, 0x2000000;                 \
+ sw t1, 0(t2);
 
-#define RVMODEL_CLEAR_MSW_INT
+#define RVMODEL_CLEAR_MSW_INT     \
+ li t2, 0x2000000;                 \
+ sw x0, 0(t2);
 
 #define RVMODEL_CLEAR_MTIMER_INT
 
 #define RVMODEL_CLEAR_MEXT_INT
 
-#define RVMODEL_PMP_GRAIN 0
-#define RVMODEL_NUM_PMPS 16
 
 #endif // _COMPLIANCE_MODEL_H

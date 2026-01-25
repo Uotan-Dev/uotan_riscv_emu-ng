@@ -5,7 +5,7 @@ import os
 import sys
 
 dutname = "uemu"
-refname = "sail_cSim"
+refname = "spike_simple"
 
 script_dir = os.path.abspath(os.path.dirname(__file__))
 out_dir = os.getcwd()
@@ -25,6 +25,9 @@ target_run=1
 
 [{0}]
 pluginpath={1}
+ispec={1}/{0}_isa.yaml
+pspec={1}/{0}_platform.yaml
+target_run=1
 """
 
 
