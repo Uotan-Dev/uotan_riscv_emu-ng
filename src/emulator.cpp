@@ -45,9 +45,9 @@ Emulator::Emulator(size_t dram_size, bool headless,
     auto hart = std::make_shared<core::Hart>();
     auto dram = std::make_shared<core::Dram>(dram_size);
     auto bus = std::make_shared<core::Bus>(dram);
-    auto mmu = std::make_shared<core::MMU>(hart, bus);
+    auto mmu = std::make_shared<core::MMU>(hart.get(), bus);
 
-    hart->connect_mmu(mmu);
+    hart->connect_mmu(mmu.get());
 
     // Clint
     bus->add_device(std::make_shared<device::Clint>(hart));

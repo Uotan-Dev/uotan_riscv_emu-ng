@@ -40,9 +40,9 @@ public:
         bool dirty;
     };
 
-    explicit MMU(std::shared_ptr<Hart> hart, std::shared_ptr<Bus> bus)
-        : reservation_address(0), reservation_valid(false),
-          hart_(std::move(hart)), bus_(std::move(bus)) {
+    explicit MMU(Hart* hart, std::shared_ptr<Bus> bus)
+        : reservation_address(0), reservation_valid(false), hart_(hart),
+          bus_(std::move(bus)) {
         tlb_flush_all();
     }
 
@@ -208,7 +208,7 @@ private:
 
     static constexpr size_t TLB_ENTRIES = 128;
 
-    std::shared_ptr<Hart> hart_;
+    Hart* hart_;
     std::shared_ptr<Bus> bus_;
 
     TLBEntry itlb_[TLB_ENTRIES];

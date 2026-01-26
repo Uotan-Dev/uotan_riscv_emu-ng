@@ -145,16 +145,14 @@ public:
     void check_interrupts() const;
     void set_interrupt_pending(reg_t mip_mask, bool pending) noexcept;
 
-    void connect_mmu(std::shared_ptr<MMU> mmu) noexcept {
-        this->mmu = std::move(mmu);
-    }
+    void connect_mmu(MMU* mmu) noexcept { this->mmu = mmu; }
 
     addr_t pc;
     RegisterFile gprs;
     std::array<FPR, FPR_COUNT> fprs;
     std::array<std::shared_ptr<CSR>, CSR_COUNT> csrs;
     PrivilegeLevel priv;
-    std::shared_ptr<MMU> mmu;
+    MMU* mmu;
 
 private:
     template <typename T>

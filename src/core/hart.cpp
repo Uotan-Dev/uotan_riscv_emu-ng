@@ -166,6 +166,8 @@ Hart::Hart(addr_t reset_pc) : pc(reset_pc) {
 
     // Start with Machine Mode
     priv = PrivilegeLevel::M;
+
+    mmu = nullptr;
 }
 
 void Hart::handle_trap(const Trap& trap) noexcept {
