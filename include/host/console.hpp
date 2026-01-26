@@ -16,9 +16,7 @@
 
 #pragma once
 
-#include <iostream>
 #include <optional>
-#include <print>
 
 #ifdef _WIN32
 #include <conio.h>
@@ -55,9 +53,12 @@ public:
 #endif
     }
 
-    void write_char(char ch) {
-        std::print("{}", ch);
-        std::cout.flush();
+    void write_char(char ch) noexcept {
+#ifdef _WIN32
+        _putch(ch);
+#else
+        ::write(STDOUT_FILENO, &ch, 1);
+#endif
     }
 
 private:
