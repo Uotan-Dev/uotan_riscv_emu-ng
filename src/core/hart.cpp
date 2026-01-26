@@ -157,12 +157,12 @@ Hart::Hart(addr_t reset_pc) : pc(reset_pc) {
 
     for (size_t i = HPMCOUNTERN::MIN_ADDRESS; i <= HPMCOUNTERN::MAX_ADDRESS;
          i += HPMCOUNTERN::DELTA_ADDRESS)
-        csrs[i] = std::make_shared<HPMCOUNTERN>(this, i);
+        csrs[i] = std::make_unique<HPMCOUNTERN>(this, i);
 
     // Unimplemented CSR
     for (size_t i = 0; i < csrs.size(); i++)
         if (!csrs[i])
-            csrs[i] = std::make_shared<UnimplementedCSR>(this, i, false);
+            csrs[i] = std::make_unique<UnimplementedCSR>(this, i, false);
 
     // Start with Machine Mode
     priv = PrivilegeLevel::M;

@@ -150,26 +150,26 @@ public:
     addr_t pc;
     RegisterFile gprs;
     std::array<FPR, FPR_COUNT> fprs;
-    std::array<std::shared_ptr<CSR>, CSR_COUNT> csrs;
+    std::array<std::unique_ptr<CSR>, CSR_COUNT> csrs;
     PrivilegeLevel priv;
     MMU* mmu;
 
 private:
     template <typename T>
     void add_csr() {
-        csrs[T::ADDRESS] = std::make_shared<T>(this);
+        csrs[T::ADDRESS] = std::make_unique<T>(this);
     }
 
     template <typename T>
     void add_csr(reg_t value) {
-        csrs[T::ADDRESS] = std::make_shared<T>(this, value);
+        csrs[T::ADDRESS] = std::make_unique<T>(this, value);
     }
 
     template <typename T>
     void add_csr_ranged() {
         for (size_t i = T::MIN_ADDRESS; i <= T::MAX_ADDRESS;
              i += T::DELTA_ADDRESS)
-            csrs[i] = std::make_shared<T>(this);
+            csrs[i] = std::make_unique<T>(this);
     }
 };
 
