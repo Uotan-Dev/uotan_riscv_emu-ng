@@ -20,6 +20,7 @@
 
 #include "core/decoder.hpp"
 #include "core/hart.hpp"
+#include "core/mmu.hpp" // IWYU pragma: keep
 
 namespace uemu::core {
 
@@ -74,6 +75,18 @@ MSTATUS::MSTATUS(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {
 
     value_ = (MISA::xlen_64 << S::SXL_SHIFT) | (MISA::xlen_64 << S::UXL_SHIFT) |
              static_cast<reg_t>(PrivilegeLevel::U) << S::MPP_SHIFT;
+}
+
+// Implementations are not required to support all MODE settings, and if
+// satp is written with an unsupported MODE, the entire write has no effect;
+// no fields in satp are modified.
+void SATP::write_unchecked(reg_t v) noexcept {
+    reg_t mode = (v & MODE) >> MODE_SHIFT;
+
+    if (value_ != v && (mode == Bare || mode == Sv39)) {
+        value_ = v;
+        hart_->mmu->tlb_flush_all();
+    }
 }
 
 Hart::Hart(addr_t reset_pc) : pc(reset_pc) {

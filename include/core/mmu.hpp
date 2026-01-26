@@ -32,9 +32,19 @@ public:
 
     enum class AccessType { Fetch, Load, Store };
 
+    struct TLBEntry {
+        addr_t vpn;
+        addr_t ppn;
+        uint8_t perm;
+        bool valid;
+        bool dirty;
+    };
+
     explicit MMU(std::shared_ptr<Hart> hart, std::shared_ptr<Bus> bus)
         : reservation_address(0), reservation_valid(false),
-          hart_(std::move(hart)), bus_(std::move(bus)) {}
+          hart_(std::move(hart)), bus_(std::move(bus)) {
+        tlb_flush_all();
+    }
 
     template <typename T>
     [[nodiscard]] T read(addr_t pc, addr_t addr) {
@@ -161,6 +171,22 @@ public:
         return {insn, Ilen::Normal};
     }
 
+    void tlb_flush_all() noexcept {
+        memset(itlb_, 0, sizeof(itlb_));
+        memset(dtlb_, 0, sizeof(dtlb_));
+    }
+
+    void tlb_flush_vaddr(addr_t vaddr) {
+        uint64_t vpn = vaddr >> PGSHIFT;
+        uint32_t idx = vpn & (TLB_ENTRIES - 1);
+
+        if (dtlb_[idx].valid && dtlb_[idx].vpn == vpn)
+            dtlb_[idx].valid = false;
+
+        if (itlb_[idx].valid && itlb_[idx].vpn == vpn)
+            itlb_[idx].valid = false;
+    }
+
     addr_t reservation_address;
     bool reservation_valid;
 
@@ -174,13 +200,19 @@ private:
     static constexpr reg_t PTE_A = 1 << 6;
     static constexpr reg_t PTE_D = 1 << 7;
     static constexpr reg_t PTE_RESERVED_MASK = 0xFFC0000000000000ULL;
+    static constexpr reg_t PTE_PERM_MASK = PTE_R | PTE_W | PTE_X | PTE_U;
 
     static constexpr size_t LEVELS = 3;
     static constexpr size_t PTESIZE = 8;
     static constexpr size_t VPNBITS = 9;
 
+    static constexpr size_t TLB_ENTRIES = 128;
+
     std::shared_ptr<Hart> hart_;
     std::shared_ptr<Bus> bus_;
+
+    TLBEntry itlb_[TLB_ENTRIES];
+    TLBEntry dtlb_[TLB_ENTRIES];
 
     // Check if an instruction at pc may cross pages
     static bool may_cross_page(addr_t pc) noexcept {
@@ -244,9 +276,42 @@ private:
         if (static_cast<addr_t>(t) != vaddr) [[unlikely]]
             raise_page_fault(pc, vaddr, type);
 
-        reg_t ppn = (satp & SATP::Field::PPN) >> SATP::Shift::PPN_SHIFT;
         bool sum = mstatus & MSTATUS::Field::SUM;
         bool mxr = mstatus & MSTATUS::Field::MXR;
+        uint64_t vpn = vaddr >> PGSHIFT;
+        uint32_t idx = vpn & (TLB_ENTRIES - 1);
+        TLBEntry* entry = type == AccessType::Fetch ? &itlb_[idx] : &dtlb_[idx];
+        bool allowed = false;
+
+        if (entry->valid && entry->vpn == vpn) [[likely]] {
+            if (entry->perm & PTE_U) {
+                if (priv == PrivilegeLevel::S &&
+                    (type == AccessType::Fetch || !sum))
+                    goto miss;
+            } else if (priv == PrivilegeLevel::U) {
+                goto miss;
+            }
+
+            switch (type) {
+                case AccessType::Fetch: allowed = entry->perm & PTE_X; break;
+                case AccessType::Load:
+                    allowed =
+                        (entry->perm & PTE_R) || (mxr && (entry->perm & PTE_X));
+                    break;
+                case AccessType::Store: allowed = entry->perm & PTE_W; break;
+            }
+
+            if (!allowed) [[unlikely]]
+                goto miss;
+
+            if (type == AccessType::Store && !entry->dirty)
+                goto miss;
+
+            return (entry->ppn << PGSHIFT) | (vaddr & PGMASK);
+        }
+
+    miss:;
+        reg_t ppn = (satp & SATP::Field::PPN) >> SATP::Shift::PPN_SHIFT;
         bool adue = hart_->csrs[MENVCFG::ADDRESS]->read_unchecked() &
                     MENVCFG::Field::ADUE;
 
@@ -330,17 +395,26 @@ private:
                     raise_access_fault(pc, vaddr, type);
             }
 
-            // Construct physical address
+            // Construct physical address and fill TLB
+            uint64_t final_ppn;
+
             if (i > 0) {
                 // Superpage
                 reg_t vpn_mask = (1ULL << (i * VPNBITS)) - 1;
                 reg_t vpn_low = (vaddr >> PGSHIFT) & vpn_mask;
                 reg_t ppn_high_mask = ~vpn_mask;
-                reg_t pa_ppn = (pte_ppn & ppn_high_mask) | vpn_low;
-                return (pa_ppn << PGSHIFT) | (vaddr & PGMASK);
+                final_ppn = (pte_ppn & ppn_high_mask) | vpn_low;
+            } else {
+                final_ppn = pte_ppn;
             }
 
-            return (pte_ppn << PGSHIFT) | (vaddr & PGMASK);
+            entry->vpn = vpn;
+            entry->ppn = final_ppn;
+            entry->perm = pte & PTE_PERM_MASK;
+            entry->valid = true;
+            entry->dirty = pte & PTE_D;
+
+            return (final_ppn << PGSHIFT) | (vaddr & PGMASK);
         }
 
         std::unreachable();

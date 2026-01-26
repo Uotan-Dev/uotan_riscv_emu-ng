@@ -131,6 +131,8 @@ private:
     std::array<reg_t, 32> gprs_;
 };
 
+class MMU;
+
 class Hart {
 public:
     static constexpr size_t GPR_COUNT = 32;
@@ -143,11 +145,16 @@ public:
     void check_interrupts() const;
     void set_interrupt_pending(reg_t mip_mask, bool pending) noexcept;
 
+    void connect_mmu(std::shared_ptr<MMU> mmu) noexcept {
+        this->mmu = std::move(mmu);
+    }
+
     addr_t pc;
     RegisterFile gprs;
     std::array<FPR, FPR_COUNT> fprs;
     std::array<std::shared_ptr<CSR>, CSR_COUNT> csrs;
     PrivilegeLevel priv;
+    std::shared_ptr<MMU> mmu;
 
 private:
     template <typename T>
@@ -1018,15 +1025,7 @@ public:
         assert(mstatus_);
     }
 
-    // Implementations are not required to support all MODE settings, and if
-    // satp is written with an unsupported MODE, the entire write has no effect;
-    // no fields in satp are modified.
-    void write_unchecked(reg_t v) noexcept override {
-        reg_t mode = (v & MODE) >> MODE_SHIFT;
-
-        if (mode == Bare || mode == Sv39)
-            value_ = v;
-    }
+    void write_unchecked(reg_t v) noexcept override;
 
     bool check_permissions() const noexcept override {
         if (hart_->priv == PrivilegeLevel::S &&

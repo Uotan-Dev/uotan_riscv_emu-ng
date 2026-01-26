@@ -286,6 +286,11 @@ IMPL(sfence_vma, {
          (hart->csrs[MSTATUS::ADDRESS]->read_unchecked() & MSTATUS::TVM)))
         [[unlikely]]
         Trap::raise_exception(pc, TrapCause::IllegalInstruction, d->insn);
+
+    if (rs1 == 0)
+        mmu->tlb_flush_all();
+    else
+        mmu->tlb_flush_vaddr(R[rs1]);
 })
 IMPL(sret, {
     if (hart->priv == PrivilegeLevel::U ||
