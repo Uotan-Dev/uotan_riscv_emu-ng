@@ -15,11 +15,6 @@
 cmake_minimum_required(VERSION 3.20)
 project(uemu-ng LANGUAGES C CXX)
 
-# Check for MSVC and reject it
-if(MSVC)
-    message(FATAL_ERROR "MSVC is not supported. Please use GCC or Clang (MinGW-w64 or LLVM on Windows).")
-endif()
-
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 17)
@@ -35,18 +30,6 @@ message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}
 
 # Compiler flags for GCC/Clang
 add_compile_options(-Wall -Wextra)
-
-# Platform-specific settings
-if(WIN32)
-    message(STATUS "Building for Windows with ${CMAKE_CXX_COMPILER_ID}")
-    # Ensure we're using MinGW or Clang on Windows
-    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-        message(WARNING "Unknown compiler on Windows. GCC (MinGW-w64) or Clang recommended.")
-    endif()
-    
-    # Windows-specific flags
-    add_compile_definitions(_WIN32_WINNT=0x0A00)  # Windows 10+
-endif()
 
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
@@ -89,15 +72,10 @@ add_executable(uemu src/main.cpp)
 target_link_libraries(uemu PRIVATE uemu_core)
 target_include_directories(uemu PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-if(WIN32)
-    set(BUILD_TESTING OFF)
-    message(STATUS "Windows detected: Testing and riscv-tests are disabled.")
-else()
-    option(BUILD_TESTING "Build tests" ON)
-    if(BUILD_TESTING)
-        enable_testing()
-        add_subdirectory(tests)
-    endif()
-
-    include(${CMAKE_CURRENT_LIST_DIR}/thirdparty/riscv-tests.cmake)
+option(BUILD_TESTING "Build tests" ON)
+if(BUILD_TESTING)
+    enable_testing()
+    add_subdirectory(tests)
 endif()
+
+include(${CMAKE_CURRENT_LIST_DIR}/thirdparty/riscv-tests.cmake)

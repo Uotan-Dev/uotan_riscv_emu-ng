@@ -16,17 +16,11 @@
 
 #pragma once
 
-#include <optional>
-
-#ifdef _WIN32
-#include <conio.h>
-#include <windows.h>
-#else
 #include <fcntl.h>
+#include <optional>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
-#endif
 
 namespace uemu::host {
 
@@ -37,12 +31,6 @@ public:
     ~HostConsole() { restore_mode(); }
 
     std::optional<char> read_char() noexcept {
-#ifdef _WIN32
-        if (_kbhit())
-            return static_cast<char>(_getch());
-
-        return std::nullopt;
-#else
         unsigned char c;
         ssize_t nread = ::read(STDIN_FILENO, &c, 1);
 
@@ -50,27 +38,12 @@ public:
             return static_cast<char>(c);
 
         return std::nullopt;
-#endif
     }
 
-    void write_char(char ch) noexcept {
-#ifdef _WIN32
-        _putch(ch);
-#else
-        ::write(STDOUT_FILENO, &ch, 1);
-#endif
-    }
+    void write_char(char ch) noexcept { ::write(STDOUT_FILENO, &ch, 1); }
 
 private:
     void enable_raw_mode() noexcept {
-#ifdef _WIN32
-        hStdin_ = GetStdHandle(STD_INPUT_HANDLE);
-        GetConsoleMode(hStdin_, &originalMode_);
-        DWORD rawMode =
-            originalMode_ &
-            ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT);
-        SetConsoleMode(hStdin_, rawMode);
-#else
         tcgetattr(STDIN_FILENO, &originalTermios_);
         struct termios raw = originalTermios_;
 
@@ -85,25 +58,15 @@ private:
 
         originalFlags_ = fcntl(STDIN_FILENO, F_GETFL, 0);
         fcntl(STDIN_FILENO, F_SETFL, originalFlags_ | O_NONBLOCK);
-#endif
     }
 
     void restore_mode() noexcept {
-#ifdef _WIN32
-        SetConsoleMode(hStdin_, originalMode_);
-#else
         tcsetattr(STDIN_FILENO, TCSAFLUSH, &originalTermios_);
         fcntl(STDIN_FILENO, F_SETFL, originalFlags_);
-#endif
     }
 
-#ifdef _WIN32
-    HANDLE hStdin_;
-    DWORD originalMode_;
-#else
     struct termios originalTermios_;
     int originalFlags_;
-#endif
 };
 
 } // namespace uemu::host
