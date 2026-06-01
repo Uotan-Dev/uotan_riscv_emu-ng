@@ -69,36 +69,6 @@ uint64_t ElfLoader::load(const std::filesystem::path& p, core::Dram& dram) {
     return hdr->e_entry;
 }
 
-void ElfLoader::dump_signature(const std::filesystem::path& elf_path,
-                               const std::filesystem::path& sig_file_path,
-                               core::Dram& dram) {
-    auto data = FileLoader::read_file(elf_path);
-    validate_elf_header(reinterpret_cast<const Elf64_Ehdr*>(data.data()));
-
-    const Elf64_Sym* begin_sym = get_symbol(data.data(), "begin_signature");
-    const Elf64_Sym* end_sym = get_symbol(data.data(), "end_signature");
-
-    if (!begin_sym || !end_sym)
-        throw std::runtime_error("Signature symbols not found in ELF file");
-
-    const uint64_t start_addr = begin_sym->st_value;
-    const uint64_t end_addr = end_sym->st_value;
-
-    std::ofstream out(sig_file_path);
-    if (!out)
-        throw std::runtime_error("Cannot open signature output file: " +
-                                 sig_file_path.string());
-
-    std::println("Dumping signature from [{:#010x}, {:#010x})", start_addr,
-                 end_addr);
-
-    for (uint64_t addr = start_addr; addr < end_addr; addr += 8)
-        out << std::hex << std::setw(16) << std::setfill('0')
-            << dram.read<uint64_t>(addr) << '\n';
-
-    std::println("Signature dumped to {}", sig_file_path.string());
-}
-
 const Elf64_Shdr* ElfLoader::get_section_header(const uint8_t* file_data,
                                                 const char* name) {
     const auto* hdr = reinterpret_cast<const Elf64_Ehdr*>(file_data);

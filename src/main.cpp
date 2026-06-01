@@ -27,7 +27,6 @@ int main(int argc, char* argv[]) {
     app.set_version_flag("-v,--version", "1.0.0");
 
     std::filesystem::path elf_file;
-    std::filesystem::path signature_file;
     std::filesystem::path disk_file;
     std::filesystem::path flash0_file, flash1_file;
     size_t dram_size_mb = 512;
@@ -44,8 +43,6 @@ int main(int argc, char* argv[]) {
     app.add_option("-d,--disk", disk_file, "Disk file to use");
     app.add_option("--flash0", flash0_file, "Flash0 file to use");
     app.add_option("--flash1", flash1_file, "Flash1 file to use");
-    app.add_option("-s,--signature", signature_file,
-                   "Dump signature to file (for riscv-arch-test)");
     app.add_option("-t,--timeout", timeout_ms,
                    "Execution timeout in milliseconds (0 = no timeout)")
         ->default_val(0);
@@ -69,10 +66,6 @@ int main(int argc, char* argv[]) {
 
         emulator.loadelf(elf_file);
         emulator.run(std::chrono::milliseconds(timeout_ms));
-
-        // Dump signature if requested
-        if (!signature_file.empty())
-            emulator.dump_signature(elf_file, signature_file);
     } catch (const std::runtime_error& e) {
         std::println(stderr, "Runtime error: {}", e.what());
         return EXIT_FAILURE;
