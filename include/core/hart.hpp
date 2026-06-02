@@ -832,7 +832,7 @@ private:
         F::SIE | F::SPIE | F::SPP | F::FS | F::SUM | F::MXR | F::UXL | F::SD;
 
     static constexpr reg_t write_mask_ =
-        F::SIE | F::SPIE | F::SPP | F::SUM | F::MXR;
+        F::SIE | F::SPIE | F::SPP | F::FS | F::SUM | F::MXR;
 
     MSTATUS* mstatus_;
 };
