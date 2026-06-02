@@ -748,52 +748,11 @@ public:
     MEPC(Hart* hart) : EPCCSR(hart, PrivilegeLevel::M) {}
 };
 
-class CAUSECSR : public CSR {
-public:
-    CAUSECSR(Hart* hart, PrivilegeLevel min_priv) : CSR(hart, min_priv, 0) {}
-
-    void write_unchecked(reg_t v) noexcept override {
-        if (is_valid_cause_value(v)) [[likely]]
-            value_ = v;
-    }
-
-    bool is_valid_cause_value(uint64_t value) noexcept {
-        switch (value) {
-            case static_cast<uint64_t>(TrapCause::InstructionAddressMisaligned):
-            case static_cast<uint64_t>(TrapCause::InstructionAccessFault):
-            case static_cast<uint64_t>(TrapCause::IllegalInstruction):
-            case static_cast<uint64_t>(TrapCause::Breakpoint):
-            case static_cast<uint64_t>(TrapCause::LoadAddressMisaligned):
-            case static_cast<uint64_t>(TrapCause::LoadAccessFault):
-            case static_cast<uint64_t>(TrapCause::StoreAMOAddressMisaligned):
-            case static_cast<uint64_t>(TrapCause::StoreAMOAccessFault):
-            case static_cast<uint64_t>(TrapCause::EnvironmentCallFromU):
-            case static_cast<uint64_t>(TrapCause::EnvironmentCallFromS):
-            case static_cast<uint64_t>(TrapCause::InstructionPageFault):
-            case static_cast<uint64_t>(TrapCause::LoadPageFault):
-            case static_cast<uint64_t>(TrapCause::StoreAMOPageFault):
-            case static_cast<uint64_t>(TrapCause::SupervisorSoftwareInterrupt):
-            case static_cast<uint64_t>(TrapCause::SupervisorTimerInterrupt):
-            case static_cast<uint64_t>(TrapCause::SupervisorExternalInterrupt):
-                return true;
-
-            // MCAUSE-only values
-            case static_cast<uint64_t>(TrapCause::EnvironmentCallFromM):
-            case static_cast<uint64_t>(TrapCause::MachineSoftwareInterrupt):
-            case static_cast<uint64_t>(TrapCause::MachineTimerInterrupt):
-            case static_cast<uint64_t>(TrapCause::MachineExternalInterrupt):
-                return min_priv_ == PrivilegeLevel::M;
-
-            default: return false;
-        }
-    }
-};
-
-class MCAUSE final : public CAUSECSR {
+class MCAUSE final : public CSR {
 public:
     static constexpr size_t ADDRESS = 0x342;
 
-    MCAUSE(Hart* hart) : CAUSECSR(hart, PrivilegeLevel::M) {}
+    MCAUSE(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {}
 };
 
 class MTVAL final : public CSR {
@@ -973,11 +932,11 @@ public:
     SEPC(Hart* hart) : EPCCSR(hart, PrivilegeLevel::S) {}
 };
 
-class SCAUSE final : public CAUSECSR {
+class SCAUSE final : public CSR {
 public:
     static constexpr size_t ADDRESS = 0x142;
 
-    SCAUSE(Hart* hart) : CAUSECSR(hart, PrivilegeLevel::S) {}
+    SCAUSE(Hart* hart) : CSR(hart, PrivilegeLevel::S, 0) {}
 };
 
 class STVAL final : public CSR {
