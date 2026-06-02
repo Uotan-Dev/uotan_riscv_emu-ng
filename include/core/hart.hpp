@@ -907,6 +907,14 @@ public:
 
     SCOUNTEREN(Hart* hart) : CSR(hart, PrivilegeLevel::S, 0) {}
 
+    // scounteren is WARL: mask matches mcounteren (Zicntr gives CY|TM|IR =
+    // 0x7). Without Sscounterenw, the spec says read-only zero, but Spike
+    // implements it as masked_csr_t(counteren_mask, 0). The ACT test expects
+    // WARL mask 0x7.
+    reg_t read_unchecked() const noexcept override { return value_ & mask_; }
+
+    void write_unchecked(reg_t v) noexcept override { value_ = v & mask_; }
+
     // Check the availability of the hardware performance-monitoring counters
     // (0xC00 to 0xC1F)
     // Note: MCOUNTEREN::hpm_available() must also be called for U-mode.
@@ -916,6 +924,10 @@ public:
 
         return value_ & (1ULL << (csr_addr - 0xC00));
     }
+
+private:
+    static constexpr reg_t mask_ =
+        MCOUNTEREN::Field::CY | MCOUNTEREN::Field::TM | MCOUNTEREN::Field::IR;
 };
 
 class SSCRATCH final : public CSR {
