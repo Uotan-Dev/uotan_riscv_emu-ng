@@ -46,17 +46,22 @@ public:
         tlb_flush_all();
     }
 
+    // Read a value of type T from `addr` during instruction execution.
+    // When `is_amo` is true, translation and access faults use Store/AMO
+    // semantics (cause 7/15) instead of Load semantics (cause 5/13), matching
+    // Spike's convert_load_traps_to_store_traps for AMO instructions.
     template <typename T>
-    [[nodiscard]] T read(addr_t pc, addr_t addr) {
+    [[nodiscard]] T read(addr_t pc, addr_t addr, bool is_amo = false) {
         constexpr size_t size = sizeof(T);
+        AccessType atype = is_amo ? AccessType::Store : AccessType::Load;
 
         // Aligned access
         if (addr % size == 0) [[likely]] {
-            addr_t paddr = translate(pc, addr, AccessType::Load);
+            addr_t paddr = translate(pc, addr, atype);
             std::optional<T> v = bus_->read<T>(paddr);
 
             if (!v.has_value()) [[unlikely]]
-                Trap::raise_exception(pc, TrapCause::LoadAccessFault, addr);
+                raise_access_fault(pc, addr, atype);
 
             return *v;
         }
@@ -65,10 +70,10 @@ public:
 
         for (size_t i = 0; i < size; i++) {
             addr_t vaddr = addr + i;
-            paddrs[i] = translate(pc, vaddr, AccessType::Load);
+            paddrs[i] = translate(pc, vaddr, atype);
 
             if (!bus_->accessible(paddrs[i])) [[unlikely]]
-                Trap::raise_exception(pc, TrapCause::LoadAccessFault, addr);
+                raise_access_fault(pc, addr, atype);
         }
 
         uint8_t bytes[size];
@@ -77,7 +82,7 @@ public:
             std::optional<uint8_t> v = bus_->read<uint8_t>(paddrs[i]);
 
             if (!v.has_value()) [[unlikely]]
-                Trap::raise_exception(pc, TrapCause::LoadAccessFault, addr);
+                raise_access_fault(pc, addr, atype);
 
             bytes[i] = *v;
         }
@@ -125,6 +130,17 @@ public:
             if (!res) [[unlikely]]
                 Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
         }
+    }
+
+    // Probe a store address for translation and accessibility with Store/AMO
+    // semantics, without actually writing data.  The caller must already have
+    // checked natural alignment.  Used by SC to validate the address before
+    // evaluating the reservation (matching Spike's check_load_reservation).
+    template <typename T>
+    void probe_store(addr_t pc, addr_t addr) {
+        addr_t paddr = translate(pc, addr, AccessType::Store);
+        if (!bus_->accessible(paddr)) [[unlikely]]
+            Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
     }
 
     // Fetch an instruction from the current PC.

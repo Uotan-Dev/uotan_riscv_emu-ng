@@ -411,21 +411,39 @@ IMPL(remw, {
 })
 
 // RV64A Extension
+//
+// All AMO/LR/SC instructions require natural alignment of the address in rs1
+// per the Zaamo/Zalrsc extensions.  Following Spike and Sail, we raise
+// access-fault exceptions (cause 5 for LR, cause 7 for SC/AMO) and check
+// alignment before address translation.
 IMPL(lr_d, {
-    uint64_t v = mmu->read<uint64_t>(pc, R[rs1]);
+    const addr_t addr = R[rs1];
+    if ((addr & 0b111) != 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::LoadAccessFault, addr);
+    uint64_t v = mmu->read<uint64_t>(pc, addr);
     R.write(rd, v);
-    mmu->reservation_address = R[rs1];
+    mmu->reservation_address = addr;
     mmu->reservation_valid = true;
 })
 IMPL(lr_w, {
-    uint32_t v = mmu->read<uint32_t>(pc, R[rs1]);
+    const addr_t addr = R[rs1];
+    if ((addr & 0b11) != 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::LoadAccessFault, addr);
+    uint32_t v = mmu->read<uint32_t>(pc, addr);
     R.write(rd, sext(v, 32));
-    mmu->reservation_address = R[rs1];
+    mmu->reservation_address = addr;
     mmu->reservation_valid = true;
 })
 IMPL(sc_d, {
-    if (mmu->reservation_valid && mmu->reservation_address == R[rs1]) {
-        mmu->write<uint64_t>(pc, R[rs1], R[rs2]);
+    const addr_t addr = R[rs1];
+    // Alignment and accessibility checks must happen regardless of reservation
+    // state, per Spike's check_load_reservation.  Alignment is checked first
+    // (matching Sail's priority), then probe_store validates translation.
+    if ((addr & 0b111) != 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+    mmu->probe_store<uint64_t>(pc, addr);
+    if (mmu->reservation_valid && mmu->reservation_address == addr) {
+        mmu->write<uint64_t>(pc, addr, R[rs2]);
         R.write(rd, 0);
     } else {
         R.write(rd, 1);
@@ -433,8 +451,12 @@ IMPL(sc_d, {
     mmu->reservation_valid = false;
 })
 IMPL(sc_w, {
-    if (mmu->reservation_valid && mmu->reservation_address == R[rs1]) {
-        mmu->write<uint32_t>(pc, R[rs1], R[rs2]);
+    const addr_t addr = R[rs1];
+    if ((addr & 0b11) != 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+    mmu->probe_store<uint32_t>(pc, addr);
+    if (mmu->reservation_valid && mmu->reservation_address == addr) {
+        mmu->write<uint32_t>(pc, addr, R[rs2]);
         R.write(rd, 0);
     } else {
         R.write(rd, 1);
@@ -442,113 +464,167 @@ IMPL(sc_w, {
     mmu->reservation_valid = false;
 })
 IMPL(amoadd_d, {
-    uint64_t t = mmu->read<uint64_t>(pc, R[rs1]);
+    const addr_t addr = R[rs1];
+    if ((addr & 0b111) != 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+    uint64_t t = mmu->read<uint64_t>(pc, addr, true);
     mmu->write<uint64_t>(
-        pc, R[rs1], static_cast<int64_t>(t) + static_cast<int64_t>(R[rs2]));
+        pc, addr, static_cast<int64_t>(t) + static_cast<int64_t>(R[rs2]));
     R.write(rd, t);
 })
 IMPL(amoadd_w, {
-    uint32_t t = mmu->read<uint32_t>(pc, R[rs1]);
+    const addr_t addr = R[rs1];
+    if ((addr & 0b11) != 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+    uint32_t t = mmu->read<uint32_t>(pc, addr, true);
     mmu->write<uint32_t>(
-        pc, R[rs1], static_cast<int32_t>(t) + static_cast<int32_t>(R[rs2]));
+        pc, addr, static_cast<int32_t>(t) + static_cast<int32_t>(R[rs2]));
     R.write(rd, sext(t, 32));
 })
 IMPL(amoand_d, {
-    uint64_t t = mmu->read<uint64_t>(pc, R[rs1]);
+    const addr_t addr = R[rs1];
+    if ((addr & 0b111) != 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+    uint64_t t = mmu->read<uint64_t>(pc, addr, true);
     mmu->write<uint64_t>(
-        pc, R[rs1], static_cast<int64_t>(t) & static_cast<int64_t>(R[rs2]));
+        pc, addr, static_cast<int64_t>(t) & static_cast<int64_t>(R[rs2]));
     R.write(rd, t);
 })
 IMPL(amoand_w, {
-    uint32_t t = mmu->read<uint32_t>(pc, R[rs1]);
+    const addr_t addr = R[rs1];
+    if ((addr & 0b11) != 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+    uint32_t t = mmu->read<uint32_t>(pc, addr, true);
     mmu->write<uint32_t>(
-        pc, R[rs1], static_cast<int32_t>(t) & static_cast<int32_t>(R[rs2]));
+        pc, addr, static_cast<int32_t>(t) & static_cast<int32_t>(R[rs2]));
     R.write(rd, sext(t, 32));
 })
 IMPL(amoor_d, {
-    uint64_t t = mmu->read<uint64_t>(pc, R[rs1]);
+    const addr_t addr = R[rs1];
+    if ((addr & 0b111) != 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+    uint64_t t = mmu->read<uint64_t>(pc, addr, true);
     mmu->write<uint64_t>(
-        pc, R[rs1], static_cast<int64_t>(t) | static_cast<int64_t>(R[rs2]));
+        pc, addr, static_cast<int64_t>(t) | static_cast<int64_t>(R[rs2]));
     R.write(rd, t);
 })
 IMPL(amoor_w, {
-    uint32_t t = mmu->read<uint32_t>(pc, R[rs1]);
+    const addr_t addr = R[rs1];
+    if ((addr & 0b11) != 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+    uint32_t t = mmu->read<uint32_t>(pc, addr, true);
     mmu->write<uint32_t>(
-        pc, R[rs1], static_cast<int32_t>(t) | static_cast<int32_t>(R[rs2]));
+        pc, addr, static_cast<int32_t>(t) | static_cast<int32_t>(R[rs2]));
     R.write(rd, sext(t, 32));
 })
 IMPL(amoxor_d, {
-    uint64_t t = mmu->read<uint64_t>(pc, R[rs1]);
+    const addr_t addr = R[rs1];
+    if ((addr & 0b111) != 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+    uint64_t t = mmu->read<uint64_t>(pc, addr, true);
     mmu->write<uint64_t>(
-        pc, R[rs1], static_cast<int64_t>(t) ^ static_cast<int64_t>(R[rs2]));
+        pc, addr, static_cast<int64_t>(t) ^ static_cast<int64_t>(R[rs2]));
     R.write(rd, t);
 })
 IMPL(amoxor_w, {
-    uint32_t t = mmu->read<uint32_t>(pc, R[rs1]);
+    const addr_t addr = R[rs1];
+    if ((addr & 0b11) != 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+    uint32_t t = mmu->read<uint32_t>(pc, addr, true);
     mmu->write<uint32_t>(
-        pc, R[rs1], static_cast<int32_t>(t) ^ static_cast<int32_t>(R[rs2]));
+        pc, addr, static_cast<int32_t>(t) ^ static_cast<int32_t>(R[rs2]));
     R.write(rd, sext(t, 32));
 })
 IMPL(amomax_d, {
-    uint64_t t = mmu->read<uint64_t>(pc, R[rs1]);
+    const addr_t addr = R[rs1];
+    if ((addr & 0b111) != 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+    uint64_t t = mmu->read<uint64_t>(pc, addr, true);
     mmu->write<uint64_t>(
-        pc, R[rs1],
+        pc, addr,
         std::max(static_cast<int64_t>(t), static_cast<int64_t>(R[rs2])));
     R.write(rd, t);
 })
 IMPL(amomax_w, {
-    uint32_t t = mmu->read<uint32_t>(pc, R[rs1]);
+    const addr_t addr = R[rs1];
+    if ((addr & 0b11) != 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+    uint32_t t = mmu->read<uint32_t>(pc, addr, true);
     mmu->write<uint32_t>(
-        pc, R[rs1],
+        pc, addr,
         std::max(static_cast<int32_t>(t), static_cast<int32_t>(R[rs2])));
     R.write(rd, sext(t, 32));
 })
 IMPL(amomaxu_d, {
-    uint64_t t = mmu->read<uint64_t>(pc, R[rs1]);
-    mmu->write<uint64_t>(pc, R[rs1], std::max(t, R[rs2]));
+    const addr_t addr = R[rs1];
+    if ((addr & 0b111) != 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+    uint64_t t = mmu->read<uint64_t>(pc, addr, true);
+    mmu->write<uint64_t>(pc, addr, std::max(t, R[rs2]));
     R.write(rd, t);
 })
 IMPL(amomaxu_w, {
-    uint32_t t = mmu->read<uint32_t>(pc, R[rs1]);
+    const addr_t addr = R[rs1];
+    if ((addr & 0b11) != 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+    uint32_t t = mmu->read<uint32_t>(pc, addr, true);
     mmu->write<uint32_t>(
-        pc, R[rs1],
+        pc, addr,
         std::max(static_cast<uint32_t>(t), static_cast<uint32_t>(R[rs2])));
     R.write(rd, sext(t, 32));
 })
 IMPL(amomin_d, {
-    uint64_t t = mmu->read<uint64_t>(pc, R[rs1]);
+    const addr_t addr = R[rs1];
+    if ((addr & 0b111) != 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+    uint64_t t = mmu->read<uint64_t>(pc, addr, true);
     mmu->write<uint64_t>(
-        pc, R[rs1],
+        pc, addr,
         std::min(static_cast<int64_t>(t), static_cast<int64_t>(R[rs2])));
     R.write(rd, t);
 })
 IMPL(amomin_w, {
-    uint32_t t = mmu->read<uint32_t>(pc, R[rs1]);
+    const addr_t addr = R[rs1];
+    if ((addr & 0b11) != 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+    uint32_t t = mmu->read<uint32_t>(pc, addr, true);
     mmu->write<uint32_t>(
-        pc, R[rs1],
+        pc, addr,
         std::min(static_cast<int32_t>(t), static_cast<int32_t>(R[rs2])));
     R.write(rd, sext(t, 32));
 })
 IMPL(amominu_d, {
-    uint64_t t = mmu->read<uint64_t>(pc, R[rs1]);
-    mmu->write<uint64_t>(pc, R[rs1], std::min(t, R[rs2]));
+    const addr_t addr = R[rs1];
+    if ((addr & 0b111) != 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+    uint64_t t = mmu->read<uint64_t>(pc, addr, true);
+    mmu->write<uint64_t>(pc, addr, std::min(t, R[rs2]));
     R.write(rd, t);
 })
 IMPL(amominu_w, {
-    uint32_t t = mmu->read<uint32_t>(pc, R[rs1]);
+    const addr_t addr = R[rs1];
+    if ((addr & 0b11) != 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+    uint32_t t = mmu->read<uint32_t>(pc, addr, true);
     mmu->write<uint32_t>(
-        pc, R[rs1],
+        pc, addr,
         std::min(static_cast<uint32_t>(t), static_cast<uint32_t>(R[rs2])));
     R.write(rd, sext(t, 32));
 })
 IMPL(amoswap_d, {
-    uint64_t t = mmu->read<uint64_t>(pc, R[rs1]);
-    mmu->write<uint64_t>(pc, R[rs1], R[rs2]);
+    const addr_t addr = R[rs1];
+    if ((addr & 0b111) != 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+    uint64_t t = mmu->read<uint64_t>(pc, addr, true);
+    mmu->write<uint64_t>(pc, addr, R[rs2]);
     R.write(rd, t);
 })
 IMPL(amoswap_w, {
-    uint32_t t = mmu->read<uint32_t>(pc, R[rs1]);
-    mmu->write<uint32_t>(pc, R[rs1], R[rs2]);
+    const addr_t addr = R[rs1];
+    if ((addr & 0b11) != 0) [[unlikely]]
+        Trap::raise_exception(pc, TrapCause::StoreAMOAccessFault, addr);
+    uint32_t t = mmu->read<uint32_t>(pc, addr, true);
+    mmu->write<uint32_t>(pc, addr, R[rs2]);
     R.write(rd, sext(t, 32));
 })
 
