@@ -1,0 +1,140 @@
+// NOTE: This file is designed to be #included from assembly (.S) files only,
+// NOT from C/C++ source.  It uses GAS assembler directives (e.g. .pushsection,
+// .equ, .align, .global) and defines RISC-V assembly macros.
+// Compiler warnings/errors from a C linter are expected and can be ignored.
+#ifndef _RVMODEL_MACROS_H
+#define _RVMODEL_MACROS_H
+
+#define RVMODEL_DATA_SECTION \
+        .pushsection .tohost,"aw",@progbits;                \
+        .align 8; .global tohost; tohost: .dword 0;         \
+        .align 8; .global fromhost; fromhost: .dword 0;     \
+        .popsection;
+
+#define STANDARD_SM_SUPPORTED
+
+##### STARTUP #####
+
+// Perform boot operations. Can be empty or left undefined unless needed for
+// DUT-specific behavior such as turning on a memory controller or
+// initializing custom state.
+//#define RVMODEL_BOOT
+
+// Custom RVMODEL_BOOT_TO_MMODE overrides default RVTEST_BOOT_TO_MMODE
+// if defined.  For most DUTs, the default should work and this macro
+// should not be defined.  If no M-mode or CSRs are implemented, define this
+// macro as blank to bypass the boot process.  If a nonconforming
+// M-mode is implemented, define this macro to set up the necessary
+// state in a fashion similar to RVTEST_BOOT_TO_MMODE.
+//#define RVMODEL_BOOT_TO_MMODE
+
+##### TERMINATION #####
+
+// Terminate test with a pass indication.
+// Writes 0x5555 to SiFiveTest (0x100000) to signal PASS.
+#define RVMODEL_HALT_PASS  \
+  li t0, 0x100000         ;\
+  li t1, 0x5555           ;\
+  sw t1, 0(t0)            ;\
+  self_loop_pass:         ;\
+  j self_loop_pass        ;
+
+// Terminate test with a fail indication.
+// Writes 0x3333 to SiFiveTest (0x100000) to signal FAIL.
+#define RVMODEL_HALT_FAIL \
+  li t0, 0x100000         ;\
+  li t1, 0x3333           ;\
+  sw t1, 0(t0)            ;\
+  self_loop_fail:         ;\
+  j self_loop_fail        ;
+
+##### IO #####
+
+// NS16550 UART at 0x10000000 (register offset = register index * 1 byte)
+.EQU UART_BASE_ADDR, 0x10000000
+.EQU UART_THR, (UART_BASE_ADDR + 0)
+.EQU UART_LCR, (UART_BASE_ADDR + 3)
+.EQU UART_LSR, (UART_BASE_ADDR + 5)
+
+// Initialization steps needed prior to writing to the console
+// _R1, _R2, and _R3 can be used as temporary registers if needed.
+// Do not modify any other registers (or make sure to restore them).
+// Can be empty or left undefined if no initialization is needed.
+#define RVMODEL_IO_INIT(_R1, _R2, _R3) \
+  uart_init:                ;\
+    li _R1, UART_LCR         ; /* Load address of UART LCR */ \
+    li _R2, 3                ; /* 8-bit characters, 1 stop bit, no parity */ \
+    sb _R2, 0(_R1)           ;
+
+// Prints a null-terminated string using the NS16550 UART.
+// A pointer to the string is passed in _STR_PTR.
+// _R1, _R2, and _R3 can be used as temporary registers if needed.
+// Do not modify any other registers (or make sure to restore them).
+#define RVMODEL_IO_WRITE_STR(_R1, _R2, _R3, _STR_PTR)               \
+1:                           ;                       \
+  lbu _R1, 0(_STR_PTR)        ;/* Load byte */        \
+  beqz _R1, 3f                ;/* Exit if null */     \
+2: /* uart_putc */           ;                      \
+  li _R2, UART_LSR ;\
+  4: /* uart_putc_wait_busy */ \
+    lbu _R3, 0(_R2) ;\
+    andi _R3, _R3, 0x20 ;/* check line status register bit 5 */ \
+    beqz _R3, 4b ;/* wait until Transmit Holding Register Empty is set */ \
+  /* uart_putc_send */ \
+    li _R2, UART_THR ; /* transmit character */ \
+    sb _R1, 0(_R2) ;\
+  addi _STR_PTR, _STR_PTR, 1 ;/* Next char */        \
+  j 1b                       ;/* Loop */             \
+3:
+
+##### Access Fault #####
+
+#define RVMODEL_ACCESS_FAULT_ADDRESS 0x00000000
+
+##### Interrupt Latency #####
+
+#define RVMODEL_INTERRUPT_LATENCY 10
+
+##### Machine Timer #####
+
+#define RVMODEL_TIMER_INT_SOON_DELAY 100
+
+#define RVMODEL_MTIME_ADDRESS  0x0200BFF8  /* Address of mtime (CLINT base + 0xBFF8) */
+
+#define RVMODEL_MTIMECMP_ADDRESS 0x02004000 /* Address of mtimecmp (CLINT base + 0x4000) */
+
+##### Machine Interrupts #####
+
+#define CLINT_BASE_ADDRESS 0x02000000
+#define RVMODEL_MSIP_ADDRESS (CLINT_BASE_ADDRESS + 0x0)
+
+// External interrupt macros are left empty — our DUT uses PLIC for external
+// interrupts and does not have a simple software-triggered external interrupt
+// generator.
+#define RVMODEL_SET_MEXT_INT(_R1, _R2)
+#define RVMODEL_CLR_MEXT_INT(_R1, _R2)
+
+#define RVMODEL_SET_MSW_INT(_R1, _R2) \
+  li _R1, 1; \
+  li _R2, RVMODEL_MSIP_ADDRESS; \
+  sw _R1, 0(_R2);
+
+#define RVMODEL_CLR_MSW_INT(_R1, _R2) \
+  li _R2, RVMODEL_MSIP_ADDRESS; \
+  sw zero, 0(_R2);
+
+##### Supervisor Interrupts #####
+
+#define RVMODEL_SET_SEXT_INT(_R1, _R2)
+#define RVMODEL_CLR_SEXT_INT(_R1, _R2)
+
+#define RVMODEL_SET_SSW_INT(_R1, _R2) \
+  li _R1, 1; \
+  li _R2, RVMODEL_MSIP_ADDRESS; \
+  sw _R1, 0(_R2);
+
+#define RVMODEL_CLR_SSW_INT(_R1, _R2) \
+  li _R2, RVMODEL_MSIP_ADDRESS; \
+  sw zero, 0(_R2);
+
+#endif // _RVMODEL_MACROS_H
