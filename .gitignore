@@ -62,3 +62,4 @@ test.dump
 .cache
 config.ini
 thirdparty/riscof-plugins/sail_cSim/env/sail_config.json
+CLAUDE.md
