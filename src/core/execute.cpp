@@ -305,9 +305,6 @@ IMPL(sret, {
     hart->priv = static_cast<PrivilegeLevel>((sstatus & SSTATUS::Field::SPP) >>
                                              SSTATUS::Shift::SPP_SHIFT);
 
-    if (hart->priv != PrivilegeLevel::M)
-        sstatus &= ~SSTATUS::Field::MPRV;
-
     if (sstatus & SSTATUS::Field::SPIE)
         sstatus |= SSTATUS::Field::SIE;
     else
@@ -317,6 +314,14 @@ IMPL(sret, {
     sstatus &= ~SSTATUS::Field::SPP;
 
     hart->csrs[SSTATUS::ADDRESS]->write_unchecked(sstatus);
+
+    // MPRV is not accessible via SSTATUS (its write mask excludes MPRV),
+    // so clear it directly in mstatus when returning to a less privileged
+    // mode.
+    if (hart->priv != PrivilegeLevel::M)
+        hart->csrs[MSTATUS::ADDRESS]->write_unchecked(
+            hart->csrs[MSTATUS::ADDRESS]->read_unchecked() &
+            ~MSTATUS::Field::MPRV);
 })
 IMPL(wfi, {
     if (hart->priv == PrivilegeLevel::U ||
