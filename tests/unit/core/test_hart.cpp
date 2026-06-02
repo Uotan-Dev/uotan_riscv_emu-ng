@@ -33,7 +33,8 @@ TEST(RegisterFileTest, X0IsHardwiredToZero) {
 
 TEST(RegisterFileTest, ReadWriteGeneralPurposeRegisters) {
     std::mt19937 rng(0x12345678);
-    std::uniform_int_distribution<reg_t> dist(1, std::numeric_limits<reg_t>::max());
+    std::uniform_int_distribution<reg_t> dist(
+        1, std::numeric_limits<reg_t>::max());
     core::RegisterFile regs;
 
     for (size_t i = 1; i < core::Hart::GPR_COUNT; i++) {
