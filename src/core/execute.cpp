@@ -552,6 +552,7 @@ IMPL(flw, {
     fp_inst_prep(hart, d);
     uint32_t v = mmu->read<uint32_t>(pc, R[rs1] + imm);
     F[rd] = float32_t{v};
+    fp_set_dirty(hart);
 })
 IMPL(fsw, {
     fp_inst_prep(hart, d);
@@ -662,26 +663,26 @@ IMPL(fcvt_w_s, {
     fp_setup_rm(hart, d);
     R.write(rd, static_cast<int64_t>(f32_to_i32(F[rs1].read_32(),
                                                 softfloat_roundingMode, true)));
-    fp_inst_end(hart);
+    fp_update_exception_flags(hart);
 })
 IMPL(fcvt_wu_s, {
     fp_inst_prep(hart, d);
     fp_setup_rm(hart, d);
     R.write(rd, static_cast<int64_t>(static_cast<int32_t>(f32_to_ui32(
                     F[rs1].read_32(), softfloat_roundingMode, true))));
-    fp_inst_end(hart);
+    fp_update_exception_flags(hart);
 })
 IMPL(fcvt_l_s, {
     fp_inst_prep(hart, d);
     fp_setup_rm(hart, d);
     R.write(rd, f32_to_i64(F[rs1].read_32(), softfloat_roundingMode, true));
-    fp_inst_end(hart);
+    fp_update_exception_flags(hart);
 })
 IMPL(fcvt_lu_s, {
     fp_inst_prep(hart, d);
     fp_setup_rm(hart, d);
     R.write(rd, f32_to_ui64(F[rs1].read_32(), softfloat_roundingMode, true));
-    fp_inst_end(hart);
+    fp_update_exception_flags(hart);
 })
 IMPL(fcvt_s_w, {
     fp_inst_prep(hart, d);
@@ -770,6 +771,7 @@ IMPL(fld, {
     fp_inst_prep(hart, d);
     uint64_t v = mmu->read<uint64_t>(pc, R[rs1] + imm);
     F[rd] = float64_t{v};
+    fp_set_dirty(hart);
 })
 IMPL(fsd, {
     fp_inst_prep(hart, d);
@@ -879,26 +881,26 @@ IMPL(fcvt_w_d, {
     fp_setup_rm(hart, d);
     R.write(rd, static_cast<int64_t>(f64_to_i32(F[rs1].read_64(),
                                                 softfloat_roundingMode, true)));
-    fp_inst_end(hart);
+    fp_update_exception_flags(hart);
 })
 IMPL(fcvt_wu_d, {
     fp_inst_prep(hart, d);
     fp_setup_rm(hart, d);
     R.write(rd, static_cast<int64_t>(static_cast<int32_t>(f64_to_ui32(
                     F[rs1].read_64(), softfloat_roundingMode, true))));
-    fp_inst_end(hart);
+    fp_update_exception_flags(hart);
 })
 IMPL(fcvt_l_d, {
     fp_inst_prep(hart, d);
     fp_setup_rm(hart, d);
     R.write(rd, f64_to_i64(F[rs1].read_64(), softfloat_roundingMode, true));
-    fp_inst_end(hart);
+    fp_update_exception_flags(hart);
 })
 IMPL(fcvt_lu_d, {
     fp_inst_prep(hart, d);
     fp_setup_rm(hart, d);
     R.write(rd, f64_to_ui64(F[rs1].read_64(), softfloat_roundingMode, true));
-    fp_inst_end(hart);
+    fp_update_exception_flags(hart);
 })
 IMPL(fcvt_d_w, {
     fp_inst_prep(hart, d);

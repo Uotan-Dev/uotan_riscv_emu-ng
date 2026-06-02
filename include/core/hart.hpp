@@ -1213,9 +1213,24 @@ public:
 
     FFLAGS(Hart* hart) : CSR(hart, PrivilegeLevel::U, 0) {}
 
+    bool check_permissions() const noexcept override {
+        if (!(hart_->csrs[MSTATUS::ADDRESS]->read_unchecked() &
+              MSTATUS::Field::FS)) [[unlikely]]
+            return false;
+
+        return CSR::check_permissions();
+    }
+
     reg_t read_unchecked() const noexcept override { return value_ & 0b11111; }
 
     void write_unchecked(reg_t v) noexcept override { value_ = v & 0b11111; }
+
+    void write_checked(const DecodedInsn& insn, reg_t v) override {
+        CSR::write_checked(insn, v);
+        hart_->csrs[MSTATUS::ADDRESS]->write_unchecked(
+            hart_->csrs[MSTATUS::ADDRESS]->read_unchecked() |
+            MSTATUS::Field::FS);
+    }
 };
 
 class FRM final : public CSR {
@@ -1233,9 +1248,24 @@ public:
 
     FRM(Hart* hart) : CSR(hart, PrivilegeLevel::U, 0) {}
 
+    bool check_permissions() const noexcept override {
+        if (!(hart_->csrs[MSTATUS::ADDRESS]->read_unchecked() &
+              MSTATUS::Field::FS)) [[unlikely]]
+            return false;
+
+        return CSR::check_permissions();
+    }
+
     reg_t read_unchecked() const noexcept override { return value_ & 0b111; }
 
     void write_unchecked(reg_t v) noexcept override { value_ = v & 0b111; }
+
+    void write_checked(const DecodedInsn& insn, reg_t v) override {
+        CSR::write_checked(insn, v);
+        hart_->csrs[MSTATUS::ADDRESS]->write_unchecked(
+            hart_->csrs[MSTATUS::ADDRESS]->read_unchecked() |
+            MSTATUS::Field::FS);
+    }
 };
 
 class FCSR final : public CSR {
@@ -1248,6 +1278,14 @@ public:
         assert(fflags_ && frm_);
     }
 
+    bool check_permissions() const noexcept override {
+        if (!(hart_->csrs[MSTATUS::ADDRESS]->read_unchecked() &
+              MSTATUS::Field::FS)) [[unlikely]]
+            return false;
+
+        return CSR::check_permissions();
+    }
+
     reg_t read_unchecked() const noexcept override {
         return fflags_->read_unchecked() | (frm_->read_unchecked() << 5);
     }
@@ -1255,6 +1293,13 @@ public:
     void write_unchecked(reg_t v) noexcept override {
         fflags_->write_unchecked(v & 0b11111);
         frm_->write_unchecked((v >> 5) & 0b111);
+    }
+
+    void write_checked(const DecodedInsn& insn, reg_t v) override {
+        CSR::write_checked(insn, v);
+        hart_->csrs[MSTATUS::ADDRESS]->write_unchecked(
+            hart_->csrs[MSTATUS::ADDRESS]->read_unchecked() |
+            MSTATUS::Field::FS);
     }
 
 private:
