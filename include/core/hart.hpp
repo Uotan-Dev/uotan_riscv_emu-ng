@@ -480,6 +480,24 @@ class MIDELEG final : public CSR {
 public:
     static constexpr size_t ADDRESS = 0x303;
 
+    enum Shift : uint32_t {
+        SSIP_SHIFT = 1,
+        MSIP_SHIFT = 3,
+        STIP_SHIFT = 5,
+        MTIP_SHIFT = 7,
+        SEIP_SHIFT = 9,
+        MEIP_SHIFT = 11,
+    };
+
+    enum Field : reg_t {
+        SSIP = 1ULL << SSIP_SHIFT,
+        MSIP = 1ULL << MSIP_SHIFT,
+        STIP = 1ULL << STIP_SHIFT,
+        MTIP = 1ULL << MTIP_SHIFT,
+        SEIP = 1ULL << SEIP_SHIFT,
+        MEIP = 1ULL << MEIP_SHIFT,
+    };
+
     MIDELEG(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {
         value_atomic_.store(0, std::memory_order_relaxed);
     }
@@ -489,10 +507,15 @@ public:
     }
 
     void write_unchecked(reg_t v) noexcept override {
-        value_atomic_.store(v, std::memory_order_relaxed);
+        value_atomic_.store(v & write_mask_, std::memory_order_relaxed);
     }
 
 private:
+    // Bits 3(MSIP), 7(MTIP), 11(MEIP) must be read-only zero per spec
+    // (machine-level interrupts cannot be delegated). Only SSIP, STIP, SEIP
+    // are delegatable in standard RV64GC without H/Sscofpmf.
+    static constexpr reg_t write_mask_ =
+        Field::SSIP | Field::STIP | Field::SEIP;
     std::atomic<reg_t> value_atomic_;
 };
 
@@ -858,15 +881,19 @@ public:
     }
 
     reg_t read_unchecked() const noexcept override {
-        return mip_->read_unchecked() & mask_ & mideleg_->read_unchecked();
+        return mip_->read_unchecked() & read_mask_ & mideleg_->read_unchecked();
     }
 
     void write_unchecked(reg_t v) noexcept override {
-        mip_->write_unchecked(v & mask_ & mideleg_->read_unchecked());
+        // Only SSIP is writable through SIP, matching Spike's ip_write_mask
+        // (MIP_SSIP | MIP_LCOFIP). STIP and SEIP are hardware-controlled
+        // from S-mode's perspective.
+        mip_->write_unchecked(v & write_mask_ & mideleg_->read_unchecked());
     }
 
 private:
-    static constexpr reg_t mask_ = Field::SSIP | Field::STIP | Field::SEIP;
+    static constexpr reg_t read_mask_ = Field::SSIP | Field::STIP | Field::SEIP;
+    static constexpr reg_t write_mask_ = Field::SSIP;
 
     MIP* mip_;
     MIDELEG* mideleg_;

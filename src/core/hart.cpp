@@ -265,9 +265,6 @@ void Hart::check_interrupts() const {
     if (!pending)
         return;
 
-    const reg_t m_pending = pending & ~mideleg;
-    const reg_t s_pending = pending & mideleg;
-
     const bool m_enabled =
         (priv < PrivilegeLevel::M) ||
         (priv == PrivilegeLevel::M && (mstatus & MSTATUS::Field::MIE));
@@ -275,28 +272,31 @@ void Hart::check_interrupts() const {
         (priv < PrivilegeLevel::S) ||
         (priv == PrivilegeLevel::S && (mstatus & MSTATUS::Field::SIE));
 
-    TrapCause selected_cause = TrapCause::None;
+    // Global interrupt priority order: MEI > MSI > MTI > SEI > SSI > STI.
+    struct {
+        reg_t bit;
+        TrapCause cause;
+    } constexpr prio[] = {
+        {MIP::Field::MEIP, TrapCause::MachineExternalInterrupt},
+        {MIP::Field::MSIP, TrapCause::MachineSoftwareInterrupt},
+        {MIP::Field::MTIP, TrapCause::MachineTimerInterrupt},
+        {MIP::Field::SEIP, TrapCause::SupervisorExternalInterrupt},
+        {MIP::Field::SSIP, TrapCause::SupervisorSoftwareInterrupt},
+        {MIP::Field::STIP, TrapCause::SupervisorTimerInterrupt},
+    };
 
-    if (m_enabled && m_pending) {
-        if (m_pending & MIP::Field::MEIP)
-            selected_cause = TrapCause::MachineExternalInterrupt;
-        else if (m_pending & MIP::Field::MSIP)
-            selected_cause = TrapCause::MachineSoftwareInterrupt;
-        else if (m_pending & MIP::Field::MTIP)
-            selected_cause = TrapCause::MachineTimerInterrupt;
+    for (auto& p : prio) {
+        if (!(pending & p.bit))
+            continue;
+
+        if (mideleg & p.bit) {
+            if (s_enabled)
+                throw Trap(pc, p.cause, 0);
+        } else {
+            if (m_enabled)
+                throw Trap(pc, p.cause, 0);
+        }
     }
-
-    if (selected_cause == TrapCause::None && s_enabled && s_pending) {
-        if (s_pending & MIP::Field::SEIP)
-            selected_cause = TrapCause::SupervisorExternalInterrupt;
-        else if (s_pending & MIP::Field::SSIP)
-            selected_cause = TrapCause::SupervisorSoftwareInterrupt;
-        else if (s_pending & MIP::Field::STIP)
-            selected_cause = TrapCause::SupervisorTimerInterrupt;
-    }
-
-    if (selected_cause != TrapCause::None)
-        throw Trap(pc, selected_cause, 0);
 }
 
 void Hart::set_interrupt_pending(reg_t mip_mask, bool pending) noexcept {
