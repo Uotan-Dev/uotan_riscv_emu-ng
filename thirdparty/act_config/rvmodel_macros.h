@@ -108,11 +108,20 @@
 #define CLINT_BASE_ADDRESS 0x02000000
 #define RVMODEL_MSIP_ADDRESS (CLINT_BASE_ADDRESS + 0x0)
 
-// External interrupt macros are left empty — our DUT uses PLIC for external
-// interrupts and does not have a simple software-triggered external interrupt
-// generator.
-#define RVMODEL_SET_MEXT_INT(_R1, _R2)
-#define RVMODEL_CLR_MEXT_INT(_R1, _R2)
+// TestIntrGen SIG (Simple Interrupt Generator) — aligned with Sail-RISCV.
+// Address 0x40000004 is TestIntrGen base (0x40000000) + PLATFORM_OFFSET (4).
+// Bit 31 = set(1)/clear(0), other bits map directly to MIP interrupt bits.
+#define SIG_ADDRESS 0x40000004
+
+#define RVMODEL_SET_MEXT_INT(_R1, _R2) \
+  li _R1, (1 << 31) | (1 << 11);      \
+  li _R2, SIG_ADDRESS;                 \
+  sw _R1, 0(_R2);
+
+#define RVMODEL_CLR_MEXT_INT(_R1, _R2) \
+  li _R1, (1 << 11);                   \
+  li _R2, SIG_ADDRESS;                 \
+  sw _R1, 0(_R2);
 
 #define RVMODEL_SET_MSW_INT(_R1, _R2) \
   li _R1, 1; \
@@ -125,16 +134,24 @@
 
 ##### Supervisor Interrupts #####
 
-#define RVMODEL_SET_SEXT_INT(_R1, _R2)
-#define RVMODEL_CLR_SEXT_INT(_R1, _R2)
+#define RVMODEL_SET_SEXT_INT(_R1, _R2) \
+  li _R1, (1 << 31) | (1 << 9);       \
+  li _R2, SIG_ADDRESS;                 \
+  sw _R1, 0(_R2);
+
+#define RVMODEL_CLR_SEXT_INT(_R1, _R2) \
+  li _R1, (1 << 9);                    \
+  li _R2, SIG_ADDRESS;                 \
+  sw _R1, 0(_R2);
 
 #define RVMODEL_SET_SSW_INT(_R1, _R2) \
-  li _R1, 1; \
-  li _R2, RVMODEL_MSIP_ADDRESS; \
+  li _R1, (1 << 31) | (1 << 1);       \
+  li _R2, SIG_ADDRESS;                 \
   sw _R1, 0(_R2);
 
 #define RVMODEL_CLR_SSW_INT(_R1, _R2) \
-  li _R2, RVMODEL_MSIP_ADDRESS; \
-  sw zero, 0(_R2);
+  li _R1, (1 << 1);                    \
+  li _R2, SIG_ADDRESS;                 \
+  sw _R1, 0(_R2);
 
 #endif // _RVMODEL_MACROS_H

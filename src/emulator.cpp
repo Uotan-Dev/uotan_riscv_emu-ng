@@ -29,6 +29,7 @@
 #include "device/plic.hpp"
 #include "device/sifive_test.hpp"
 #include "device/simple_fb.hpp"
+#include "device/test_intr_gen.hpp"
 #include "device/virtio_blk.hpp"
 #include "emulator.hpp"
 #include "ui/headless_backend.hpp"
@@ -51,6 +52,9 @@ Emulator::Emulator(size_t dram_size, bool headless,
 
     // Clint
     bus->add_device(std::make_shared<device::Clint>(hart));
+
+    // TestIntrGen — Sail-style simple interrupt generator for ACT tests
+    bus->add_device(std::make_shared<device::TestIntrGen>(hart));
 
     // Plic
     auto plic = std::make_shared<device::Plic>(hart);
