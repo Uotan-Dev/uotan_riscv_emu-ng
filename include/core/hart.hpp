@@ -26,6 +26,10 @@
 #include "common/float.hpp"
 #include "core/dram.hpp"
 
+namespace uemu::device {
+class Clint;
+}
+
 namespace uemu::core {
 
 enum class PrivilegeLevel : uint8_t {
@@ -154,7 +158,13 @@ public:
     PrivilegeLevel priv;
     MMU* mmu;
 
+    device::Clint* get_clint() const noexcept { return clint_; }
+
+    void set_clint(device::Clint* c) noexcept { clint_ = c; }
+
 private:
+    device::Clint* clint_ = nullptr;
+
     template <typename T>
     void add_csr() {
         csrs[T::ADDRESS] = std::make_unique<T>(this);
@@ -1050,9 +1060,7 @@ public:
         return value_atomic_.load(std::memory_order_relaxed);
     }
 
-    void write_unchecked(reg_t v) noexcept override {
-        value_atomic_.store(v, std::memory_order_relaxed);
-    }
+    void write_unchecked(reg_t v) noexcept override;
 
 protected:
     bool check_permissions() const noexcept override {
@@ -1136,17 +1144,7 @@ public:
         assert(mcounteren_ && scounteren_);
     }
 
-    reg_t read_unchecked() const noexcept override {
-        return value_atomic_.load(std::memory_order_relaxed);
-    }
-
-    void write_unchecked(reg_t v) noexcept override {
-        value_atomic_.store(v, std::memory_order_relaxed);
-    }
-
-    void mirror_from_mtime(reg_t mtime_value) noexcept {
-        value_atomic_.store(mtime_value, std::memory_order_relaxed);
-    }
+    reg_t read_unchecked() const noexcept override;
 
 protected:
     bool check_permissions() const noexcept override {
@@ -1166,8 +1164,6 @@ protected:
 private:
     MCOUNTEREN* mcounteren_;
     SCOUNTEREN* scounteren_;
-
-    std::atomic<reg_t> value_atomic_;
 };
 
 class INSTRET final : public UserCounterCSR {

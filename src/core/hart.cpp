@@ -21,6 +21,7 @@
 #include "core/decoder.hpp"
 #include "core/hart.hpp"
 #include "core/mmu.hpp" // IWYU pragma: keep
+#include "device/clint.hpp"
 
 namespace uemu::core {
 
@@ -307,6 +308,20 @@ void Hart::set_interrupt_pending(reg_t mip_mask, bool pending) noexcept {
         mip->set_pending(mip_mask);
     else
         mip->clear_pending(mip_mask);
+}
+
+void STIMECMP::write_unchecked(reg_t v) noexcept {
+    value_atomic_.store(v, std::memory_order_relaxed);
+
+    if (auto* clint = hart_->get_clint(); clint)
+        clint->tick();
+}
+
+reg_t TIME::read_unchecked() const noexcept {
+    if (auto* clint = hart_->get_clint(); clint) [[likely]]
+        return clint->get_mtime();
+
+    return 0;
 }
 
 } // namespace uemu::core

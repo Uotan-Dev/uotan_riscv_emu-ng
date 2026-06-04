@@ -36,14 +36,15 @@ public:
     Clint(std::shared_ptr<core::Hart> hart, uint64_t freq_hz = DEFAULT_FREQ);
 
     void tick() override;
+    uint64_t get_mtime() noexcept;
 
 private:
     std::optional<uint64_t> read_internal(addr_t offset, size_t size) override;
     bool write_internal(addr_t offset, size_t size, uint64_t value) override;
 
+    inline void tick_internal();
     inline void handle_mtimecmp();
     inline void handle_stimecmp();
-    inline void handle_time();
 
     std::shared_ptr<core::Hart> hart_;
 
@@ -52,7 +53,7 @@ private:
     uint64_t mtimecmp_;
 
     std::chrono::steady_clock::time_point start_time_;
-    uint64_t freq_hz_;
+    const uint64_t freq_hz_;
 };
 
 } // namespace uemu::device

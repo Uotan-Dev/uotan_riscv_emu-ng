@@ -22,19 +22,19 @@ Clint::Clint(std::shared_ptr<core::Hart> hart, uint64_t freq_hz)
     : Device("CLINT", DEFAULT_BASE, SIZE), hart_(std::move(hart)), mtime_(0),
       mtimecmp_(0), freq_hz_(freq_hz) {
     start_time_ = std::chrono::steady_clock::now();
+    hart_->set_clint(this);
     tick();
 }
 
 void Clint::tick() {
-    {
-        auto now = std::chrono::steady_clock::now();
-        std::chrono::duration<double> elapsed = now - start_time_;
-        std::lock_guard<std::mutex> lock(clint_mutex_);
-        mtime_ = static_cast<uint64_t>(elapsed.count() * freq_hz_);
-        handle_time();
-        handle_mtimecmp();
-        handle_stimecmp();
-    }
+    std::lock_guard<std::mutex> lock(clint_mutex_);
+    tick_internal();
+}
+
+uint64_t Clint::get_mtime() noexcept {
+    std::lock_guard<std::mutex> lock(clint_mutex_);
+    tick_internal();
+    return mtime_;
 }
 
 std::optional<uint64_t> Clint::read_internal(addr_t offset, size_t size) {
@@ -58,9 +58,9 @@ std::optional<uint64_t> Clint::read_internal(addr_t offset, size_t size) {
         return result;
     } else if (offset >= MTIME_OFFSET && offset < MTIME_OFFSET + 8) {
         // MTIME
+        uint64_t cur_mtime = get_mtime();
         uint64_t result = 0;
-        std::lock_guard<std::mutex> lock(clint_mutex_);
-        read_little_endian(&mtime_, offset - MTIME_OFFSET, size, &result);
+        read_little_endian(&cur_mtime, offset - MTIME_OFFSET, size, &result);
         return result;
     }
 
@@ -77,16 +77,11 @@ bool Clint::write_internal(addr_t offset, size_t size, uint64_t value) {
         // MTIMECMP
         std::lock_guard<std::mutex> lock(clint_mutex_);
         write_little_endian(&mtimecmp_, offset - MTIMECMP_OFFSET, size, value);
-
-        handle_time();
-        handle_mtimecmp();
-        handle_stimecmp();
+        tick_internal();
     } else if (offset >= MTIME_OFFSET && offset < MTIME_OFFSET + 8) {
         // MTIME
         std::lock_guard<std::mutex> lock(clint_mutex_);
         write_little_endian(&mtime_, offset - MTIME_OFFSET, size, value);
-
-        handle_time();
 
         auto now = std::chrono::steady_clock::now();
         std::chrono::duration<double> new_elapsed(static_cast<double>(mtime_) /
@@ -105,6 +100,15 @@ bool Clint::write_internal(addr_t offset, size_t size, uint64_t value) {
     return true;
 }
 
+void Clint::tick_internal() {
+    auto now = std::chrono::steady_clock::now();
+    std::chrono::duration<double> elapsed = now - start_time_;
+
+    mtime_ = static_cast<uint64_t>(elapsed.count() * freq_hz_);
+    handle_mtimecmp();
+    handle_stimecmp();
+}
+
 void Clint::handle_mtimecmp() {
     hart_->set_interrupt_pending(core::MIP::Field::MTIP, mtime_ >= mtimecmp_);
 }
@@ -119,14 +123,6 @@ void Clint::handle_stimecmp() {
     if (menvcfg->read_unchecked() & core::MENVCFG::Field::STCE)
         hart_->set_interrupt_pending(core::MIP::Field::STIP,
                                      mtime_ >= stimecmp->read_unchecked());
-}
-
-void Clint::handle_time() {
-    core::TIME* time =
-        dynamic_cast<core::TIME*>(hart_->csrs[core::TIME::ADDRESS].get());
-    assert(time);
-
-    time->mirror_from_mtime(mtime_);
 }
 
 }; // namespace uemu::device
