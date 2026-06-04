@@ -24,6 +24,7 @@
 | Device | Address Range | Description |
 |--------|---------------|-------------|
 | CLINT | 0x2000000-0x200ffff | Core Local Interruptor |
+| TestIntrGen | 0x40000000-0x40000fff | Sail-style interrupt generator for ACT tests |
 | PLIC | 0xc000000-0xcffffff | Platform-Level Interrupt Controller |
 | SiFiveTest | 0x100000-0x100fff | Test device for shutdown/reboot |
 | NS16550 UART | 0x10000000-0x100000ff | Serial console |
@@ -56,7 +57,6 @@
 * **CMake**: 3.20 or later
 * **C++ Compiler**: C++23 compatible
 * **C Compiler**: C17 compatible
-* **Platform Note**: If you are on **Windows**, you must use the **MSYS2 Clang64** environment. Standard MSVC (Visual Studio) is not supported.
 
 ### Required dependencies:
 
@@ -107,6 +107,18 @@ OPTIONS:
 
 * **No JIT**: It lacks Just-In-Time compilation; every instruction is fetched and decoded individually, so it is slower than **uemu**.
 * ~~**EDK2/UEFI Compatibility**: The `virtio-blk` device currently cannot be successfully probed or initialized by **edk2**, making it unavailable as a boot or storage device in UEFI environments.~~
+* **ACT Interrupt Tests**: The following ACT compliance tests currently fail:
+    * `InterruptsSm` — M-mode interrupt handling
+    * `InterruptsS` — S-mode interrupt handling
+    * `InterruptsU` — U-mode interrupt handling
+
+## ACT4 Compliance Testing
+
+**uemu-ng** uses the [riscv-arch-test](https://github.com/riscv/riscv-arch-test) (ACT4) suite for RISC-V ISA compliance verification. The test configuration files are located in `thirdparty/act_config/`.
+
+The following extensions are excluded from testing:
+* `SsstrictS`, `SsstrictSm`, `SsstrictU` — strict s-mode coverage
+* `Sscounterenw` — scounteren write behavior
 
 ## TODO
 
@@ -143,7 +155,6 @@ for their course
 
 ### Contributions and Support
 
-- [@Lu-1-Ning](https://github.com/Lu-1-Ning) — for code review and valuable feedback.
 - [Wuhan Youtan Network Technology Co., Ltd.](https://www.uotan.cn/) — for providing support during the development of this project.
 
 ## License
