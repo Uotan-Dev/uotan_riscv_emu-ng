@@ -99,8 +99,6 @@
 
 #define RVMODEL_TIMER_INT_SOON_DELAY 100
 
-#define RVMODEL_MAX_CYCLES_PER_TIMER_TICK 100
-
 #define RVMODEL_MTIME_ADDRESS  0x0200BFF8  /* Address of mtime (CLINT base + 0xBFF8) */
 
 #define RVMODEL_MTIMECMP_ADDRESS 0x02004000 /* Address of mtimecmp (CLINT base + 0x4000) */

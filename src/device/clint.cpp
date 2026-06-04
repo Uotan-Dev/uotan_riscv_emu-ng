@@ -18,28 +18,23 @@
 
 namespace uemu::device {
 
-Clint::Clint(std::shared_ptr<core::Hart> hart)
-    : Device("CLINT", DEFAULT_BASE, SIZE), hart_(std::move(hart)),
-      cycle_count_(0), mtime_(0), mtimecmp_(0) {
+Clint::Clint(std::shared_ptr<core::Hart> hart, uint64_t freq_hz)
+    : Device("CLINT", DEFAULT_BASE, SIZE), hart_(std::move(hart)), mtime_(0),
+      mtimecmp_(0), freq_hz_(freq_hz) {
+    start_time_ = std::chrono::steady_clock::now();
     hart_->set_clint(this);
+    tick();
 }
 
-void Clint::update() noexcept {
-    cycle_count_++;
-
-    // At each INSNS_PER_RTC_TICK boundary: advance mtime by 1 tick and
-    // re-evaluate timer comparators. Between boundaries, only cycle_count_
-    // changes — no atomic MIP operations on the hot path.
-    if (cycle_count_ % INSNS_PER_RTC_TICK == 0) [[unlikely]] {
-        mtime_++;
-        handle_mtimecmp();
-        handle_stimecmp();
-    }
+void Clint::tick() {
+    std::lock_guard<std::mutex> lock(clint_mutex_);
+    tick_internal();
 }
 
-void Clint::sync() noexcept {
-    handle_mtimecmp();
-    handle_stimecmp();
+uint64_t Clint::get_mtime() noexcept {
+    std::lock_guard<std::mutex> lock(clint_mutex_);
+    tick_internal();
+    return mtime_;
 }
 
 std::optional<uint64_t> Clint::read_internal(addr_t offset, size_t size) {
@@ -56,14 +51,16 @@ std::optional<uint64_t> Clint::read_internal(addr_t offset, size_t size) {
         read_little_endian(&msip_val, offset - MSIP_OFFSET, size, &result);
         return result;
     } else if (offset >= MTIMECMP_OFFSET && offset < MTIMECMP_OFFSET + 8) {
-        // MTIMECMP — no lock needed (CPU-thread only)
+        // MTIMECMP
         uint64_t result = 0;
+        std::lock_guard<std::mutex> lock(clint_mutex_);
         read_little_endian(&mtimecmp_, offset - MTIMECMP_OFFSET, size, &result);
         return result;
     } else if (offset >= MTIME_OFFSET && offset < MTIME_OFFSET + 8) {
-        // MTIME — no lock needed (CPU-thread only)
+        // MTIME
+        uint64_t cur_mtime = get_mtime();
         uint64_t result = 0;
-        read_little_endian(&mtime_, offset - MTIME_OFFSET, size, &result);
+        read_little_endian(&cur_mtime, offset - MTIME_OFFSET, size, &result);
         return result;
     }
 
@@ -77,18 +74,23 @@ bool Clint::write_internal(addr_t offset, size_t size, uint64_t value) {
         write_little_endian(&msip_val, offset - MSIP_OFFSET, size, value);
         hart_->set_interrupt_pending(core::MIP::Field::MSIP, (msip_val & 1));
     } else if (offset >= MTIMECMP_OFFSET && offset < MTIMECMP_OFFSET + 8) {
-        // MTIMECMP: store new value, immediately re-evaluate comparators
-        // so MTIP is updated without waiting for the next update() boundary.
+        // MTIMECMP
+        std::lock_guard<std::mutex> lock(clint_mutex_);
         write_little_endian(&mtimecmp_, offset - MTIMECMP_OFFSET, size, value);
-        handle_mtimecmp();
-        handle_stimecmp();
+        tick_internal();
     } else if (offset >= MTIME_OFFSET && offset < MTIME_OFFSET + 8) {
-        // MTIME: update mtime_ and resync cycle_count_ to maintain the
-        // invariant mtime_ = cycle_count_ / INSNS_PER_RTC_TICK. The
-        // sub-tick remainder is dropped (acceptable — this is a one-time
-        // event per MTIME MMIO write).
+        // MTIME
+        std::lock_guard<std::mutex> lock(clint_mutex_);
         write_little_endian(&mtime_, offset - MTIME_OFFSET, size, value);
-        cycle_count_ = mtime_ * INSNS_PER_RTC_TICK;
+
+        auto now = std::chrono::steady_clock::now();
+        std::chrono::duration<double> new_elapsed(static_cast<double>(mtime_) /
+                                                  freq_hz_);
+        start_time_ =
+            now -
+            std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                new_elapsed);
+
         handle_mtimecmp();
         handle_stimecmp();
     } else {
@@ -98,11 +100,20 @@ bool Clint::write_internal(addr_t offset, size_t size, uint64_t value) {
     return true;
 }
 
-void Clint::handle_mtimecmp() noexcept {
+void Clint::tick_internal() {
+    auto now = std::chrono::steady_clock::now();
+    std::chrono::duration<double> elapsed = now - start_time_;
+
+    mtime_ = static_cast<uint64_t>(elapsed.count() * freq_hz_);
+    handle_mtimecmp();
+    handle_stimecmp();
+}
+
+void Clint::handle_mtimecmp() {
     hart_->set_interrupt_pending(core::MIP::Field::MTIP, mtime_ >= mtimecmp_);
 }
 
-void Clint::handle_stimecmp() noexcept {
+void Clint::handle_stimecmp() {
     core::MENVCFG* menvcfg =
         dynamic_cast<core::MENVCFG*>(hart_->csrs[core::MENVCFG::ADDRESS].get());
     core::STIMECMP* stimecmp = dynamic_cast<core::STIMECMP*>(
@@ -114,4 +125,4 @@ void Clint::handle_stimecmp() noexcept {
                                      mtime_ >= stimecmp->read_unchecked());
 }
 
-} // namespace uemu::device
+}; // namespace uemu::device

@@ -25,16 +25,12 @@ namespace uemu {
 
 class Emulator;
 
-namespace device {
-class Clint;
-}
-
 class ExecutionEngine {
 public:
     ExecutionEngine(std::shared_ptr<core::Hart> hart,
                     std::shared_ptr<core::Dram> dram,
                     std::shared_ptr<core::Bus> bus,
-                    std::shared_ptr<core::MMU> mmu, device::Clint* clint);
+                    std::shared_ptr<core::MMU> mmu);
 
     ~ExecutionEngine();
 
@@ -85,7 +81,6 @@ private:
 
     core::MCYCLE* mcycle_;
     core::MINSTRET* minstret_;
-    device::Clint* clint_;
 };
 
 } // namespace uemu

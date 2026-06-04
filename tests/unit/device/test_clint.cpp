@@ -21,75 +21,42 @@
 
 namespace uemu::test {
 
-TEST(ClintTest, MtimeAdvance) {
-    constexpr auto N = device::Clint::INSNS_PER_RTC_TICK;
-
-    auto hart = std::make_shared<core::Hart>();
-    device::Clint clint(hart);
-
-    // mtime starts at 0
-    EXPECT_EQ(clint.get_mtime(), 0);
-
-    // N-1 updates: mtime should stay at 0
-    for (size_t i = 0; i < N - 1; i++)
-        clint.update();
-    EXPECT_EQ(clint.get_mtime(), 0);
-
-    // Nth update: cross boundary, mtime becomes 1
-    clint.update();
-    EXPECT_EQ(clint.get_mtime(), 1);
-
-    // Another N updates: mtime becomes 2
-    for (size_t i = 0; i < N; i++)
-        clint.update();
-    EXPECT_EQ(clint.get_mtime(), 2);
-}
-
 TEST(ClintTest, MTIMECMPTrigger) {
-    constexpr auto N = device::Clint::INSNS_PER_RTC_TICK;
-    constexpr addr_t MTIMECMP_ADDR =
+    constexpr size_t MTIMECMP_ADDR =
         device::Clint::DEFAULT_BASE + device::Clint::MTIMECMP_OFFSET;
 
-    auto hart = std::make_shared<core::Hart>();
+    auto hart = std::make_shared<uemu::core::Hart>();
     core::MIP* mip =
         dynamic_cast<core::MIP*>(hart->csrs[core::MIP::ADDRESS].get());
     ASSERT_NE(mip, nullptr);
 
-    device::Clint clint(hart);
+    device::Clint clint(hart, 1000);
 
-    // Set mtimecmp = 5 → triggers when mtime reaches 5
-    bool r = clint.write<uint64_t>(MTIMECMP_ADDR, 5);
-    EXPECT_TRUE(r);
-
-    // Advance to mtime = 4: 4 * N = 400 updates.
-    // After this, cycle_count_ == 400, at a boundary (400 % 100 == 0).
-    for (size_t i = 0; i < 4 * N; i++)
-        clint.update();
-    EXPECT_EQ(clint.get_mtime(), 4);
+    bool r = clint.write(MTIMECMP_ADDR, 1145141919810ull);
+    clint.tick();
     EXPECT_FALSE(mip->read_unchecked() & core::MIP::MTIP);
 
-    // Advance to mtime = 5: need N more updates to reach cycle_count_ = 500.
-    for (size_t i = 0; i < N; i++)
-        clint.update();
-    EXPECT_EQ(clint.get_mtime(), 5);
+    r = clint.write<uint64_t>(MTIMECMP_ADDR, 0ull);
+    std::this_thread::sleep_for(std::chrono::milliseconds(64));
+    clint.tick();
+    EXPECT_TRUE(r);
     EXPECT_TRUE(mip->read_unchecked() & core::MIP::MTIP);
 
-    // Re-arm: set mtimecmp larger than current mtime → MTIP cleared
-    r = clint.write<uint64_t>(MTIMECMP_ADDR, 10);
+    r = clint.write<uint64_t>(MTIMECMP_ADDR, 1145141919810ull);
     EXPECT_TRUE(r);
     EXPECT_FALSE(mip->read_unchecked() & core::MIP::MTIP);
 }
 
 TEST(ClintTest, MSIPWrite) {
-    constexpr addr_t MSIP_ADDR =
+    constexpr size_t MSIP_ADDR =
         device::Clint::DEFAULT_BASE + device::Clint::MSIP_OFFSET;
 
-    auto hart = std::make_shared<core::Hart>();
+    auto hart = std::make_shared<uemu::core::Hart>();
     core::MIP* mip =
         dynamic_cast<core::MIP*>(hart->csrs[core::MIP::ADDRESS].get());
     ASSERT_NE(mip, nullptr);
 
-    device::Clint clint(hart);
+    device::Clint clint(hart, 1000);
 
     // Write 1 to MSIP
     bool r = clint.write<uint32_t>(MSIP_ADDR, 1);

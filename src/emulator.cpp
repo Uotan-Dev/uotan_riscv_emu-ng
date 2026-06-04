@@ -51,8 +51,7 @@ Emulator::Emulator(size_t dram_size, bool headless,
     hart->connect_mmu(mmu.get());
 
     // Clint
-    auto clint = std::make_shared<device::Clint>(hart);
-    bus->add_device(clint);
+    bus->add_device(std::make_shared<device::Clint>(hart));
 
     // TestIntrGen — Sail-style simple interrupt generator for ACT tests
     bus->add_device(std::make_shared<device::TestIntrGen>(hart));
@@ -116,8 +115,7 @@ Emulator::Emulator(size_t dram_size, bool headless,
     bus->add_device(std::make_shared<device::NemuConsole>());
 
     // ExecutionEngine
-    engine_ =
-        std::make_unique<ExecutionEngine>(hart, dram, bus, mmu, clint.get());
+    engine_ = std::make_unique<ExecutionEngine>(hart, dram, bus, mmu);
 
     // UI backend
     auto host_exit = [this]() -> void {
