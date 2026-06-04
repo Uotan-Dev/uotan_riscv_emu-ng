@@ -15,15 +15,17 @@
  */
 
 #include "executionengine.hpp"
+#include "device/clint.hpp"
 
 namespace uemu {
 
 ExecutionEngine::ExecutionEngine(std::shared_ptr<core::Hart> hart,
                                  std::shared_ptr<core::Dram> dram,
                                  std::shared_ptr<core::Bus> bus,
-                                 std::shared_ptr<core::MMU> mmu)
+                                 std::shared_ptr<core::MMU> mmu,
+                                 device::Clint* clint)
     : hart_(std::move(hart)), dram_(std::move(dram)), bus_(std::move(bus)),
-      mmu_(std::move(mmu)) {
+      mmu_(std::move(mmu)), clint_(clint) {
     cpu_thread_running_ = false;
 
     shutdown_from_guest_ = true;
@@ -131,6 +133,7 @@ void ExecutionEngine::cpu_thread() {
             break;
 
         mcycle_->advance();
+        clint_->update();
 
         try {
             // Normal execution
@@ -148,6 +151,11 @@ void ExecutionEngine::cpu_thread() {
             // pending (mip & mie != 0).
             minstret_->advance(); // WFI counts as retired
 
+            // Spike-compatible tight spin: advance cycle_count_ in
+            // INTERLEAVE-sized batches. Each update() call is 1 credit
+            // (like Spike's step credit). Yield after each batch to let
+            // the main/UI thread run. On the next outer iteration,
+            // update() is called again — satisfying "after yield".
             while (true) {
                 if (shutdown_from_guest_) [[unlikely]]
                     break;
@@ -156,19 +164,24 @@ void ExecutionEngine::cpu_thread() {
                     [[unlikely]]
                     break;
 
-                std::this_thread::yield();
+                for (size_t b = 0; b < device::Clint::INTERLEAVE; b++) {
+                    clint_->update();
 
-                if (hart_->has_pending_enabled_interrupt()) {
-                    try {
-                        hart_->check_interrupts();
-                    } catch (const core::Trap& trap) {
-                        hart_->handle_trap(trap);
-                        break;
+                    if (hart_->has_pending_enabled_interrupt()) [[unlikely]] {
+                        try {
+                            hart_->check_interrupts();
+                        } catch (const core::Trap& trap) {
+                            hart_->handle_trap(trap);
+                            goto wfi_done;
+                        }
+                        goto wfi_done;
                     }
-
-                    break;
                 }
+
+                std::this_thread::yield();
             }
+
+        wfi_done:;
         } catch (const core::Trap& trap) {
             // RISC-V Traps
             hart_->handle_trap(trap);

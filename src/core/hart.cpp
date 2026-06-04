@@ -321,7 +321,7 @@ void STIMECMP::write_unchecked(reg_t v) noexcept {
     value_atomic_.store(v, std::memory_order_relaxed);
 
     if (auto* clint = hart_->get_clint(); clint)
-        clint->tick();
+        clint->sync();
 }
 
 reg_t TIME::read_unchecked() const noexcept {
