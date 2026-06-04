@@ -300,6 +300,13 @@ void Hart::check_interrupts() const {
     }
 }
 
+bool Hart::has_pending_enabled_interrupt() const noexcept {
+    const reg_t mip = csrs[MIP::ADDRESS]->read_unchecked();
+    const reg_t mie = csrs[MIE::ADDRESS]->read_unchecked();
+
+    return (mip & mie) != 0;
+}
+
 void Hart::set_interrupt_pending(reg_t mip_mask, bool pending) noexcept {
     MIP* mip = dynamic_cast<MIP*>(csrs[MIP::ADDRESS].get());
     assert(mip);

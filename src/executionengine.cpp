@@ -143,6 +143,32 @@ void ExecutionEngine::cpu_thread() {
             hart_->pc += static_cast<addr_t>(ilen);
             decoded_insn(*hart_, *mmu_);
             minstret_->advance();
+        } catch (const core::WfiWait&) {
+            // WFI: hart stalls until a locally-enabled interrupt becomes
+            // pending (mip & mie != 0).
+            minstret_->advance(); // WFI counts as retired
+
+            while (true) {
+                if (shutdown_from_guest_) [[unlikely]]
+                    break;
+
+                if (shutdown_from_host_.load(std::memory_order_relaxed))
+                    [[unlikely]]
+                    break;
+
+                std::this_thread::yield();
+
+                if (hart_->has_pending_enabled_interrupt()) {
+                    try {
+                        hart_->check_interrupts();
+                    } catch (const core::Trap& trap) {
+                        hart_->handle_trap(trap);
+                        break;
+                    }
+
+                    break;
+                }
+            }
         } catch (const core::Trap& trap) {
             // RISC-V Traps
             hart_->handle_trap(trap);

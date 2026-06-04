@@ -328,6 +328,15 @@ IMPL(wfi, {
         (hart->priv < PrivilegeLevel::M &&
          (hart->csrs[MSTATUS::ADDRESS]->read_unchecked() & MSTATUS::TW)))
         Trap::raise_exception(pc, TrapCause::IllegalInstruction, d->insn);
+
+    if (hart->has_pending_enabled_interrupt())
+        return;
+
+    const reg_t mie = hart->csrs[MIE::ADDRESS]->read_unchecked();
+    if (mie == 0)
+        return;
+
+    throw WfiWait{};
 })
 
 // RV64M Extension

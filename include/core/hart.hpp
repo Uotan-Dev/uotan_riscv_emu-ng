@@ -88,6 +88,13 @@ public:
     const uint64_t tval;
 };
 
+// Raised by WFI when the hart should stall until a locally-enabled
+// interrupt becomes pending.
+class WfiWait final : public std::exception {
+public:
+    const char* what() const noexcept override { return "WFI wait"; }
+};
+
 class DecodedInsn;
 class CSR;
 
@@ -147,6 +154,7 @@ public:
 
     void handle_trap(const Trap& trap) noexcept;
     void check_interrupts() const;
+    [[nodiscard]] bool has_pending_enabled_interrupt() const noexcept;
     void set_interrupt_pending(reg_t mip_mask, bool pending) noexcept;
 
     void connect_mmu(MMU* mmu) noexcept { this->mmu = mmu; }
