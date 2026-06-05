@@ -24,7 +24,7 @@ namespace uemu::device {
 
 class GoldfishRTC : public IrqDevice {
 public:
-    static constexpr addr_t DEFAULT_BASE = 0x10000100;
+    static constexpr addr_t DEFAULT_BASE = 0x101000;
     static constexpr size_t SIZE = 0x100;
     static constexpr uint32_t DEFAULT_INTERRUPT_ID = 11;
 

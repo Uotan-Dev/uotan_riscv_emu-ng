@@ -32,7 +32,7 @@
 | VirtIO-Block | 0x10001000-0x10001fff | Block device interface |
 | pflash-cfi01 | 0x20000000-0x23ffffff | CFI parallel flash with Intel command set |
 | GoldfishEvents | 0x10002000-0x10002fff | Input event device |
-| GoldfishRTC | 0x10000100-0x100001ff | Real-time clock |
+| GoldfishRTC | 0x101000-0x1010ff | Real-time clock |
 | GoldfishBattery | 0x10003000-0x10003fff | Battery status |
 | BCM2835Rng | 0x10004000-0x1000400f | Random number generator |
 | NemuConsole | 0x10008000-0x10008007 | Debug console from [NEMU](https://github.com/NJU-ProjectN/nemu) |

@@ -96,9 +96,9 @@
             compatible = "sifive,test1", "sifive,test0", "syscon";
         };
 
-        rtc@10000100 {
+        rtc@101000 {
             compatible = "google,goldfish-rtc";
-            reg = <0x0 0x10000100 0x0 0x100>;
+            reg = <0x0 0x101000 0x0 0x100>;
             interrupts = <11>;
             interrupt-parent = <&plic0>;
         };
