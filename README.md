@@ -4,6 +4,8 @@
 
 **Uotan RISC-V Emulator - Next Generation** (*uemu-ng*) is a small rv64gc system emulator. It is a refactored version of [uemu](https://github.com/Uotan-Dev/uotan_riscv_emu). While **uemu** served as a proof-of-concept, the **NG** version focuses on strict architectural compliance and robust device emulation.
 
+A UEFI firmware implementation (EDK2) for **uemu-ng** is available at [Uotan-Dev/edk2-uemu](https://github.com/Uotan-Dev/edk2-uemu).
+
 **uemu-ng** supports the following RISC-V ISA features:
 * RV64I base ISAs, v2.1
 * Zifencei extension, v2.0
