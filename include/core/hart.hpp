@@ -95,7 +95,6 @@ public:
     const char* what() const noexcept override { return "WFI wait"; }
 };
 
-class DecodedInsn;
 class CSR;
 
 class FPR final {
@@ -205,9 +204,9 @@ public:
 
     virtual void write_unchecked(reg_t v) noexcept { value_ = v; }
 
-    virtual reg_t read_checked(const DecodedInsn& insn) const;
+    virtual reg_t read_checked(addr_t pc, uint32_t insn) const;
 
-    virtual void write_checked(const DecodedInsn& insn, reg_t v);
+    virtual void write_checked(addr_t pc, uint32_t insn, reg_t v);
 
 protected:
     virtual bool check_permissions() const noexcept {
@@ -230,9 +229,9 @@ public:
 
     void write_unchecked([[maybe_unused]] reg_t v) noexcept override {}
 
-    [[noreturn]] reg_t read_checked(const DecodedInsn& insn) const override;
+    [[noreturn]] reg_t read_checked(addr_t pc, uint32_t insn) const override;
 
-    [[noreturn]] void write_checked(const DecodedInsn& insn, reg_t v) override;
+    [[noreturn]] void write_checked(addr_t pc, uint32_t insn, reg_t v) override;
 
 private:
     size_t address_;
@@ -248,7 +247,7 @@ public:
 
     void write_unchecked([[maybe_unused]] reg_t v) noexcept override {}
 
-    [[noreturn]] void write_checked(const DecodedInsn& insn, reg_t v) override;
+    [[noreturn]] void write_checked(addr_t pc, uint32_t insn, reg_t v) override;
 };
 
 // Hardwired CSR.
@@ -692,8 +691,8 @@ public:
         assert(mcountinhibit_);
     }
 
-    void write_checked(const DecodedInsn& insn, reg_t v) override {
-        CSR::write_checked(insn, v);
+    void write_checked(addr_t pc, uint32_t insn, reg_t v) override {
+        CSR::write_checked(pc, insn, v);
         increase_suppressed_ = true;
     }
 
@@ -1227,8 +1226,8 @@ public:
 
     void write_unchecked(reg_t v) noexcept override { value_ = v & 0b11111; }
 
-    void write_checked(const DecodedInsn& insn, reg_t v) override {
-        CSR::write_checked(insn, v);
+    void write_checked(addr_t pc, uint32_t insn, reg_t v) override {
+        CSR::write_checked(pc, insn, v);
         hart_->csrs[MSTATUS::ADDRESS]->write_unchecked(
             hart_->csrs[MSTATUS::ADDRESS]->read_unchecked() |
             MSTATUS::Field::FS);
@@ -1262,8 +1261,8 @@ public:
 
     void write_unchecked(reg_t v) noexcept override { value_ = v & 0b111; }
 
-    void write_checked(const DecodedInsn& insn, reg_t v) override {
-        CSR::write_checked(insn, v);
+    void write_checked(addr_t pc, uint32_t insn, reg_t v) override {
+        CSR::write_checked(pc, insn, v);
         hart_->csrs[MSTATUS::ADDRESS]->write_unchecked(
             hart_->csrs[MSTATUS::ADDRESS]->read_unchecked() |
             MSTATUS::Field::FS);
@@ -1297,8 +1296,8 @@ public:
         frm_->write_unchecked((v >> 5) & 0b111);
     }
 
-    void write_checked(const DecodedInsn& insn, reg_t v) override {
-        CSR::write_checked(insn, v);
+    void write_checked(addr_t pc, uint32_t insn, reg_t v) override {
+        CSR::write_checked(pc, insn, v);
         hart_->csrs[MSTATUS::ADDRESS]->write_unchecked(
             hart_->csrs[MSTATUS::ADDRESS]->read_unchecked() |
             MSTATUS::Field::FS);

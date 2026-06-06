@@ -16,7 +16,6 @@
 
 #include <print>
 
-#include "core/decoder.hpp"
 #include "core/mmu.hpp"
 #include "device/bcm2835_rng.hpp"
 #include "device/clint.hpp"

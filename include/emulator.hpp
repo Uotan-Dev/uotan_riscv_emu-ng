@@ -18,7 +18,7 @@
 
 #include <filesystem>
 
-#include "execution_engine.hpp"
+#include "core/execution_engine.hpp"
 #include "host/console.hpp"
 
 namespace uemu {

@@ -18,49 +18,49 @@
 #include <exception>
 #include <print>
 
-#include "core/decoder.hpp"
+#include "common/types.hpp"
 #include "core/hart.hpp"
 #include "core/mmu.hpp" // IWYU pragma: keep
 #include "device/clint.hpp"
 
 namespace uemu::core {
 
-reg_t CSR::read_checked(const DecodedInsn& insn) const {
+reg_t CSR::read_checked(addr_t pc, uint32_t insn) const {
     if (!check_permissions()) [[unlikely]]
-        Trap::raise_exception(insn.pc, TrapCause::IllegalInstruction,
-                              insn.insn);
+        Trap::raise_exception(pc, TrapCause::IllegalInstruction,
+                              insn);
 
     return read_unchecked();
 }
 
-void CSR::write_checked(const DecodedInsn& insn, reg_t v) {
+void CSR::write_checked(addr_t pc, uint32_t insn, reg_t v) {
     if (!check_permissions()) [[unlikely]]
-        Trap::raise_exception(insn.pc, TrapCause::IllegalInstruction,
-                              insn.insn);
+        Trap::raise_exception(pc, TrapCause::IllegalInstruction,
+                              insn);
 
     write_unchecked(v);
 }
 
 [[noreturn]] reg_t
-UnimplementedCSR::read_checked(const DecodedInsn& insn) const {
+UnimplementedCSR::read_checked(addr_t pc, uint32_t insn) const {
     if (trace_)
         std::println(stderr, "Unimplemented CSR: {:#010x}", address_);
 
-    Trap::raise_exception(insn.pc, TrapCause::IllegalInstruction, insn.insn);
+    Trap::raise_exception(pc, TrapCause::IllegalInstruction, insn);
 }
 
-[[noreturn]] void UnimplementedCSR::write_checked(const DecodedInsn& insn,
+[[noreturn]] void UnimplementedCSR::write_checked(addr_t pc, uint32_t insn,
                                                   [[maybe_unused]] reg_t v) {
     if (trace_)
         std::println(stderr, "Unimplemented CSR: {:#010x}", address_);
 
-    Trap::raise_exception(insn.pc, TrapCause::IllegalInstruction, insn.insn);
+    Trap::raise_exception(pc, TrapCause::IllegalInstruction, insn);
 }
 
 [[noreturn]]
-void ConstCSR::write_checked(const DecodedInsn& insn,
+void ConstCSR::write_checked(addr_t pc, uint32_t insn,
                              [[maybe_unused]] reg_t v) {
-    Trap::raise_exception(insn.pc, TrapCause::IllegalInstruction, insn.insn);
+    Trap::raise_exception(pc, TrapCause::IllegalInstruction, insn);
 }
 
 MSTATUS::MSTATUS(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {

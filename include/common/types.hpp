@@ -23,4 +23,13 @@ namespace uemu {
 using addr_t = uint64_t;
 using reg_t = uint64_t;
 
+namespace core {
+
+enum class Ilen : uint8_t {
+    Compressed = 2,
+    Normal = 4,
+};
+
+} // namespace core
+
 } // namespace uemu

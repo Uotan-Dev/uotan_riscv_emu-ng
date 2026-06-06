@@ -19,7 +19,7 @@
 #include <utility>
 
 #include "core/bus.hpp"
-#include "core/decoder.hpp"
+#include "common/types.hpp"
 #include "core/hart.hpp"
 
 namespace uemu::core {
@@ -158,7 +158,7 @@ public:
 
             uint32_t insn = *v;
 
-            if (Decoder::is_compressed(insn))
+            if ((insn & 0x3) != 0x3)
                 return {insn & 0xFFFF, Ilen::Compressed};
 
             return {insn, Ilen::Normal};
@@ -173,7 +173,7 @@ public:
 
         uint32_t insn = *v;
 
-        if (Decoder::is_compressed(insn))
+        if ((insn & 0x3) != 0x3)
             return {insn, Ilen::Compressed};
 
         paddr = translate(pc, pc + 2, AccessType::Fetch);
