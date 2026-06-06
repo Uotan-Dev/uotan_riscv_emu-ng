@@ -114,29 +114,32 @@ void VirtioBlk::update_status(uint32_t status) {
     }
 }
 
-void VirtioBlk::read_handler(uint64_t sector, uint64_t desc_addr,
+bool VirtioBlk::read_handler(uint64_t sector, uint64_t desc_addr,
                              uint32_t len) {
     uint64_t offset = sector * DISK_BLK_SIZE;
 
-    if (offset >= disk_size_ || offset + len > disk_size_)
-        return;
+    if (offset >= disk_size_ || offset + len > disk_size_) [[unlikely]]
+        return false;
 
     // Read from file
     std::vector<uint8_t> buffer(len);
     disk_file_.seekg(offset);
     if (!disk_file_.read(reinterpret_cast<char*>(buffer.data()), len))
-        return;
+        [[unlikely]]
+        return false;
 
     // Copy to DRAM
     dram_->write_bytes(desc_addr, buffer.data(), len);
+
+    return true;
 }
 
-void VirtioBlk::write_handler(uint64_t sector, uint64_t desc_addr,
+bool VirtioBlk::write_handler(uint64_t sector, uint64_t desc_addr,
                               uint32_t len) {
     uint64_t offset = sector * DISK_BLK_SIZE;
 
-    if (offset >= disk_size_ || offset + len > disk_size_)
-        return;
+    if (offset >= disk_size_ || offset + len > disk_size_) [[unlikely]]
+        return false;
 
     // Read from DRAM
     std::vector<uint8_t> buffer(len);
@@ -145,7 +148,8 @@ void VirtioBlk::write_handler(uint64_t sector, uint64_t desc_addr,
     // Write to file
     disk_file_.seekp(offset);
     disk_file_.write(reinterpret_cast<const char*>(buffer.data()), len);
-    // disk_file_.flush();
+
+    return disk_file_.good();
 }
 
 int VirtioBlk::desc_handler(const VirtioBlkQueue& queue, uint16_t desc_idx,
@@ -173,6 +177,16 @@ int VirtioBlk::desc_handler(const VirtioBlkQueue& queue, uint16_t desc_idx,
         return -1;
     }
 
+    // Validate descriptor WRITE flags (protocol errors → set_fail)
+    if (vq_desc[0].flags & VIRTIO_DESC_F_WRITE) {
+        set_fail();
+        return -1;
+    }
+    if (!(vq_desc[2].flags & VIRTIO_DESC_F_WRITE)) {
+        set_fail();
+        return -1;
+    }
+
     // Read request header from first descriptor
     if (!dram_->is_valid_addr(vq_desc[0].addr, 16)) {
         set_fail();
@@ -182,42 +196,53 @@ int VirtioBlk::desc_handler(const VirtioBlkQueue& queue, uint16_t desc_idx,
     uint32_t type = dram_->read<uint32_t>(vq_desc[0].addr + 0);
     uint64_t sector = dram_->read<uint64_t>(vq_desc[0].addr + 8);
 
-    // Validate sector bounds
-    if (sector > config_.capacity - 1) {
-        dram_->write<uint8_t>(vq_desc[2].addr, VIRTIO_BLK_S_IOERR);
-        return -1;
-    }
-
     uint8_t status = VIRTIO_BLK_S_OK;
 
     switch (type) {
         case VIRTIO_BLK_T_IN:
-            // Read from disk to buffer
-            read_handler(sector, vq_desc[1].addr, vq_desc[1].len);
+            if (vq_desc[1].flags & VIRTIO_DESC_F_WRITE) [[likely]] {
+                if (sector > config_.capacity - 1 ||
+                    !read_handler(sector, vq_desc[1].addr, vq_desc[1].len))
+                    status = VIRTIO_BLK_S_IOERR;
+            } else {
+                set_fail();
+                return -1;
+            }
             break;
         case VIRTIO_BLK_T_OUT:
-            // Write from buffer to disk
-            if (device_features_ & VIRTIO_BLK_F_RO)
-                status = VIRTIO_BLK_S_IOERR;
-            else
-                write_handler(sector, vq_desc[1].addr, vq_desc[1].len);
+            if (!(vq_desc[1].flags & VIRTIO_DESC_F_WRITE)) [[likely]] {
+                if (device_features_ & VIRTIO_BLK_F_RO)
+                    status = VIRTIO_BLK_S_IOERR;
+                else if (sector > config_.capacity - 1 ||
+                         !write_handler(sector, vq_desc[1].addr,
+                                        vq_desc[1].len))
+                    status = VIRTIO_BLK_S_IOERR;
+            } else {
+                set_fail();
+                return -1;
+            }
             break;
         case VIRTIO_BLK_T_FLUSH: disk_file_.flush(); break;
-        case VIRTIO_BLK_T_GET_ID:
-            dram_->write_bytes(vq_desc[1].addr, (const uint8_t*)"SERIAL0001",
-                               10);
+        case VIRTIO_BLK_T_GET_ID: {
+            if (!(vq_desc[1].flags & VIRTIO_DESC_F_WRITE)) {
+                set_fail();
+                return -1;
+            }
+            const char* serial = "SERIAL0001";
+            uint32_t write_len = vq_desc[1].len < 10 ? vq_desc[1].len : 10;
+            dram_->write_bytes(vq_desc[1].addr,
+                               reinterpret_cast<const uint8_t*>(serial),
+                               write_len);
             break;
-        default:
-            // println(std::cerr, "FUCKED: {}", type);
-            status = VIRTIO_BLK_S_UNSUPP;
-            break;
+        }
+        default: status = VIRTIO_BLK_S_UNSUPP; break;
     }
 
-    // Write status to third descriptor
+    // Write status byte to the third descriptor
     dram_->write<uint8_t>(vq_desc[2].addr, status);
-    *plen = vq_desc[1].len;
+    *plen = (status == VIRTIO_BLK_S_OK) ? vq_desc[1].len : 0;
 
-    return (status == VIRTIO_BLK_S_OK) ? 0 : -1;
+    return 0;
 }
 
 void VirtioBlk::queue_notify_handler(uint32_t index) {

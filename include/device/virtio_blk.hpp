@@ -165,8 +165,8 @@ private:
     void queue_notify_handler(uint32_t index);
     int desc_handler(const VirtioBlkQueue& queue, uint16_t desc_idx,
                      uint32_t* plen);
-    void read_handler(uint64_t sector, uint64_t desc_addr, uint32_t len);
-    void write_handler(uint64_t sector, uint64_t desc_addr, uint32_t len);
+    bool read_handler(uint64_t sector, uint64_t desc_addr, uint32_t len);
+    bool write_handler(uint64_t sector, uint64_t desc_addr, uint32_t len);
 
     bool open_disk(const std::filesystem::path& disk_path);
     void close_disk();
