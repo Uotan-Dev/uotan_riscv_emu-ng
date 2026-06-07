@@ -16,20 +16,17 @@
 
 #pragma once
 
-#include "ui/ui_backend.hpp"
+#include <cstddef>
+#include <cstdint>
+#include <span>
 
 namespace uemu::ui {
 
-class HeadlessBackend : public UIBackend {
+class ByteSource {
 public:
-    HeadlessBackend(Endpoints endpoints, ExitCallback exit_callback)
-        : UIBackend(std::move(endpoints), std::move(exit_callback)) {
-        terminal::enable_raw_mode();
-    }
+    virtual ~ByteSource() = default;
 
-    ~HeadlessBackend() override { terminal::restore_mode(); }
-
-    void update() override { pump_terminal_io(); }
+    virtual size_t pop_bytes(std::span<uint8_t> bytes) = 0;
 };
 
 } // namespace uemu::ui

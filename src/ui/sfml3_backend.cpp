@@ -26,18 +26,16 @@ namespace uemu::ui {
 
 bool SFML3Backend::initialized_ = false;
 
-SFML3Backend::SFML3Backend(std::shared_ptr<ui::PixelSource> pixel_source,
-                           std::shared_ptr<ui::InputSink> input_sink,
-                           ExitCallback exit_callback)
-    : UIBackend(pixel_source, input_sink, exit_callback) {
+SFML3Backend::SFML3Backend(Endpoints endpoints, ExitCallback exit_callback)
+    : UIBackend(std::move(endpoints), std::move(exit_callback)) {
     if (initialized_)
         throw std::runtime_error("Double SFML3Backend instances.");
 
     initialized_ = true;
 
-    display_width_ = pixel_source_->get_width();
-    display_height_ = pixel_source_->get_height();
-    pixel_buffer_.resize(pixel_source->get_size());
+    display_width_ = endpoints_.pixel_source->get_width();
+    display_height_ = endpoints_.pixel_source->get_height();
+    pixel_buffer_.resize(endpoints_.pixel_source->get_size());
 
     window_ = std::make_unique<sf::RenderWindow>(
         sf::VideoMode(sf::Vector2u(display_width_, display_height_)),
@@ -58,9 +56,14 @@ SFML3Backend::SFML3Backend(std::shared_ptr<ui::PixelSource> pixel_source,
     texture_->setSmooth(true);
 
     sprite_ = std::make_unique<sf::Sprite>(*texture_);
+
+    terminal::enable_raw_mode();
 }
 
-SFML3Backend::~SFML3Backend() { initialized_ = false; }
+SFML3Backend::~SFML3Backend() {
+    terminal::restore_mode();
+    initialized_ = false;
+}
 
 void SFML3Backend::update() {
     if (!initialized_) [[unlikely]]
@@ -79,24 +82,26 @@ void SFML3Backend::update() {
             auto linux_event_code =
                 sfml_scancode_to_linux(keyPressed->scancode);
 
-            if (linux_event_code != KEY_RESERVED && input_sink_)
-                input_sink_->push_key_event(
+            if (linux_event_code != KEY_RESERVED && endpoints_.input_sink)
+                endpoints_.input_sink->push_key_event(
                     {linux_event_code, InputSink::KeyAction::Press});
         } else if (const auto* keyReleased =
                        event->getIf<sf::Event::KeyReleased>()) {
             auto linux_event_code =
                 sfml_scancode_to_linux(keyReleased->scancode);
 
-            if (linux_event_code != KEY_RESERVED && input_sink_)
-                input_sink_->push_key_event(
+            if (linux_event_code != KEY_RESERVED && endpoints_.input_sink)
+                endpoints_.input_sink->push_key_event(
                     {linux_event_code, InputSink::KeyAction::Release});
         }
     }
 
+    pump_terminal_io();
+
     using clock = std::chrono::steady_clock;
     using namespace std::chrono_literals;
 
-    if (!pixel_source_) [[unlikely]]
+    if (!endpoints_.pixel_source) [[unlikely]]
         return;
 
     static auto last_update = clock::now();
@@ -106,12 +111,13 @@ void SFML3Backend::update() {
     if (now - last_update < frame_interval)
         return;
 
-    const size_t size = pixel_source_->get_size();
+    const size_t size = endpoints_.pixel_source->get_size();
     uint8_t* buffer = pixel_buffer_.data();
 
     {
-        std::unique_lock<std::mutex> lock = pixel_source_->acquire_lock();
-        const uint8_t* pixels = pixel_source_->get_pixels();
+        std::unique_lock<std::mutex> lock =
+            endpoints_.pixel_source->acquire_lock();
+        const uint8_t* pixels = endpoints_.pixel_source->get_pixels();
         std::memcpy(buffer, pixels, sizeof(uint8_t) * size);
     }
 

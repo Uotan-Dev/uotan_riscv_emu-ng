@@ -28,29 +28,51 @@
 
 namespace uemu::device {
 
-NS16550::NS16550(std::shared_ptr<host::HostConsole> console,
-                 IrqCallback irq_callback, uint32_t interrupt_id,
+NS16550::NS16550(IrqCallback irq_callback, uint32_t interrupt_id,
                  uint32_t reg_shift, uint32_t reg_io_width)
     : IrqDevice("NS16550", DEFAULT_BASE, SIZE, irq_callback, interrupt_id),
-      console_(std::move(console)), reg_shift_(reg_shift),
-      reg_io_width_(reg_io_width), dll_(0x0C), dlm_(0), iir_(IIR_NO_INT),
-      ier_(0), fcr_(0), lcr_(0), mcr_(MCR_OUT2), lsr_(LSR_TEMT | LSR_THRE),
-      msr_(MSR_DCD | MSR_DSR | MSR_CTS), scr_(0) {}
+      reg_shift_(reg_shift), reg_io_width_(reg_io_width), dll_(0x0C), dlm_(0),
+      iir_(IIR_NO_INT), ier_(0), fcr_(0), lcr_(0), mcr_(MCR_OUT2),
+      lsr_(LSR_TEMT | LSR_THRE), msr_(MSR_DCD | MSR_DSR | MSR_CTS), scr_(0) {}
 
-void NS16550::tick() {
+void NS16550::tick() {}
+
+size_t NS16550::push_bytes(std::span<const uint8_t> bytes) {
     std::lock_guard<std::mutex> lock(ns16550_mutex_);
 
-    if (!(fcr_ & FCR_ENABLE_FIFO) || (mcr_ & MCR_LOOP) ||
-        QUEUE_SIZE <= rx_queue_.size())
-        return;
+    if (mcr_ & MCR_LOOP)
+        return 0;
 
-    std::optional<char> c = console_->read_char();
+    size_t pushed = 0;
+    for (uint8_t byte : bytes) {
+        if (QUEUE_SIZE <= rx_queue_.size())
+            break;
 
-    if (c.has_value()) {
-        rx_queue_.push(static_cast<uint8_t>(*c));
+        rx_queue_.push(byte);
         lsr_ |= LSR_DR;
-        update_interrupt();
+        pushed++;
     }
+
+    if (pushed > 0)
+        update_interrupt();
+
+    return pushed;
+}
+
+size_t NS16550::pop_bytes(std::span<uint8_t> bytes) {
+    std::lock_guard<std::mutex> lock(ns16550_mutex_);
+
+    size_t popped = 0;
+    for (uint8_t& byte : bytes) {
+        if (tx_queue_.empty())
+            break;
+
+        byte = tx_queue_.front();
+        tx_queue_.pop();
+        popped++;
+    }
+
+    return popped;
 }
 
 std::optional<uint64_t> NS16550::read_internal(addr_t offset, size_t size) {
@@ -222,7 +244,7 @@ uint8_t NS16550::rx_byte() {
 
 void NS16550::tx_byte(uint8_t val) {
     lsr_ |= LSR_TEMT | LSR_THRE;
-    console_->write_char(val);
+    tx_queue_.push(val);
 }
 
 } // namespace uemu::device

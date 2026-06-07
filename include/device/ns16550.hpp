@@ -23,18 +23,19 @@
  * https://opensource.org/licenses/BSD-3-Clause
  */
 
-#include <memory>
+#pragma once
+
 #include <mutex>
 #include <queue>
+#include <span>
 
 #include "device/device.hpp"
-#include "host/console.hpp"
-
-#pragma once
+#include "ui/byte_sink.hpp"
+#include "ui/byte_source.hpp"
 
 namespace uemu::device {
 
-class NS16550 : public IrqDevice {
+class NS16550 : public IrqDevice, public ui::ByteSink, public ui::ByteSource {
 public:
     static constexpr addr_t DEFAULT_BASE = 0x10000000;
     static constexpr size_t SIZE = 0x100;
@@ -116,13 +117,14 @@ public:
     static constexpr uint8_t MSR_DCTS = 0x01; // Delta CTS
     static constexpr uint8_t MSR_ANY_DELTA = 0x0F;
 
-    explicit NS16550(std::shared_ptr<host::HostConsole> console,
-                     IrqCallback irq_callback,
+    explicit NS16550(IrqCallback irq_callback,
                      uint32_t interrupt_id = DEFAULT_INTERRUPT_ID,
                      uint32_t reg_shift = DEFAULT_REG_SHIFT,
                      uint32_t reg_io_width = DEFAULT_REG_IO_WIDTH);
 
     void tick() override;
+    size_t push_bytes(std::span<const uint8_t> bytes) override;
+    size_t pop_bytes(std::span<uint8_t> bytes) override;
 
 private:
     std::optional<uint64_t> read_internal(addr_t offset, size_t size) override;
@@ -133,14 +135,13 @@ private:
     uint8_t rx_byte();
     void tx_byte(uint8_t val);
 
-    std::shared_ptr<host::HostConsole> console_;
-
     uint32_t reg_shift_;
     uint32_t reg_io_width_;
 
     std::mutex ns16550_mutex_;
 
     std::queue<uint8_t> rx_queue_;
+    std::queue<uint8_t> tx_queue_;
     uint8_t dll_;
     uint8_t dlm_;
     uint8_t iir_;

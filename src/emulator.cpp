@@ -72,10 +72,9 @@ Emulator::Emulator(size_t dram_size, bool headless,
                                                  static_cast<uint16_t>(status));
         }));
 
-    // NS16550 and host console
-    hostconsole_ = std::make_shared<host::HostConsole>();
-    bus->add_device(
-        std::make_shared<device::NS16550>(hostconsole_, request_irq));
+    // NS16550
+    auto ns16550 = std::make_shared<device::NS16550>(request_irq);
+    bus->add_device(ns16550);
 
     // SimpleFB
     auto simple_fb = std::make_shared<device::SimpleFB>();
@@ -118,16 +117,24 @@ Emulator::Emulator(size_t dram_size, bool headless,
     engine_ = std::make_unique<ExecutionEngine>(hart, dram, bus, mmu);
 
     // UI backend
+    ui::UIBackend::Endpoints endpoints{
+        .pixel_source = simple_fb,
+        .input_sink = goldfish_events,
+        .byte_sink = ns16550,
+        .byte_source = ns16550,
+    };
+
     auto host_exit = [this]() -> void {
         engine_->request_shutdown_from_host();
     };
+
     std::shared_ptr<ui::UIBackend> ui_backend;
+
     if (headless)
-        ui_backend = std::make_shared<ui::HeadlessBackend>(
-            simple_fb, goldfish_events, host_exit);
+        ui_backend =
+            std::make_shared<ui::HeadlessBackend>(endpoints, host_exit);
     else
-        ui_backend = std::make_shared<ui::SFML3Backend>(
-            simple_fb, goldfish_events, host_exit);
+        ui_backend = std::make_shared<ui::SFML3Backend>(endpoints, host_exit);
 
     engine_->set_ui_backend(ui_backend);
 }

@@ -24,9 +24,7 @@ namespace uemu::ui {
 
 class SFML3Backend : public UIBackend {
 public:
-    SFML3Backend(std::shared_ptr<ui::PixelSource> pixel_source,
-                 std::shared_ptr<ui::InputSink> input_sink,
-                 ExitCallback exit_callback);
+    SFML3Backend(Endpoints endpoints, ExitCallback exit_callback);
     ~SFML3Backend() override;
 
     void update() override;
