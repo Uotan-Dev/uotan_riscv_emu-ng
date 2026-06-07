@@ -134,7 +134,8 @@ void ExecutionEngine::cpu_thread() {
 
         try {
             // Normal execution
-            hart_->check_interrupts();
+            if ((i & 0xFF) == 0 || hart_->interrupt_check_pending) [[unlikely]]
+                hart_->check_interrupts();
 
             const auto [insn, ilen] = mmu_->ifetch();
             core::DecodedInsn decoded_insn =

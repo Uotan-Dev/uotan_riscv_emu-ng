@@ -166,12 +166,18 @@ public:
     PrivilegeLevel priv;
     MMU* mmu;
 
+    // Set to true after xRET, WFI, or CSR writes that may change
+    // interrupt trap conditions.  Forces immediate check_interrupts()
+    // on the next loop iteration, bypassing the 256-insn batch window.
+    // Reset to false by check_interrupts().
+    mutable bool interrupt_check_pending;
+
     device::Clint* get_clint() const noexcept { return clint_; }
 
     void set_clint(device::Clint* c) noexcept { clint_ = c; }
 
 private:
-    device::Clint* clint_ = nullptr;
+    device::Clint* clint_;
 
     template <typename T>
     void add_csr() {

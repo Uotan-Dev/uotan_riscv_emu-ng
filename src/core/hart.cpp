@@ -90,7 +90,8 @@ void SATP::write_unchecked(reg_t v) noexcept {
     }
 }
 
-Hart::Hart(addr_t reset_pc) : pc(reset_pc) {
+Hart::Hart(addr_t reset_pc)
+    : pc(reset_pc), interrupt_check_pending(false), clint_(nullptr) {
     // Machine Level
     add_csr<MISA>(MISA::Field::I | MISA::Field::M | MISA::Field::A |
                   MISA::Field::F | MISA::Field::D | MISA::Field::C |
@@ -256,6 +257,8 @@ void Hart::handle_trap(const Trap& trap) noexcept {
 }
 
 void Hart::check_interrupts() const {
+    interrupt_check_pending = false;
+
     const reg_t mip = csrs[MIP::ADDRESS]->read_unchecked();
     const reg_t mie = csrs[MIE::ADDRESS]->read_unchecked();
     const reg_t mstatus = csrs[MSTATUS::ADDRESS]->read_unchecked();

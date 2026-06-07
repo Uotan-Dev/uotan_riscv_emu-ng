@@ -202,12 +202,14 @@ IMPL(xori, R.write(rd, R[rs1] ^ imm))
 
 // Zicsr Extension (CSR Instructions) and Privileged Instructions
 IMPL(csrrc, {
+    hart->interrupt_check_pending = true;
     reg_t t = csrs[csr]->read_checked(*d);
     if (rs1)
         csrs[csr]->write_checked(*d, t & ~R[rs1]);
     R.write(rd, t);
 })
 IMPL(csrrci, {
+    hart->interrupt_check_pending = true;
     uint64_t zimm = bits(d->insn, 19, 15);
     reg_t t = csrs[csr]->read_checked(*d);
     if (zimm)
@@ -215,12 +217,14 @@ IMPL(csrrci, {
     R.write(rd, t);
 })
 IMPL(csrrs, {
+    hart->interrupt_check_pending = true;
     uint64_t t = csrs[csr]->read_checked(*d);
     if (rs1)
         csrs[csr]->write_checked(*d, t | R[rs1]);
     R.write(rd, t);
 })
 IMPL(csrrsi, {
+    hart->interrupt_check_pending = true;
     uint64_t zimm = bits(d->insn, 19, 15);
     uint64_t t = csrs[csr]->read_checked(*d);
     if (zimm)
@@ -228,6 +232,7 @@ IMPL(csrrsi, {
     R.write(rd, t);
 })
 IMPL(csrrw, {
+    hart->interrupt_check_pending = true;
     if (rd) {
         uint64_t t = csrs[csr]->read_checked(*d);
         csrs[csr]->write_checked(*d, R[rs1]);
@@ -237,6 +242,7 @@ IMPL(csrrw, {
     }
 })
 IMPL(csrrwi, {
+    hart->interrupt_check_pending = true;
     uint64_t zimm = bits(d->insn, 19, 15);
     if (rd)
         R.write(rd, csrs[csr]->read_checked(*d));
@@ -258,6 +264,8 @@ IMPL(ecall, {
     }
 })
 IMPL(mret, {
+    hart->interrupt_check_pending = true;
+
     if (hart->priv != PrivilegeLevel::M) [[unlikely]]
         Trap::raise_exception(pc, TrapCause::IllegalInstruction, d->insn);
 
@@ -293,6 +301,8 @@ IMPL(sfence_vma, {
         mmu->tlb_flush_vaddr(R[rs1]);
 })
 IMPL(sret, {
+    hart->interrupt_check_pending = true;
+
     if (hart->priv == PrivilegeLevel::U ||
         (hart->priv == PrivilegeLevel::S &&
          (hart->csrs[MSTATUS::ADDRESS]->read_unchecked() & MSTATUS::TSR)))
@@ -324,16 +334,18 @@ IMPL(sret, {
             ~MSTATUS::Field::MPRV);
 })
 IMPL(wfi, {
+    hart->interrupt_check_pending = true;
+
     if (hart->priv == PrivilegeLevel::U ||
         (hart->priv < PrivilegeLevel::M &&
          (hart->csrs[MSTATUS::ADDRESS]->read_unchecked() & MSTATUS::TW)))
+        [[unlikely]]
         Trap::raise_exception(pc, TrapCause::IllegalInstruction, d->insn);
 
     if (hart->has_pending_enabled_interrupt())
         return;
 
-    const reg_t mie = hart->csrs[MIE::ADDRESS]->read_unchecked();
-    if (mie == 0)
+    if (hart->csrs[MIE::ADDRESS]->read_unchecked() == 0)
         return;
 
     throw WfiWait{};
