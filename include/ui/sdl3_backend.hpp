@@ -18,6 +18,7 @@
 
 #include <SDL3/SDL.h>
 
+#include "host/console.hpp"
 #include "ui/ui_backend.hpp"
 
 namespace uemu::ui {
@@ -26,6 +27,7 @@ class SDL3Backend : public UIBackend {
 public:
     SDL3Backend(std::shared_ptr<ui::PixelSource> pixel_source,
                 std::shared_ptr<ui::InputSink> input_sink,
+                std::shared_ptr<ui::ConsoleEndpoint> console_endpoint,
                 ExitCallback exit_callback);
     ~SDL3Backend() override;
 
@@ -44,6 +46,8 @@ private:
     size_t display_width_ = 0;
     size_t display_height_ = 0;
     std::vector<uint8_t> pixel_buffer_;
+
+    host::HostConsole host_console_;
 };
 
 } // namespace uemu::ui

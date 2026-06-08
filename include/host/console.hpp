@@ -16,11 +16,15 @@
 
 #pragma once
 
-#include <fcntl.h>
+#include <functional>
 #include <optional>
+
+#include <fcntl.h>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
+
+#include "ui/console_endpoint.hpp"
 
 namespace uemu::host {
 
@@ -30,7 +34,7 @@ public:
 
     ~HostConsole() { restore_mode(); }
 
-    std::optional<char> read_char() noexcept {
+    std::optional<char> read_char() const noexcept {
         unsigned char c;
         ssize_t nread = ::read(STDIN_FILENO, &c, 1);
 
@@ -40,7 +44,15 @@ public:
         return std::nullopt;
     }
 
-    void write_char(char ch) noexcept { ::write(STDOUT_FILENO, &ch, 1); }
+    void write_char(char ch) const noexcept { ::write(STDOUT_FILENO, &ch, 1); }
+
+    void apply_to_endpoint(ui::ConsoleEndpoint& endpoint) const noexcept {
+        endpoint.read_char = [this]() -> std::optional<char> {
+            return this->read_char();
+        };
+
+        endpoint.write_char = [this](char ch) -> void { this->write_char(ch); };
+    }
 
 private:
     void enable_raw_mode() noexcept {

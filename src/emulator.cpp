@@ -73,9 +73,8 @@ Emulator::Emulator(size_t dram_size, bool headless,
         }));
 
     // NS16550 and host console
-    hostconsole_ = std::make_shared<host::HostConsole>();
-    bus->add_device(
-        std::make_shared<device::NS16550>(hostconsole_, request_irq));
+    auto ns16550 = std::make_shared<device::NS16550>(request_irq);
+    bus->add_device(ns16550);
 
     // SimpleFB
     auto simple_fb = std::make_shared<device::SimpleFB>();
@@ -124,10 +123,10 @@ Emulator::Emulator(size_t dram_size, bool headless,
     std::shared_ptr<ui::UIBackend> ui_backend;
     if (headless)
         ui_backend = std::make_shared<ui::HeadlessBackend>(
-            simple_fb, goldfish_events, host_exit);
+            simple_fb, goldfish_events, ns16550, host_exit);
     else
         ui_backend = std::make_shared<ui::SDL3Backend>(
-            simple_fb, goldfish_events, host_exit);
+            simple_fb, goldfish_events, ns16550, host_exit);
 
     engine_->set_ui_backend(ui_backend);
 }

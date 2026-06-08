@@ -28,14 +28,12 @@
 
 namespace uemu::device {
 
-NS16550::NS16550(std::shared_ptr<host::HostConsole> console,
-                 IrqCallback irq_callback, uint32_t interrupt_id,
+NS16550::NS16550(IrqCallback irq_callback, uint32_t interrupt_id,
                  uint32_t reg_shift, uint32_t reg_io_width)
     : IrqDevice("NS16550", DEFAULT_BASE, SIZE, irq_callback, interrupt_id),
-      console_(std::move(console)), reg_shift_(reg_shift),
-      reg_io_width_(reg_io_width), dll_(0x0C), dlm_(0), iir_(IIR_NO_INT),
-      ier_(0), fcr_(0), lcr_(0), mcr_(MCR_OUT2), lsr_(LSR_TEMT | LSR_THRE),
-      msr_(MSR_DCD | MSR_DSR | MSR_CTS), scr_(0) {}
+      reg_shift_(reg_shift), reg_io_width_(reg_io_width), dll_(0x0C), dlm_(0),
+      iir_(IIR_NO_INT), ier_(0), fcr_(0), lcr_(0), mcr_(MCR_OUT2),
+      lsr_(LSR_TEMT | LSR_THRE), msr_(MSR_DCD | MSR_DSR | MSR_CTS), scr_(0) {}
 
 void NS16550::tick() {
     std::lock_guard<std::mutex> lock(ns16550_mutex_);
@@ -44,7 +42,10 @@ void NS16550::tick() {
         QUEUE_SIZE <= rx_queue_.size())
         return;
 
-    std::optional<char> c = console_->read_char();
+    std::optional<char> c = std::nullopt;
+
+    if (read_char) [[likely]]
+        c = read_char();
 
     if (c.has_value()) {
         rx_queue_.push(static_cast<uint8_t>(*c));
@@ -222,7 +223,9 @@ uint8_t NS16550::rx_byte() {
 
 void NS16550::tx_byte(uint8_t val) {
     lsr_ |= LSR_TEMT | LSR_THRE;
-    console_->write_char(val);
+
+    if (write_char) [[likely]]
+        write_char(val);
 }
 
 } // namespace uemu::device

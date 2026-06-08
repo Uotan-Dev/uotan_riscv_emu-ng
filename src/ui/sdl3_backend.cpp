@@ -28,6 +28,7 @@ namespace uemu::ui {
 
 SDL3Backend::SDL3Backend(std::shared_ptr<ui::PixelSource> pixel_source,
                          std::shared_ptr<ui::InputSink> input_sink,
+                         std::shared_ptr<ui::ConsoleEndpoint> console_endpoint,
                          ExitCallback exit_callback)
     : UIBackend(std::move(pixel_source), std::move(input_sink),
                 std::move(exit_callback)) {
@@ -65,6 +66,8 @@ SDL3Backend::SDL3Backend(std::shared_ptr<ui::PixelSource> pixel_source,
             SDL_DestroySurface(icon);
         }
     }
+
+    host_console_.apply_to_endpoint(*console_endpoint);
 
     return;
 
