@@ -17,12 +17,15 @@
 #pragma once
 
 #include <mutex>
+#include <string>
 
 namespace uemu::ui {
 
 class PixelSource {
 public:
     virtual ~PixelSource() = default;
+
+    [[nodiscard]] virtual std::string tag_name() const = 0;
 
     virtual size_t get_width() const = 0;
     virtual size_t get_height() const = 0;

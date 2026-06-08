@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#ifdef UEMU_UI_SFML3
+
 #include <algorithm>
 #include <cstring>
 #include <stdexcept>
@@ -325,3 +327,5 @@ SFML3Backend::sfml_scancode_to_linux(sf::Keyboard::Scancode code) noexcept {
 }
 
 } // namespace uemu::ui
+
+#endif // UEMU_UI_SFML3

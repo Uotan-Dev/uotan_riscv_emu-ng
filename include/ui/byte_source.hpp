@@ -19,12 +19,15 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <string>
 
 namespace uemu::ui {
 
 class ByteSource {
 public:
     virtual ~ByteSource() = default;
+
+    [[nodiscard]] virtual std::string tag_name() const = 0;
 
     virtual size_t pop_bytes(std::span<uint8_t> bytes) = 0;
 };

@@ -33,7 +33,12 @@
 #include "device/virtio_blk.hpp"
 #include "emulator.hpp"
 #include "ui/headless_backend.hpp"
+#ifdef UEMU_UI_SFML3
 #include "ui/sfml3_backend.hpp"
+#endif
+#ifdef UEMU_UI_GTK4
+#include "ui/gtk4_backend.hpp"
+#endif
 #include "utils/elfloader.hpp"
 #include "utils/fileloader.hpp"
 
@@ -130,11 +135,24 @@ Emulator::Emulator(size_t dram_size, bool headless,
 
     std::shared_ptr<ui::UIBackend> ui_backend;
 
-    if (headless)
+    if (headless) {
         ui_backend =
             std::make_shared<ui::HeadlessBackend>(endpoints, host_exit);
-    else
+    }
+#ifdef UEMU_UI_GTK4
+    else {
+        ui_backend = std::make_shared<ui::GTK4Backend>(endpoints, host_exit);
+    }
+#elif defined(UEMU_UI_SFML3)
+    else {
         ui_backend = std::make_shared<ui::SFML3Backend>(endpoints, host_exit);
+    }
+#else
+    else {
+        ui_backend =
+            std::make_shared<ui::HeadlessBackend>(endpoints, host_exit);
+    }
+#endif
 
     engine_->set_ui_backend(ui_backend);
 }

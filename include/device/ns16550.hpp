@@ -126,6 +126,8 @@ public:
     size_t push_bytes(std::span<const uint8_t> bytes) override;
     size_t pop_bytes(std::span<uint8_t> bytes) override;
 
+    [[nodiscard]] std::string tag_name() const override { return "NS16550"; }
+
 private:
     std::optional<uint64_t> read_internal(addr_t offset, size_t size) override;
     bool write_internal(addr_t offset, size_t size, uint64_t value) override;

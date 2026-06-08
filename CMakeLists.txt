@@ -37,7 +37,42 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 # Find required packages
 find_package(CLI11 CONFIG REQUIRED)
 find_package(Threads REQUIRED)
-find_package(SFML 3 REQUIRED COMPONENTS Graphics)
+find_package(PkgConfig REQUIRED)
+
+# ---- UI Backend selection ----
+set(UEMU_UI_BACKEND "gtk4" CACHE STRING "UI backend: gtk4, sfml3, or headless")
+set_property(CACHE UEMU_UI_BACKEND PROPERTY STRINGS "gtk4" "sfml3" "headless")
+
+# SFML3 (optional, for sfml3 backend)
+find_package(SFML 3 QUIET COMPONENTS Graphics)
+
+# gtkmm4 + VTE4 (optional, for gtk4 backend)
+pkg_check_modules(GTKMM4 IMPORTED_TARGET gtkmm-4.0)
+pkg_check_modules(VTE4 IMPORTED_TARGET vte-2.91-gtk4)
+
+# Validate backend selection
+set(UEMU_UI_DEFINE "")
+if(UEMU_UI_BACKEND STREQUAL "gtk4")
+    if(NOT GTKMM4_FOUND)
+        message(FATAL_ERROR "GTK4 backend requires gtkmm-4.0 (package gtkmm-4.0)")
+    endif()
+    if(NOT VTE4_FOUND)
+        message(FATAL_ERROR "GTK4 backend requires vte-2.91-gtk4 (package vte4)")
+    endif()
+    set(UEMU_UI_DEFINE UEMU_UI_GTK4)
+    message(STATUS "UI backend: GTK4")
+elseif(UEMU_UI_BACKEND STREQUAL "sfml3")
+    if(NOT SFML_FOUND)
+        message(FATAL_ERROR "SFML3 backend requires SFML 3 (package sfml)")
+    endif()
+    set(UEMU_UI_DEFINE UEMU_UI_SFML3)
+    message(STATUS "UI backend: SFML3")
+elseif(UEMU_UI_BACKEND STREQUAL "headless")
+    set(UEMU_UI_DEFINE UEMU_UI_HEADLESS)
+    message(STATUS "UI backend: headless")
+else()
+    message(FATAL_ERROR "Unknown UEMU_UI_BACKEND=${UEMU_UI_BACKEND}. Valid: gtk4, sfml3, headless")
+endif()
 
 include(${CMAKE_CURRENT_LIST_DIR}/thirdparty/berkeley-softfloat-3.cmake)
 
@@ -55,18 +90,25 @@ add_library(uemu_core STATIC ${SOURCES} ${HEADERS})
 
 target_include_directories(uemu_core
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
-    PUBLIC 
+    PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/kernel-headers/generic/include
 )
 
-# Link libraries that the core needs
+target_compile_definitions(uemu_core PRIVATE ${UEMU_UI_DEFINE})
+
+# Link libraries based on backend choice
 target_link_libraries(uemu_core
     PUBLIC
         CLI11::CLI11
         Threads::Threads
         softfloat
-        SFML::Graphics
 )
+
+if(UEMU_UI_BACKEND STREQUAL "gtk4")
+    target_link_libraries(uemu_core PUBLIC PkgConfig::GTKMM4 PkgConfig::VTE4)
+elseif(UEMU_UI_BACKEND STREQUAL "sfml3")
+    target_link_libraries(uemu_core PUBLIC SFML::Graphics)
+endif()
 
 add_executable(uemu src/main.cpp)
 target_link_libraries(uemu PRIVATE uemu_core)

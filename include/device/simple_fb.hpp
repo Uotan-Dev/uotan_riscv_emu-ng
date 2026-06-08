@@ -36,6 +36,8 @@ public:
 
     size_t get_height() const override { return DEFAULT_HEIGHT; }
 
+    [[nodiscard]] std::string tag_name() const override { return "SimpleFB"; }
+
     size_t get_size() const override {
         return DEFAULT_WIDTH * DEFAULT_HEIGHT * BPP;
     }

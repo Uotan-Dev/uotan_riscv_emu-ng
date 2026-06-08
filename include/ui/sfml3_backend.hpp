@@ -16,6 +16,8 @@
 
 #pragma once
 
+#ifdef UEMU_UI_SFML3
+
 #include <SFML/Graphics.hpp>
 
 #include "ui/ui_backend.hpp"
@@ -47,3 +49,5 @@ private:
 };
 
 } // namespace uemu::ui
+
+#endif // UEMU_UI_SFML3
