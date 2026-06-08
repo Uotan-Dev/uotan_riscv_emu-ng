@@ -16,18 +16,18 @@
 
 #pragma once
 
-#include <SFML/Graphics.hpp>
+#include <SDL3/SDL.h>
 
 #include "ui/ui_backend.hpp"
 
 namespace uemu::ui {
 
-class SFML3Backend : public UIBackend {
+class SDL3Backend : public UIBackend {
 public:
-    SFML3Backend(std::shared_ptr<ui::PixelSource> pixel_source,
-                 std::shared_ptr<ui::InputSink> input_sink,
-                 ExitCallback exit_callback);
-    ~SFML3Backend() override;
+    SDL3Backend(std::shared_ptr<ui::PixelSource> pixel_source,
+                std::shared_ptr<ui::InputSink> input_sink,
+                ExitCallback exit_callback);
+    ~SDL3Backend() override;
 
     void update() override;
 
@@ -35,16 +35,14 @@ private:
     void update_view();
 
     static constexpr InputSink::linux_event_code_t
-    sfml_scancode_to_linux(sf::Keyboard::Scancode code) noexcept;
+    sdl_scancode_to_linux(SDL_Scancode code) noexcept;
 
-    static bool initialized_;
+    SDL_Window* window_ = nullptr;
+    SDL_Renderer* renderer_ = nullptr;
+    SDL_Texture* texture_ = nullptr;
 
-    std::unique_ptr<sf::RenderWindow> window_;
-    std::unique_ptr<sf::Texture> texture_;
-    std::unique_ptr<sf::Sprite> sprite_;
-
-    size_t display_width_;
-    size_t display_height_;
+    size_t display_width_ = 0;
+    size_t display_height_ = 0;
     std::vector<uint8_t> pixel_buffer_;
 };
 

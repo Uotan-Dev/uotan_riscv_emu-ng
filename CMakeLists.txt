@@ -37,7 +37,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 # Find required packages
 find_package(CLI11 CONFIG REQUIRED)
 find_package(Threads REQUIRED)
-find_package(SFML 3 REQUIRED COMPONENTS Graphics)
+find_package(SDL3 REQUIRED CONFIG)
 
 include(${CMAKE_CURRENT_LIST_DIR}/thirdparty/berkeley-softfloat-3.cmake)
 
@@ -65,7 +65,7 @@ target_link_libraries(uemu_core
         CLI11::CLI11
         Threads::Threads
         softfloat
-        SFML::Graphics
+        SDL3::SDL3
 )
 
 add_executable(uemu src/main.cpp)

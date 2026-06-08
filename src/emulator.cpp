@@ -33,7 +33,7 @@
 #include "device/virtio_blk.hpp"
 #include "emulator.hpp"
 #include "ui/headless_backend.hpp"
-#include "ui/sfml3_backend.hpp"
+#include "ui/sdl3_backend.hpp"
 #include "utils/elfloader.hpp"
 #include "utils/fileloader.hpp"
 
@@ -126,7 +126,7 @@ Emulator::Emulator(size_t dram_size, bool headless,
         ui_backend = std::make_shared<ui::HeadlessBackend>(
             simple_fb, goldfish_events, host_exit);
     else
-        ui_backend = std::make_shared<ui::SFML3Backend>(
+        ui_backend = std::make_shared<ui::SDL3Backend>(
             simple_fb, goldfish_events, host_exit);
 
     engine_->set_ui_backend(ui_backend);

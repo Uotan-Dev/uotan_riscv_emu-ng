@@ -18,6 +18,9 @@
 #include <filesystem>
 #include <print>
 
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
+
 #include <CLI/CLI.hpp>
 
 #include "emulator.hpp"

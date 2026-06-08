@@ -18,6 +18,7 @@
 
 #include <functional>
 #include <memory>
+#include <stdexcept>
 
 #include "ui/input_sink.hpp"
 #include "ui/pixel_source.hpp"
@@ -32,9 +33,15 @@ public:
               std::shared_ptr<ui::InputSink> input_sink,
               ExitCallback exit_callback)
         : pixel_source_(std::move(pixel_source)),
-          input_sink_(std::move(input_sink)), exit_callback_(exit_callback) {}
+          input_sink_(std::move(input_sink)), exit_callback_(exit_callback) {
+        if (initialized_)
+            throw std::runtime_error("Only one UIBackend instance is allowed.");
 
-    virtual ~UIBackend() = default;
+        initialized_ = true;
+    }
+
+    virtual ~UIBackend() { initialized_ = false; }
+
     virtual void update() = 0;
 
 protected:
@@ -48,6 +55,8 @@ protected:
 
 private:
     ExitCallback exit_callback_;
+
+    static bool initialized_;
 };
 
 } // namespace uemu::ui
