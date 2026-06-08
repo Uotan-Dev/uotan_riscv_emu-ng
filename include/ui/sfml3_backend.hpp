@@ -24,9 +24,12 @@ namespace uemu::ui {
 
 class SFML3Backend : public UIBackend {
 public:
-    SFML3Backend(Endpoints endpoints, ExitCallback exit_callback);
+    SFML3Backend();
     ~SFML3Backend() override;
 
+    void run(std::function<bool()> should_continue) override;
+
+protected:
     void update() override;
 
 private:
@@ -34,8 +37,6 @@ private:
 
     static constexpr InputSink::linux_event_code_t
     sfml_scancode_to_linux(sf::Keyboard::Scancode code) noexcept;
-
-    static bool initialized_;
 
     std::unique_ptr<sf::RenderWindow> window_;
     std::unique_ptr<sf::Texture> texture_;

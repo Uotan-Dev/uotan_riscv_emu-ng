@@ -24,6 +24,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <stdexcept>
 #include <utility>
 
 #include "ui/byte_sink.hpp"
@@ -43,19 +44,29 @@ public:
         std::shared_ptr<ui::InputSink> input_sink;
         std::shared_ptr<ui::ByteSink> byte_sink;
         std::shared_ptr<ui::ByteSource> byte_source;
+        ExitCallback exit_callback;
     };
 
-    UIBackend(Endpoints endpoints, ExitCallback exit_callback)
-        : endpoints_(std::move(endpoints)),
-          exit_callback_(std::move(exit_callback)) {}
+    UIBackend() : running_(true) {
+        if (initialized_)
+            throw std::runtime_error("Only one UIBackend instance allowed.");
 
-    virtual ~UIBackend() = default;
-    virtual void update() = 0;
+        initialized_ = true;
+    }
+
+    virtual ~UIBackend() { initialized_ = false; }
+
+    void set_endpoints(Endpoints endpoints) { endpoints_ = std::move(endpoints); }
+    virtual void run(std::function<bool()> should_continue) = 0;
 
 protected:
+    virtual void update() = 0;
+
     void request_exit() {
-        if (exit_callback_)
-            exit_callback_();
+        running_ = false;
+
+        if (endpoints_.exit_callback)
+            endpoints_.exit_callback();
     }
 
     void pump_terminal_io() {
@@ -95,9 +106,11 @@ protected:
     }
 
     Endpoints endpoints_;
+    bool running_;
+
+    inline static bool initialized_ = false;
 
 private:
-    ExitCallback exit_callback_;
     std::deque<uint8_t> pending_terminal_input_;
 };
 

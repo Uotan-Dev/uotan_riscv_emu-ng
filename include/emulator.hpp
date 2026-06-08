@@ -19,12 +19,13 @@
 #include <filesystem>
 
 #include "execution_engine.hpp"
+#include "ui/ui_backend.hpp"
 
 namespace uemu {
 
 class Emulator {
 public:
-    explicit Emulator(size_t dram_size, bool headless = true,
+    explicit Emulator(size_t dram_size,
                       const std::filesystem::path& disk_path = "",
                       const std::filesystem::path& flash0_path = "",
                       const std::filesystem::path& flash1_path = "");
@@ -60,8 +61,13 @@ public:
         return engine_->shutdown_status();
     }
 
+    ui::UIBackend::Endpoints& get_ui_endpoints() noexcept {
+        return ui_endpoints_;
+    }
+
 private:
     std::unique_ptr<ExecutionEngine> engine_;
+    ui::UIBackend::Endpoints ui_endpoints_;
 };
 
 } // namespace uemu

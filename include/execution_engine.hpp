@@ -19,7 +19,6 @@
 #include <thread>
 
 #include "core/mmu.hpp"
-#include "ui/ui_backend.hpp"
 
 namespace uemu {
 
@@ -53,10 +52,6 @@ public:
 
     core::Dram& get_dram() noexcept { return *dram_.get(); }
 
-    void set_ui_backend(std::shared_ptr<ui::UIBackend> ui_backend) noexcept {
-        ui_backend_ = std::move(ui_backend);
-    }
-
 private:
     void cpu_thread();
 
@@ -64,8 +59,6 @@ private:
     std::shared_ptr<core::Dram> dram_;
     std::shared_ptr<core::Bus> bus_;
     std::shared_ptr<core::MMU> mmu_;
-
-    std::shared_ptr<ui::UIBackend> ui_backend_;
 
     bool cpu_thread_running_;
     std::unique_ptr<std::thread> cpu_thread_;

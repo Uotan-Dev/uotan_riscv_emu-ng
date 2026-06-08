@@ -16,19 +16,28 @@
 
 #pragma once
 
+#include <thread>
+
 #include "ui/ui_backend.hpp"
 
 namespace uemu::ui {
 
 class HeadlessBackend : public UIBackend {
 public:
-    HeadlessBackend(Endpoints endpoints, ExitCallback exit_callback)
-        : UIBackend(std::move(endpoints), std::move(exit_callback)) {
+    HeadlessBackend() : UIBackend() {
         terminal::enable_raw_mode();
     }
 
     ~HeadlessBackend() override { terminal::restore_mode(); }
 
+    void run(std::function<bool(void)> should_continue) override {
+        while (running_ && should_continue()) {
+            update();
+            std::this_thread::yield();
+        }
+    }
+
+protected:
     void update() override { pump_terminal_io(); }
 };
 

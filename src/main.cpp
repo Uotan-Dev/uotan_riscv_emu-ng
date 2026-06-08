@@ -14,13 +14,17 @@
  * limitations under the License.
  */
 
+#include <atomic>
 #include <cstdlib>
 #include <filesystem>
 #include <print>
+#include <thread>
 
 #include <CLI/CLI.hpp>
 
 #include "emulator.hpp"
+#include "ui/headless_backend.hpp"
+#include "ui/sfml3_backend.hpp"
 
 int main(int argc, char* argv[]) {
     CLI::App app{"uemu-ng: RISC-V Emulator"};
@@ -61,11 +65,36 @@ int main(int argc, char* argv[]) {
         if (timeout_ms > 0)
             std::println("  Timeout: {} ms", timeout_ms);
 
-        uemu::Emulator emulator(dram_size, headless, disk_file, flash0_file,
-                                flash1_file);
+        // 1. Create UI backend first (parameterless)
+        std::unique_ptr<uemu::ui::UIBackend> ui_backend;
+        if (headless)
+            ui_backend = std::make_unique<uemu::ui::HeadlessBackend>();
+        else
+            ui_backend = std::make_unique<uemu::ui::SFML3Backend>();
 
+        // 2. Create emulator (no more headless param)
+        uemu::Emulator emulator(dram_size, disk_file, flash0_file,
+                                flash1_file);
         emulator.loadelf(elf_file);
-        emulator.run(std::chrono::milliseconds(timeout_ms));
+
+        // 3. Wire endpoints
+        ui_backend->set_endpoints(emulator.get_ui_endpoints());
+
+        // 4. Engine on worker thread
+        std::atomic<bool> engine_alive = true;
+        std::thread engine_thread([&]() -> void {
+            emulator.run(std::chrono::milliseconds(timeout_ms));
+            engine_alive.store(false, std::memory_order::release);
+        });
+
+        // 5. UI owns main thread
+        ui_backend->run([&]() -> bool {
+            return engine_alive.load(std::memory_order::acquire);
+        });
+
+        // 6. Cleanup
+        if (engine_thread.joinable())
+            engine_thread.join();
     } catch (const std::runtime_error& e) {
         std::println(stderr, "Runtime error: {}", e.what());
         return EXIT_FAILURE;

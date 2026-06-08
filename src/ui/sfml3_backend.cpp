@@ -24,15 +24,13 @@
 
 namespace uemu::ui {
 
-bool SFML3Backend::initialized_ = false;
+SFML3Backend::SFML3Backend() : UIBackend() {
+    terminal::enable_raw_mode();
+}
 
-SFML3Backend::SFML3Backend(Endpoints endpoints, ExitCallback exit_callback)
-    : UIBackend(std::move(endpoints), std::move(exit_callback)) {
-    if (initialized_)
-        throw std::runtime_error("Double SFML3Backend instances.");
+SFML3Backend::~SFML3Backend() { terminal::restore_mode(); }
 
-    initialized_ = true;
-
+void SFML3Backend::run(std::function<bool()> should_continue) {
     display_width_ = endpoints_.pixel_source->get_width();
     display_height_ = endpoints_.pixel_source->get_height();
     pixel_buffer_.resize(endpoints_.pixel_source->get_size());
@@ -57,18 +55,11 @@ SFML3Backend::SFML3Backend(Endpoints endpoints, ExitCallback exit_callback)
 
     sprite_ = std::make_unique<sf::Sprite>(*texture_);
 
-    terminal::enable_raw_mode();
-}
-
-SFML3Backend::~SFML3Backend() {
-    terminal::restore_mode();
-    initialized_ = false;
+    while (running_ && should_continue())
+        update();
 }
 
 void SFML3Backend::update() {
-    if (!initialized_) [[unlikely]]
-        throw std::runtime_error("SFML3Backend should have been initialized.");
-
     while (const std::optional<sf::Event> event = window_->pollEvent()) {
         if (event->is<sf::Event::Closed>()) [[unlikely]] {
             request_exit();

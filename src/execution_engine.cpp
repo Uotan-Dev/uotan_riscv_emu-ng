@@ -93,10 +93,6 @@ void ExecutionEngine::execute_until_halt(std::chrono::milliseconds timeout) {
         // Tick devices
         bus_->tick_devices();
 
-        // Update UI
-        if (ui_backend_) [[likely]]
-            ui_backend_->update();
-
         std::this_thread::yield();
     }
 

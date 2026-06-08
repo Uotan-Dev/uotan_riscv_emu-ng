@@ -32,14 +32,12 @@
 #include "device/test_intr_gen.hpp"
 #include "device/virtio_blk.hpp"
 #include "emulator.hpp"
-#include "ui/headless_backend.hpp"
-#include "ui/sfml3_backend.hpp"
 #include "utils/elfloader.hpp"
 #include "utils/fileloader.hpp"
 
 namespace uemu {
 
-Emulator::Emulator(size_t dram_size, bool headless,
+Emulator::Emulator(size_t dram_size,
                    const std::filesystem::path& disk,
                    const std::filesystem::path& flash0_path,
                    const std::filesystem::path& flash1_path) {
@@ -116,27 +114,14 @@ Emulator::Emulator(size_t dram_size, bool headless,
     // ExecutionEngine
     engine_ = std::make_unique<ExecutionEngine>(hart, dram, bus, mmu);
 
-    // UI backend
-    ui::UIBackend::Endpoints endpoints{
+    // UI Endpoints
+    ui_endpoints_ = ui::UIBackend::Endpoints{
         .pixel_source = simple_fb,
         .input_sink = goldfish_events,
         .byte_sink = ns16550,
         .byte_source = ns16550,
+        .exit_callback = [this]() -> void { engine_->request_shutdown_from_host(); },
     };
-
-    auto host_exit = [this]() -> void {
-        engine_->request_shutdown_from_host();
-    };
-
-    std::shared_ptr<ui::UIBackend> ui_backend;
-
-    if (headless)
-        ui_backend =
-            std::make_shared<ui::HeadlessBackend>(endpoints, host_exit);
-    else
-        ui_backend = std::make_shared<ui::SFML3Backend>(endpoints, host_exit);
-
-    engine_->set_ui_backend(ui_backend);
 }
 
 void Emulator::run(std::chrono::milliseconds timeout) {
