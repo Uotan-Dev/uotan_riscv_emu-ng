@@ -43,8 +43,6 @@ void Plic::set_interrupt_level(uint32_t id, bool lvl) {
     uint32_t id_word = id / 32;
     uint32_t id_mask = 1 << (id % 32);
 
-    std::lock_guard<std::mutex> lock(plic_mutex_);
-
     if (lvl)
         level_[id_word] |= id_mask;
     else
@@ -84,8 +82,6 @@ std::optional<uint64_t> Plic::read_internal(addr_t offset, size_t size) {
     if (size != 4)
         return std::nullopt;
 
-    std::lock_guard<std::mutex> lock(plic_mutex_);
-
     if (PRIORITY_BASE <= offset && offset < PENDING_BASE) {
         return priority_read(offset);
     } else if (PENDING_BASE <= offset && offset < ENABLE_BASE) {
@@ -93,11 +89,13 @@ std::optional<uint64_t> Plic::read_internal(addr_t offset, size_t size) {
     } else if (ENABLE_BASE <= offset && offset < CONTEXT_BASE) {
         uint32_t cntx = (offset - ENABLE_BASE) / ENABLE_PER_HART;
         offset -= cntx * ENABLE_PER_HART + ENABLE_BASE;
+
         if (cntx < contexts_.size())
             return context_enable_read(&contexts_[cntx], offset);
     } else if (CONTEXT_BASE <= offset && offset < SIZE) {
         uint32_t cntx = (offset - CONTEXT_BASE) / CONTEXT_PER_HART;
         offset -= cntx * CONTEXT_PER_HART + CONTEXT_BASE;
+
         if (cntx < contexts_.size())
             return context_read(&contexts_[cntx], offset);
     }
@@ -112,8 +110,6 @@ bool Plic::write_internal(addr_t offset, size_t size, uint64_t value) {
 
     if (size != 4)
         return false;
-
-    std::lock_guard<std::mutex> lock(plic_mutex_);
 
     if (PRIORITY_BASE <= offset && offset < ENABLE_BASE) {
         priority_write(offset, value);

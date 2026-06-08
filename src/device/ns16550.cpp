@@ -35,8 +35,6 @@ NS16550::NS16550(IrqCallback irq_callback, uint32_t interrupt_id,
       iir_(IIR_NO_INT), ier_(0), fcr_(0), lcr_(0), mcr_(MCR_OUT2),
       lsr_(LSR_TEMT | LSR_THRE), msr_(MSR_DCD | MSR_DSR | MSR_CTS), scr_(0) {}
 
-void NS16550::tick() {}
-
 size_t NS16550::push_bytes(std::span<const uint8_t> bytes) {
     std::lock_guard<std::mutex> lock(ns16550_mutex_);
 

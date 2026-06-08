@@ -122,7 +122,6 @@ public:
                      uint32_t reg_shift = DEFAULT_REG_SHIFT,
                      uint32_t reg_io_width = DEFAULT_REG_IO_WIDTH);
 
-    void tick() override;
     size_t push_bytes(std::span<const uint8_t> bytes) override;
     size_t pop_bytes(std::span<uint8_t> bytes) override;
 

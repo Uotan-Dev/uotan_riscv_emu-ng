@@ -123,8 +123,10 @@ void ExecutionEngine::cpu_thread() {
     cpu_cond_.notify_all();
 
     for (uint16_t i = 0;; i++) {
-        if (shutdown_from_guest_) [[unlikely]]
+        if (shutdown_from_guest_) [[unlikely]] {
+            bus_->tick_devices();
             break;
+        }
 
         if (i == 0 && shutdown_from_host_.load(std::memory_order::relaxed))
             [[unlikely]]
@@ -134,6 +136,9 @@ void ExecutionEngine::cpu_thread() {
 
         try {
             // Normal execution
+            if ((i & 0xFF) == 0) [[unlikely]]
+                bus_->tick_devices();
+
             if ((i & 0xFF) == 0 || hart_->interrupt_check_pending) [[unlikely]]
                 hart_->check_interrupts();
 
@@ -150,14 +155,14 @@ void ExecutionEngine::cpu_thread() {
             minstret_->advance(); // WFI counts as retired
 
             while (true) {
+                bus_->tick_devices();
+
                 if (shutdown_from_guest_) [[unlikely]]
                     break;
 
                 if (shutdown_from_host_.load(std::memory_order_relaxed))
                     [[unlikely]]
                     break;
-
-                std::this_thread::yield();
 
                 if (hart_->has_pending_enabled_interrupt()) {
                     try {
@@ -169,6 +174,8 @@ void ExecutionEngine::cpu_thread() {
 
                     break;
                 }
+
+                std::this_thread::yield();
             }
         } catch (const core::Trap& trap) {
             // RISC-V Traps

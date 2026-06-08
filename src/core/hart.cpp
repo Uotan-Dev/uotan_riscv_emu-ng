@@ -321,7 +321,7 @@ void Hart::set_interrupt_pending(reg_t mip_mask, bool pending) noexcept {
 }
 
 void STIMECMP::write_unchecked(reg_t v) noexcept {
-    value_atomic_.store(v, std::memory_order_relaxed);
+    value_ = v;
 
     if (auto* clint = hart_->get_clint(); clint)
         clint->tick();

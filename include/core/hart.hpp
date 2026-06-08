@@ -17,7 +17,6 @@
 #pragma once
 
 #include <array>
-#include <atomic>
 #include <cassert>
 #include <exception>
 #include <limits>
@@ -374,21 +373,18 @@ public:
     };
 
     MENVCFG(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {
-        value_atomic_.store(0, std::memory_order_relaxed);
     }
 
     reg_t read_unchecked() const noexcept override {
-        return value_atomic_.load(std::memory_order_relaxed) & mask_;
+        return value_ & mask_;
     }
 
     void write_unchecked(reg_t v) noexcept override {
-        value_atomic_.store(v & mask_, std::memory_order_relaxed);
+        value_ = v & mask_;
     }
 
 private:
     static constexpr reg_t mask_ = Field::FIOM | Field::ADUE | Field::STCE;
-
-    std::atomic<reg_t> value_atomic_;
 };
 
 class MSTATUS final : public CSR {
@@ -523,15 +519,10 @@ public:
     };
 
     MIDELEG(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {
-        value_atomic_.store(0, std::memory_order_relaxed);
-    }
-
-    reg_t read_unchecked() const noexcept override {
-        return value_atomic_.load(std::memory_order_relaxed);
     }
 
     void write_unchecked(reg_t v) noexcept override {
-        value_atomic_.store(v & write_mask_, std::memory_order_relaxed);
+        value_ = v & write_mask_;
     }
 
 private:
@@ -540,7 +531,6 @@ private:
     // are delegatable in standard RV64GC without H/Sscofpmf.
     static constexpr reg_t write_mask_ =
         Field::SSIP | Field::STIP | Field::SEIP;
-    std::atomic<reg_t> value_atomic_;
 };
 
 class MIP final : public CSR {
@@ -566,36 +556,30 @@ public:
     };
 
     MIP(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {
-        value_atomic_.store(0, std::memory_order_relaxed);
         menvcfg_ = dynamic_cast<MENVCFG*>(hart_->csrs[MENVCFG::ADDRESS].get());
         assert(menvcfg_);
     }
 
     reg_t read_unchecked() const noexcept override {
-        return value_atomic_.load(std::memory_order_relaxed) & read_mask_;
+        return value_ & read_mask_;
     }
 
     // For csr instructions
     void write_unchecked(reg_t v) noexcept override {
-        reg_t old_val = value_atomic_.load(std::memory_order_relaxed);
-        reg_t new_val;
-        do {
-            reg_t write_mask = write_mask_;
+        reg_t write_mask = write_mask_;
 
-            if (!(menvcfg_->read_unchecked() & MENVCFG::Field::STCE))
-                write_mask |= Field::STIP;
+        if (!(menvcfg_->read_unchecked() & MENVCFG::Field::STCE))
+            write_mask |= Field::STIP;
 
-            new_val = (old_val & ~write_mask) | (v & write_mask);
-        } while (!value_atomic_.compare_exchange_weak(
-            old_val, new_val, std::memory_order_relaxed));
+        value_ = (value_ & ~write_mask) | (v & write_mask);
     }
 
     void set_pending(reg_t mask) noexcept {
-        value_atomic_.fetch_or(mask & read_mask_, std::memory_order_relaxed);
+        value_ |= (mask & read_mask_);
     }
 
     void clear_pending(reg_t mask) noexcept {
-        value_atomic_.fetch_and(~mask, std::memory_order_relaxed);
+        value_ &= ~mask;
     }
 
 private:
@@ -605,7 +589,6 @@ private:
 
     static constexpr reg_t write_mask_ = Field::SSIP | Field::SEIP;
 
-    std::atomic<reg_t> value_atomic_;
     MENVCFG* menvcfg_;
 };
 
@@ -1070,10 +1053,6 @@ public:
         assert(mcounteren_ && menvcfg_);
     }
 
-    reg_t read_unchecked() const noexcept override {
-        return value_atomic_.load(std::memory_order_relaxed);
-    }
-
     void write_unchecked(reg_t v) noexcept override;
 
 protected:
@@ -1096,8 +1075,6 @@ protected:
 private:
     MCOUNTEREN* mcounteren_;
     MENVCFG* menvcfg_;
-
-    std::atomic<reg_t> value_atomic_;
 };
 
 class UserCounterCSR : public ConstCSR {

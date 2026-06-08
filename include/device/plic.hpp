@@ -25,7 +25,6 @@
 
 #pragma once
 
-#include <mutex>
 #include <vector>
 
 #include "core/hart.hpp"
@@ -96,8 +95,6 @@ private:
     bool context_write(Context* ctx, reg_t offset, uint32_t val);
 
     std::shared_ptr<core::Hart> hart_;
-
-    std::mutex plic_mutex_;
 
     std::vector<Context> contexts_;
     uint32_t num_ids_;

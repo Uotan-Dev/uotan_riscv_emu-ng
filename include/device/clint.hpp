@@ -17,7 +17,6 @@
 #pragma once
 
 #include <chrono>
-#include <mutex>
 
 #include "core/hart.hpp"
 #include "device/device.hpp"
@@ -48,7 +47,6 @@ private:
 
     std::shared_ptr<core::Hart> hart_;
 
-    std::mutex clint_mutex_;
     uint64_t mtime_;
     uint64_t mtimecmp_;
 

@@ -16,8 +16,6 @@
 
 #pragma once
 
-#include <mutex>
-
 #include "device/device.hpp"
 
 namespace uemu::device {
@@ -58,8 +56,6 @@ private:
     void clear_alarm();
     void trigger_interrupt();
     void update_irq();
-
-    std::mutex goldfish_rtc_mutex_;
 
     // Offset between host time and guest time (in nanoseconds)
     uint64_t tick_offset_;

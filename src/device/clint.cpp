@@ -27,12 +27,10 @@ Clint::Clint(std::shared_ptr<core::Hart> hart, uint64_t freq_hz)
 }
 
 void Clint::tick() {
-    std::lock_guard<std::mutex> lock(clint_mutex_);
     tick_internal();
 }
 
 uint64_t Clint::get_mtime() noexcept {
-    std::lock_guard<std::mutex> lock(clint_mutex_);
     tick_internal();
     return mtime_;
 }
@@ -53,7 +51,6 @@ std::optional<uint64_t> Clint::read_internal(addr_t offset, size_t size) {
     } else if (offset >= MTIMECMP_OFFSET && offset < MTIMECMP_OFFSET + 8) {
         // MTIMECMP
         uint64_t result = 0;
-        std::lock_guard<std::mutex> lock(clint_mutex_);
         read_little_endian(&mtimecmp_, offset - MTIMECMP_OFFSET, size, &result);
         return result;
     } else if (offset >= MTIME_OFFSET && offset < MTIME_OFFSET + 8) {
@@ -75,12 +72,10 @@ bool Clint::write_internal(addr_t offset, size_t size, uint64_t value) {
         hart_->set_interrupt_pending(core::MIP::Field::MSIP, (msip_val & 1));
     } else if (offset >= MTIMECMP_OFFSET && offset < MTIMECMP_OFFSET + 8) {
         // MTIMECMP
-        std::lock_guard<std::mutex> lock(clint_mutex_);
         write_little_endian(&mtimecmp_, offset - MTIMECMP_OFFSET, size, value);
         tick_internal();
     } else if (offset >= MTIME_OFFSET && offset < MTIME_OFFSET + 8) {
         // MTIME
-        std::lock_guard<std::mutex> lock(clint_mutex_);
         write_little_endian(&mtime_, offset - MTIME_OFFSET, size, value);
 
         auto now = std::chrono::steady_clock::now();
