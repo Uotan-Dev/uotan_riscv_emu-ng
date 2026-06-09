@@ -32,7 +32,7 @@ A UEFI firmware implementation (EDK2) for **uemu-ng** is available at [Uotan-Dev
 | NS16550 UART | 0x10000000-0x100000ff | Serial console |
 | SimpleFB | 0x50000000-0x502fffff | Framebuffer (3MB, 1024x768) |
 | VirtIO-Block | 0x10001000-0x10001fff | Block device interface |
-| pflash-cfi01 | 0x20000000-0x23ffffff | CFI parallel flash with Intel command set |
+| pflash-cfi01 | 0x20000000-0x21ffffff<br>0x22000000-0x23ffffff | CFI parallel flash with Intel command set |
 | GoldfishEvents | 0x10002000-0x10002fff | Input event device |
 | GoldfishRTC | 0x101000-0x1010ff | Real-time clock |
 | GoldfishBattery | 0x10003000-0x10003fff | Battery status |
