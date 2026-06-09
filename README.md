@@ -1,6 +1,11 @@
 # uemu-ng — tiny RISC-V system emulator
 
-![EDK2](./assets/edk2.png)
+<table>
+  <tr>
+    <td><img src="./assets/edk2_boot.png" alt="EDK II boot" width="100%"></td>
+    <td><img src="./assets/edk2_uiapp.png" alt="EDK II UIApp" width="100%"></td>
+  </tr>
+</table>
 
 **Uotan RISC-V Emulator - Next Generation** (*uemu-ng*) is a small rv64gc system emulator. It is a refactored version of [uemu](https://github.com/Uotan-Dev/uotan_riscv_emu). While **uemu** served as a proof-of-concept, the **NG** version focuses on strict architectural compliance and robust device emulation.
 
@@ -48,9 +53,7 @@ A UEFI firmware implementation (EDK2) for **uemu-ng** is available at [Uotan-Dev
 
 ## Boot Demo
 
-### [Alpine Linux v3.22](https://www.alpinelinux.org/)
-![Booting Alpine on uemu-ng](./assets/alpine.png)
-### [Debian forky](https://www.debian.org/)
+### [Debian](https://www.debian.org/)
 ![Booting Debian on uemu-ng](./assets/debian.png)
 
 ## Building
@@ -63,7 +66,7 @@ A UEFI firmware implementation (EDK2) for **uemu-ng** is available at [Uotan-Dev
 ### Required dependencies:
 
 * CLI11 - Command line parsing
-* SDL 3 - Graphics and windowing
+* SDL3 & SDL3_image - Graphics and windowing
 * `riscv64-unknown-elf-gcc`, `riscv64-unknown-elf-objcopy`, `riscv64-unknown-elf-objdump`
 
 ### Build Instructions
