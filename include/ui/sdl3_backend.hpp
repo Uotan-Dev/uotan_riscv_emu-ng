@@ -25,10 +25,7 @@ namespace uemu::ui {
 
 class SDL3Backend : public UIBackend {
 public:
-    SDL3Backend(std::shared_ptr<ui::PixelSource> pixel_source,
-                std::shared_ptr<ui::InputSink> input_sink,
-                std::shared_ptr<ui::ConsoleEndpoint> console_endpoint,
-                ExitCallback exit_callback);
+    SDL3Backend(Endpoints endpoints);
     ~SDL3Backend() override;
 
     void update() override;

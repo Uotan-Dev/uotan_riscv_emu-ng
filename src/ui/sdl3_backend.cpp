@@ -26,15 +26,13 @@
 
 namespace uemu::ui {
 
-SDL3Backend::SDL3Backend(std::shared_ptr<ui::PixelSource> pixel_source,
-                         std::shared_ptr<ui::InputSink> input_sink,
-                         std::shared_ptr<ui::ConsoleEndpoint> console_endpoint,
-                         ExitCallback exit_callback)
-    : UIBackend(std::move(pixel_source), std::move(input_sink),
-                std::move(exit_callback)) {
-    display_width_ = pixel_source_->get_width();
-    display_height_ = pixel_source_->get_height();
-    pixel_buffer_.resize(pixel_source_->get_size());
+SDL3Backend::SDL3Backend(Endpoints endpoints)
+    : UIBackend(std::move(endpoints)) {
+    const auto& pixel_source = endpoints_.pixel_source;
+
+    display_width_ = pixel_source->get_width();
+    display_height_ = pixel_source->get_height();
+    pixel_buffer_.resize(pixel_source->get_size());
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
         goto fail;
@@ -67,7 +65,7 @@ SDL3Backend::SDL3Backend(std::shared_ptr<ui::PixelSource> pixel_source,
         }
     }
 
-    host_console_.apply_to_endpoint(*console_endpoint);
+    host_console_.apply_to_endpoint(*endpoints_.console_endpoint);
 
     return;
 
@@ -107,7 +105,11 @@ SDL3Backend::~SDL3Backend() {
 }
 
 void SDL3Backend::update() {
+    const auto& input_sink = endpoints_.input_sink;
+    const auto& pixel_source = endpoints_.pixel_source;
+
     SDL_Event event;
+
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
             case SDL_EVENT_QUIT: request_exit(); return;
@@ -116,16 +118,16 @@ void SDL3Backend::update() {
 
             case SDL_EVENT_KEY_DOWN: {
                 auto linux_code = sdl_scancode_to_linux(event.key.scancode);
-                if (linux_code != KEY_RESERVED && input_sink_)
-                    input_sink_->push_key_event(
+                if (linux_code != KEY_RESERVED && input_sink)
+                    input_sink->push_key_event(
                         {linux_code, InputSink::KeyAction::Press});
                 break;
             }
 
             case SDL_EVENT_KEY_UP: {
                 auto linux_code = sdl_scancode_to_linux(event.key.scancode);
-                if (linux_code != KEY_RESERVED && input_sink_)
-                    input_sink_->push_key_event(
+                if (linux_code != KEY_RESERVED && input_sink)
+                    input_sink->push_key_event(
                         {linux_code, InputSink::KeyAction::Release});
                 break;
             }
@@ -137,7 +139,7 @@ void SDL3Backend::update() {
     using clock = std::chrono::steady_clock;
     using namespace std::chrono_literals;
 
-    if (!pixel_source_) [[unlikely]]
+    if (!pixel_source) [[unlikely]]
         return;
 
     static auto last_update = clock::now();
@@ -147,12 +149,12 @@ void SDL3Backend::update() {
     if (now - last_update < frame_interval)
         return;
 
-    const size_t size = pixel_source_->get_size();
+    const size_t size = pixel_source->get_size();
     uint8_t* buffer = pixel_buffer_.data();
 
     {
-        std::unique_lock<std::mutex> lock = pixel_source_->acquire_lock();
-        const uint8_t* pixels = pixel_source_->get_pixels();
+        std::unique_lock<std::mutex> lock = pixel_source->acquire_lock();
+        const uint8_t* pixels = pixel_source->get_pixels();
         std::memcpy(buffer, pixels, sizeof(uint8_t) * size);
     }
 

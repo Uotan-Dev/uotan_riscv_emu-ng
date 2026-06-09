@@ -117,16 +117,20 @@ Emulator::Emulator(size_t dram_size, bool headless,
     engine_ = std::make_unique<ExecutionEngine>(hart, dram, bus, mmu);
 
     // UI backend
-    auto host_exit = [this]() -> void {
-        engine_->request_shutdown_from_host();
+    ui::UIBackend::Endpoints endpoints{
+        .console_endpoint = ns16550,
+        .input_sink = goldfish_events,
+        .pixel_source = simple_fb,
+        .exit_callback = [this]() -> void {
+            engine_->request_shutdown_from_host();
+        },
     };
     std::shared_ptr<ui::UIBackend> ui_backend;
+
     if (headless)
-        ui_backend = std::make_shared<ui::HeadlessBackend>(
-            simple_fb, goldfish_events, ns16550, host_exit);
+        ui_backend = std::make_shared<ui::HeadlessBackend>(endpoints);
     else
-        ui_backend = std::make_shared<ui::SDL3Backend>(
-            simple_fb, goldfish_events, ns16550, host_exit);
+        ui_backend = std::make_shared<ui::SDL3Backend>(endpoints);
 
     engine_->set_ui_backend(ui_backend);
 }

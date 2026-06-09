@@ -20,6 +20,7 @@
 #include <memory>
 #include <stdexcept>
 
+#include "ui/console_endpoint.hpp"
 #include "ui/input_sink.hpp"
 #include "ui/pixel_source.hpp"
 
@@ -29,11 +30,14 @@ class UIBackend {
 public:
     using ExitCallback = std::function<void(void)>;
 
-    UIBackend(std::shared_ptr<ui::PixelSource> pixel_source,
-              std::shared_ptr<ui::InputSink> input_sink,
-              ExitCallback exit_callback)
-        : pixel_source_(std::move(pixel_source)),
-          input_sink_(std::move(input_sink)), exit_callback_(exit_callback) {
+    struct Endpoints {
+        std::shared_ptr<ui::ConsoleEndpoint> console_endpoint;
+        std::shared_ptr<ui::InputSink> input_sink;
+        std::shared_ptr<ui::PixelSource> pixel_source;
+        ExitCallback exit_callback;
+    };
+
+    UIBackend(Endpoints endpoints) : endpoints_(std::move(endpoints)) {
         if (initialized_)
             throw std::runtime_error("Only one UIBackend instance is allowed.");
 
@@ -46,16 +50,13 @@ public:
 
 protected:
     void request_exit() {
-        if (exit_callback_)
-            exit_callback_();
+        if (endpoints_.exit_callback)
+            endpoints_.exit_callback();
     }
 
-    std::shared_ptr<ui::PixelSource> pixel_source_;
-    std::shared_ptr<ui::InputSink> input_sink_;
+    Endpoints endpoints_;
 
 private:
-    ExitCallback exit_callback_;
-
     static bool initialized_;
 };
 
