@@ -27,7 +27,7 @@
 
 int main(int argc, char* argv[]) {
     CLI::App app{"uemu-ng: RISC-V Emulator"};
-    app.set_version_flag("-v,--version", "1.0.0");
+    app.set_version_flag("-v,--version", "1.1.0");
 
     std::filesystem::path elf_file;
     std::filesystem::path disk_file;
