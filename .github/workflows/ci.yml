@@ -97,6 +97,21 @@ jobs:
         sudo cmake --install . --parallel $(nproc)
         cd ../..
 
+    - name: Build and install SDL3_image from source
+      run: |
+        git clone https://github.com/libsdl-org/SDL_image.git -b release-3.4.4 --depth=1
+        cd SDL_image
+        mkdir build && cd build
+        cmake .. \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_SHARED_LIBS=ON \
+          -DSDLIMAGE_SAMPLES=OFF \
+          -DSDLIMAGE_TESTS=OFF \
+          -G Ninja
+        cmake --build . --parallel $(nproc)
+        sudo cmake --install . --parallel $(nproc)
+        cd ../..
+
     - name: Configure CMake
       run: |
         mkdir build
