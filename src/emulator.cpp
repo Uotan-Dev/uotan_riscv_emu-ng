@@ -86,15 +86,18 @@ Emulator::Emulator(size_t dram_size, bool headless,
             std::make_shared<device::VirtioBlk>(dram, disk, request_irq));
 
     // pflash_cfi01
-    auto flash =
-        std::make_shared<device::PFlashCFI01>(0x20000000, 0x10000, 1024);
+    auto flash0 =
+        std::make_shared<device::PFlashCFI01>(0x20000000, 0x10000, 512);
+    auto flash1 =
+        std::make_shared<device::PFlashCFI01>(0x22000000, 0x10000, 512);
 
     if (!flash0_path.empty())
-        flash->load(flash0_path, 0x0000000);
+        flash0->load(flash0_path, 0);
     if (!flash1_path.empty())
-        flash->load(flash1_path, 0x2000000);
+        flash1->load(flash1_path, 0);
 
-    bus->add_device(flash);
+    bus->add_device(flash0);
+    bus->add_device(flash1);
 
     // GoldfishEvents
     auto goldfish_events =
