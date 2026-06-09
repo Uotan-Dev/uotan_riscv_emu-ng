@@ -46,19 +46,27 @@ jobs:
           libxext-dev \
           libxrandr-dev \
           libxcursor-dev \
-          libxinerama-dev \
+          libxfixes-dev \
           libxi-dev \
-          libasound2-dev \
-          libpulse-dev \
-          libdbus-1-dev \
-          libudev-dev \
-          libegl1-mesa-dev \
-          libgl1-mesa-dev \
-          libgles2-mesa-dev \
+          libxss-dev \
+          libxtst-dev \
           libxkbcommon-dev \
-          libwayland-dev \
           libdrm-dev \
           libgbm-dev \
+          libgl1-mesa-dev \
+          libgles2-mesa-dev \
+          libegl1-mesa-dev \
+          libdbus-1-dev \
+          libibus-1.0-dev \
+          libudev-dev \
+          libusb-1.0-0-dev \
+          libasound2-dev \
+          libpulse-dev \
+          libpipewire-0.3-dev \
+          libwayland-dev \
+          libdecor-0-dev \
+          liburing-dev \
+          libfribidi-dev \
           libcli11-dev \
           clang
     
