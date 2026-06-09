@@ -13,7 +13,7 @@
 # limitations under the License.
 
 cmake_minimum_required(VERSION 3.20)
-project(uemu-ng LANGUAGES C CXX)
+project(uemu-ng LANGUAGES C CXX ASM)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -38,13 +38,25 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 find_package(CLI11 CONFIG REQUIRED)
 find_package(Threads REQUIRED)
 find_package(SDL3 REQUIRED CONFIG)
+find_package(SDL3_image REQUIRED CONFIG)
 
 include(${CMAKE_CURRENT_LIST_DIR}/thirdparty/berkeley-softfloat-3.cmake)
+
+# Generate .S from .S.in to bake in absolute icon path
+set(UOTAN_ICON_PATH ${CMAKE_CURRENT_SOURCE_DIR}/assets/uotan.png)
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/uotan_icon.S.in
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/uotan_icon.S
+    @ONLY
+)
 
 file(GLOB_RECURSE SOURCES
     "src/*.cpp"
     "src/*.c"
+    "src/*.S"
 )
+
+list(APPEND SOURCES ${CMAKE_CURRENT_BINARY_DIR}/generated/uotan_icon.S)
 
 file(GLOB_RECURSE HEADERS
     "include/*.h"
@@ -55,7 +67,7 @@ add_library(uemu_core STATIC ${SOURCES} ${HEADERS})
 
 target_include_directories(uemu_core
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
-    PUBLIC 
+    PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/kernel-headers/generic/include
 )
 
@@ -66,6 +78,7 @@ target_link_libraries(uemu_core
         Threads::Threads
         softfloat
         SDL3::SDL3
+        SDL3_image::SDL3_image
 )
 
 add_executable(uemu src/main.cpp)

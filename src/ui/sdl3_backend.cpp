@@ -19,10 +19,15 @@
 #include <stdexcept>
 
 #include <SDL3/SDL_init.h>
+#include <SDL3/SDL_iostream.h>
+#include <SDL3_image/SDL_image.h>
 
 #include "ui/sdl3_backend.hpp"
 
-#include "local-include/uotan_rgba.hpp"
+extern "C" {
+extern const uint8_t uotan_icon_data[];
+extern const ptrdiff_t uotan_icon_size;
+}
 
 namespace uemu::ui {
 
@@ -51,17 +56,17 @@ SDL3Backend::SDL3Backend(Endpoints endpoints)
         goto fail;
 
     {
-        // Set window icon from embedded RGBA data
-        static constexpr int ICON_SIZE = 64;
-        static_assert(uotan_rgba_len == 16384);
+        // Set window icon from embedded PNG via SDL3_image
+        SDL_IOStream* io = SDL_IOFromConstMem(
+            uotan_icon_data, static_cast<size_t>(uotan_icon_size));
 
-        SDL_Surface* icon = SDL_CreateSurfaceFrom(ICON_SIZE, ICON_SIZE,
-                                                  SDL_PIXELFORMAT_RGBA8888,
-                                                  uotan_rgba, ICON_SIZE * 4);
+        if (io) {
+            SDL_Surface* icon = IMG_LoadTyped_IO(io, true, "PNG");
 
-        if (icon) {
-            SDL_SetWindowIcon(window_, icon);
-            SDL_DestroySurface(icon);
+            if (icon) {
+                SDL_SetWindowIcon(window_, icon);
+                SDL_DestroySurface(icon);
+            }
         }
     }
 
