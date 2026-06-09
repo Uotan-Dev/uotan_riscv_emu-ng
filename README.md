@@ -63,7 +63,7 @@ A UEFI firmware implementation (EDK2) for **uemu-ng** is available at [Uotan-Dev
 ### Required dependencies:
 
 * CLI11 - Command line parsing
-* SFML 3 - Graphics and windowing
+* SDL 3 - Graphics and windowing
 * `riscv64-unknown-elf-gcc`, `riscv64-unknown-elf-objcopy`, `riscv64-unknown-elf-objdump`
 
 ### Build Instructions
