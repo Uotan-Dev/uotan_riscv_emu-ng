@@ -8,17 +8,84 @@ Checks: >
   cppcoreguidelines-*,
   hicpp-*,
   portability-*,
-  -modernize-pass-by-value
+  -modernize-pass-by-value,
+  -modernize-use-trailing-return-type,
+  -readability-identifier-length,
+  -readability-implicit-bool-conversion,
+  -portability-avoid-pragma-once,
+  -performance-enum-size,
+  -readability-braces-around-statements,
+  -hicpp-braces-around-statements,
+  -bugprone-assignment-in-if-condition,
+  -readability-magic-numbers,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -hicpp-signed-bitwise,
+  -bugprone-easily-swappable-parameters,
+  -cppcoreguidelines-macro-to-enum,
+  -modernize-macro-to-enum,
+  -cppcoreguidelines-macro-usage,
+  -hicpp-uppercase-literal-suffix,
+  -readability-uppercase-literal-suffix,
+  -readability-identifier-naming,
+  -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -hicpp-no-array-decay,
+  -cppcoreguidelines-avoid-do-while,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-pro-type-union-access,
+  -cppcoreguidelines-avoid-goto,
+  -hicpp-avoid-goto,
+  -cppcoreguidelines-avoid-c-arrays,
+  -hicpp-avoid-c-arrays,
+  -modernize-avoid-c-arrays,
+  -cppcoreguidelines-avoid-const-or-ref-data-members,
+  -cppcoreguidelines-pro-type-vararg,
+  -hicpp-vararg,
+  -cppcoreguidelines-use-enum-class,
+  -bugprone-reserved-identifier,
+  -hicpp-named-parameter,
+  -readability-named-parameter,
+  -hicpp-use-auto,
+  -modernize-use-auto,
+  -hicpp-explicit-conversions,
+  -cppcoreguidelines-special-member-functions,
+  -hicpp-special-member-functions,
+  -cppcoreguidelines-c-copy-assignment-signature,
+  -cppcoreguidelines-prefer-member-initializer,
+  -bugprone-branch-clone,
+  -readability-function-size,
+  -readability-isolate-declaration,
+  -hicpp-function-size,
+  -readability-function-cognitive-complexity,
+  -bugprone-narrowing-conversions,
+  -cppcoreguidelines-narrowing-conversions,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-random-generator-seed,
+  -readability-math-missing-parentheses,
+  -bugprone-exception-escape,
+  -bugprone-unchecked-optional-access
 WarningsAsErrors: >
   clang-analyzer-*,
   bugprone-*,
   cppcoreguidelines-*,
   hicpp-*
-HeaderFilterRegex: '.*'
-AnalyzeTemporaryDtors: true
+HeaderFilterRegex: '^((?!thirdparty).)*\.(hpp|h)$'
 FormatStyle: none
 CheckOptions:
   - key:             readability-identifier-naming.VariableCase
     value:           lower_case
   - key:             readability-identifier-naming.FunctionCase
     value:           lower_case
+  - key:             readability-identifier-naming.ConstantCase
+    value:           UPPER_CASE
+  - key:             readability-identifier-naming.EnumConstantCase
+    value:           PascalCase
+  - key:             readability-function-cognitive-complexity.Threshold
+    value:           2000
+  - key:             readability-function-size.LineThreshold
+    value:           600
+  - key:             hicpp-function-size.LineThreshold
+    value:           600

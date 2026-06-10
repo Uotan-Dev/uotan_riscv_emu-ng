@@ -81,7 +81,9 @@ public:
         throw Trap(pc, cause, tval);
     }
 
-    const char* what() const noexcept override { return "RISC-V Trap"; }
+    [[nodiscard]] const char* what() const noexcept override {
+        return "RISC-V Trap";
+    }
 
     const addr_t pc;
     const TrapCause cause;
@@ -92,7 +94,9 @@ public:
 // interrupt becomes pending.
 class WfiWait final : public std::exception {
 public:
-    const char* what() const noexcept override { return "WFI wait"; }
+    [[nodiscard]] const char* what() const noexcept override {
+        return "WFI wait";
+    }
 };
 
 class DecodedInsn;
@@ -102,14 +106,14 @@ class FPR final {
 public:
     FPR() : value_(float64_t{0}) {}
 
-    float32_t read_32() const noexcept {
+    [[nodiscard]] float32_t read_32() const noexcept {
         if (is_boxed_f32(value_))
             return unbox_f32(value_);
 
         return float32_t{F32_DEFAULT_NAN};
     }
 
-    float64_t read_64() const noexcept { return value_; }
+    [[nodiscard]] float64_t read_64() const noexcept { return value_; }
 
     void write_32(float32_t x) noexcept { value_ = box_f32(x); }
 
@@ -127,19 +131,19 @@ class RegisterFile {
 public:
     RegisterFile() noexcept { gprs_.fill(0); }
 
-    inline reg_t read(size_t idx) const noexcept {
+    [[nodiscard]] reg_t read(size_t idx) const noexcept {
         return idx ? gprs_[idx] : 0;
     }
 
-    inline void write(size_t idx, reg_t value) noexcept {
+    void write(size_t idx, reg_t value) noexcept {
         if (idx != 0) [[likely]]
             gprs_[idx] = value;
     }
 
-    inline reg_t operator[](size_t idx) const noexcept { return read(idx); }
+    reg_t operator[](size_t idx) const noexcept { return read(idx); }
 
 private:
-    std::array<reg_t, 32> gprs_;
+    std::array<reg_t, 32> gprs_{};
 };
 
 class MMU;
@@ -207,16 +211,18 @@ public:
 
     virtual ~CSR() = default;
 
-    virtual reg_t read_unchecked() const noexcept { return value_; }
+    [[nodiscard]] virtual reg_t read_unchecked() const noexcept {
+        return value_;
+    }
 
     virtual void write_unchecked(reg_t v) noexcept { value_ = v; }
 
-    virtual reg_t read_checked(const DecodedInsn& insn) const;
+    [[nodiscard]] virtual reg_t read_checked(const DecodedInsn& insn) const;
 
     virtual void write_checked(const DecodedInsn& insn, reg_t v);
 
 protected:
-    virtual bool check_permissions() const noexcept {
+    [[nodiscard]] virtual bool check_permissions() const noexcept {
         return hart_->priv >= min_priv_;
     }
 
@@ -232,7 +238,7 @@ public:
     UnimplementedCSR(Hart* hart, size_t address, bool trace)
         : CSR(hart, PrivilegeLevel::M, 0), address_(address), trace_(trace) {}
 
-    reg_t read_unchecked() const noexcept override { return 0; }
+    [[nodiscard]] reg_t read_unchecked() const noexcept override { return 0; }
 
     void write_unchecked([[maybe_unused]] reg_t v) noexcept override {}
 
@@ -377,7 +383,7 @@ public:
         value_atomic_.store(0, std::memory_order_relaxed);
     }
 
-    reg_t read_unchecked() const noexcept override {
+    [[nodiscard]] reg_t read_unchecked() const noexcept override {
         return value_atomic_.load(std::memory_order_relaxed) & mask_;
     }
 
@@ -435,7 +441,7 @@ public:
 
     MSTATUS(Hart* hart);
 
-    reg_t read_unchecked() const noexcept override {
+    [[nodiscard]] reg_t read_unchecked() const noexcept override {
         return value_ & read_mask_;
     }
 
@@ -490,7 +496,9 @@ public:
 
     MEDELEG(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {}
 
-    reg_t read_unchecked() const noexcept override { return value_ & mask_; }
+    [[nodiscard]] reg_t read_unchecked() const noexcept override {
+        return value_ & mask_;
+    }
 
     void write_unchecked(reg_t v) noexcept override { value_ = v & mask_; }
 
@@ -526,7 +534,7 @@ public:
         value_atomic_.store(0, std::memory_order_relaxed);
     }
 
-    reg_t read_unchecked() const noexcept override {
+    [[nodiscard]] reg_t read_unchecked() const noexcept override {
         return value_atomic_.load(std::memory_order_relaxed);
     }
 
@@ -565,20 +573,23 @@ public:
         MEIP = 1ULL << MEIP_SHIFT
     };
 
-    MIP(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {
+    MIP(Hart* hart)
+        : CSR(hart, PrivilegeLevel::M, 0),
+          menvcfg_(
+              dynamic_cast<MENVCFG*>(hart_->csrs[MENVCFG::ADDRESS].get())) {
         value_atomic_.store(0, std::memory_order_relaxed);
-        menvcfg_ = dynamic_cast<MENVCFG*>(hart_->csrs[MENVCFG::ADDRESS].get());
         assert(menvcfg_);
     }
 
-    reg_t read_unchecked() const noexcept override {
+    [[nodiscard]] reg_t read_unchecked() const noexcept override {
         return value_atomic_.load(std::memory_order_relaxed) & read_mask_;
     }
 
     // For csr instructions
     void write_unchecked(reg_t v) noexcept override {
         reg_t old_val = value_atomic_.load(std::memory_order_relaxed);
-        reg_t new_val;
+        reg_t new_val; // NOLINT(cppcoreguidelines-init-variables)
+
         do {
             reg_t write_mask = write_mask_;
 
@@ -633,7 +644,9 @@ public:
 
     MIE(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {}
 
-    reg_t read_unchecked() const noexcept override { return value_ & mask_; }
+    [[nodiscard]] reg_t read_unchecked() const noexcept override {
+        return value_ & mask_;
+    }
 
     void write_unchecked(reg_t v) noexcept override { value_ = v & mask_; }
 
@@ -658,7 +671,9 @@ public:
 
     MCOUNTINHIBIT(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {}
 
-    reg_t read_unchecked() const noexcept override { return value_ & mask_; }
+    [[nodiscard]] reg_t read_unchecked() const noexcept override {
+        return value_ & mask_;
+    }
 
     void write_unchecked(reg_t v) noexcept override { value_ = v & mask_; }
 
@@ -670,9 +685,10 @@ class MCYCLE final : public CSR {
 public:
     static constexpr size_t ADDRESS = 0xB00;
 
-    MCYCLE(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {
-        mcountinhibit_ = dynamic_cast<MCOUNTINHIBIT*>(
-            hart_->csrs[MCOUNTINHIBIT::ADDRESS].get());
+    MCYCLE(Hart* hart)
+        : CSR(hart, PrivilegeLevel::M, 0),
+          mcountinhibit_(dynamic_cast<MCOUNTINHIBIT*>(
+              hart_->csrs[MCOUNTINHIBIT::ADDRESS].get())) {
         assert(mcountinhibit_);
     }
 
@@ -692,9 +708,9 @@ public:
     static constexpr size_t ADDRESS = 0xB02;
 
     MINSTRET(Hart* hart)
-        : CSR(hart, PrivilegeLevel::M, 0), increase_suppressed_(false) {
-        mcountinhibit_ = dynamic_cast<MCOUNTINHIBIT*>(
-            hart_->csrs[MCOUNTINHIBIT::ADDRESS].get());
+        : CSR(hart, PrivilegeLevel::M, 0),
+          mcountinhibit_(dynamic_cast<MCOUNTINHIBIT*>(
+              hart_->csrs[MCOUNTINHIBIT::ADDRESS].get())) {
         assert(mcountinhibit_);
     }
 
@@ -713,7 +729,7 @@ public:
 
 private:
     MCOUNTINHIBIT* mcountinhibit_;
-    bool increase_suppressed_;
+    bool increase_suppressed_ = false;
 };
 
 class MHPMCOUNTERN final : public HardwiredCSR {
@@ -750,7 +766,8 @@ public:
 
     // Check the availability of the hardware performance-monitoring counters
     // (0xC00 to 0xC1F)
-    bool hpm_available_to_supervisor_and_user(size_t csr_addr) const noexcept {
+    [[nodiscard]] bool
+    hpm_available_to_supervisor_and_user(size_t csr_addr) const noexcept {
         if (csr_addr == 0x14D) // stimecmp
             return value_ & TM;
 
@@ -770,22 +787,18 @@ public:
 
 class EPCCSR : public CSR {
 public:
-    EPCCSR(Hart* hart, PrivilegeLevel min_priv) : CSR(hart, min_priv, 0) {
-        write_mask_ = ~1ULL;
-        read_mask_ = ~1ULL;
-    }
+    EPCCSR(Hart* hart, PrivilegeLevel min_priv) : CSR(hart, min_priv, 0) {}
 
-    reg_t read_unchecked() const noexcept override {
-        return value_ & read_mask_;
+    [[nodiscard]] reg_t read_unchecked() const noexcept override {
+        return value_ & mask_;
     }
 
     void write_unchecked(reg_t v) noexcept override {
-        value_ = (value_ & ~write_mask_) | (v & write_mask_);
+        value_ = (value_ & ~mask_) | (v & mask_);
     }
 
 private:
-    reg_t read_mask_;
-    reg_t write_mask_;
+    static constexpr reg_t mask_ = ~1ULL;
 };
 
 class MEPC final : public EPCCSR {
@@ -859,12 +872,13 @@ public:
     using F = MSTATUS::Field;
     using S = MSTATUS::Shift;
 
-    SSTATUS(Hart* hart) : CSR(hart, PrivilegeLevel::S, 0) {
-        mstatus_ = dynamic_cast<MSTATUS*>(hart->csrs[MSTATUS::ADDRESS].get());
+    SSTATUS(Hart* hart)
+        : CSR(hart, PrivilegeLevel::S, 0),
+          mstatus_(dynamic_cast<MSTATUS*>(hart->csrs[MSTATUS::ADDRESS].get())) {
         assert(mstatus_);
     }
 
-    reg_t read_unchecked() const noexcept override {
+    [[nodiscard]] reg_t read_unchecked() const noexcept override {
         return mstatus_->read_unchecked() & read_mask_;
     }
 
@@ -898,13 +912,14 @@ public:
     using Shift = MIP::Shift;
     using Field = MIP::Field;
 
-    SIP(Hart* hart) : CSR(hart, PrivilegeLevel::S, 0) {
-        mip_ = dynamic_cast<MIP*>(hart->csrs[MIP::ADDRESS].get());
-        mideleg_ = dynamic_cast<MIDELEG*>(hart->csrs[MIDELEG::ADDRESS].get());
+    SIP(Hart* hart)
+        : CSR(hart, PrivilegeLevel::S, 0),
+          mip_(dynamic_cast<MIP*>(hart->csrs[MIP::ADDRESS].get())),
+          mideleg_(dynamic_cast<MIDELEG*>(hart->csrs[MIDELEG::ADDRESS].get())) {
         assert(mip_ && mideleg_);
     }
 
-    reg_t read_unchecked() const noexcept override {
+    [[nodiscard]] reg_t read_unchecked() const noexcept override {
         return mip_->read_unchecked() & read_mask_ & mideleg_->read_unchecked();
     }
 
@@ -930,12 +945,13 @@ public:
     using Shift = MIE::Shift;
     using Field = MIE::Field;
 
-    SIE(Hart* hart) : CSR(hart, PrivilegeLevel::S, 0) {
-        mie_ = dynamic_cast<MIE*>(hart->csrs[MIE::ADDRESS].get());
+    SIE(Hart* hart)
+        : CSR(hart, PrivilegeLevel::S, 0),
+          mie_(dynamic_cast<MIE*>(hart->csrs[MIE::ADDRESS].get())) {
         assert(mie_);
     }
 
-    reg_t read_unchecked() const noexcept override {
+    [[nodiscard]] reg_t read_unchecked() const noexcept override {
         return mie_->read_unchecked() & mask_;
     }
 
@@ -962,14 +978,16 @@ public:
     // 0x7). Without Sscounterenw, the spec says read-only zero, but Spike
     // implements it as masked_csr_t(counteren_mask, 0). The ACT test expects
     // WARL mask 0x7.
-    reg_t read_unchecked() const noexcept override { return value_ & mask_; }
+    [[nodiscard]] reg_t read_unchecked() const noexcept override {
+        return value_ & mask_;
+    }
 
     void write_unchecked(reg_t v) noexcept override { value_ = v & mask_; }
 
     // Check the availability of the hardware performance-monitoring counters
     // (0xC00 to 0xC1F)
     // Note: MCOUNTEREN::hpm_available() must also be called for U-mode.
-    bool hpm_available_to_user(size_t csr_addr) const noexcept {
+    [[nodiscard]] bool hpm_available_to_user(size_t csr_addr) const noexcept {
         if (csr_addr < 0xC00 || csr_addr > 0xC1F) [[unlikely]]
             std::terminate();
 
@@ -1018,7 +1036,9 @@ public:
 
     SENVCFG(Hart* hart) : CSR(hart, PrivilegeLevel::S, 0) {}
 
-    reg_t read_unchecked() const noexcept override { return value_ & mask_; }
+    [[nodiscard]] reg_t read_unchecked() const noexcept override {
+        return value_ & mask_;
+    }
 
     void write_unchecked(reg_t v) noexcept override { value_ = v & mask_; }
 
@@ -1040,14 +1060,15 @@ public:
 
     enum Mode : reg_t { Bare = 0, Sv39 = 8, Sv48 = 9, Sv57 = 10 };
 
-    SATP(Hart* hart) : CSR(hart, PrivilegeLevel::S, 0) {
-        mstatus_ = dynamic_cast<MSTATUS*>(hart->csrs[MSTATUS::ADDRESS].get());
+    SATP(Hart* hart)
+        : CSR(hart, PrivilegeLevel::S, 0),
+          mstatus_(dynamic_cast<MSTATUS*>(hart->csrs[MSTATUS::ADDRESS].get())) {
         assert(mstatus_);
     }
 
     void write_unchecked(reg_t v) noexcept override;
 
-    bool check_permissions() const noexcept override {
+    [[nodiscard]] bool check_permissions() const noexcept override {
         if (hart_->priv == PrivilegeLevel::S &&
             (mstatus_->read_unchecked() & MSTATUS::TVM))
             return false;
@@ -1063,21 +1084,23 @@ class STIMECMP : public CSR {
 public:
     static constexpr size_t ADDRESS = 0x14D;
 
-    STIMECMP(Hart* hart) : CSR(hart, PrivilegeLevel::S, 0) {
-        mcounteren_ =
-            dynamic_cast<MCOUNTEREN*>(hart_->csrs[MCOUNTEREN::ADDRESS].get());
-        menvcfg_ = dynamic_cast<MENVCFG*>(hart_->csrs[MENVCFG::ADDRESS].get());
+    STIMECMP(Hart* hart)
+        : CSR(hart, PrivilegeLevel::S, 0),
+          mcounteren_(dynamic_cast<MCOUNTEREN*>(
+              hart_->csrs[MCOUNTEREN::ADDRESS].get())),
+          menvcfg_(
+              dynamic_cast<MENVCFG*>(hart_->csrs[MENVCFG::ADDRESS].get())) {
         assert(mcounteren_ && menvcfg_);
     }
 
-    reg_t read_unchecked() const noexcept override {
+    [[nodiscard]] reg_t read_unchecked() const noexcept override {
         return value_atomic_.load(std::memory_order_relaxed);
     }
 
     void write_unchecked(reg_t v) noexcept override;
 
 protected:
-    bool check_permissions() const noexcept override {
+    [[nodiscard]] bool check_permissions() const noexcept override {
         if (hart_->priv == PrivilegeLevel::M)
             return true;
 
@@ -1104,20 +1127,20 @@ class UserCounterCSR : public ConstCSR {
 public:
     UserCounterCSR(Hart* hart, size_t address, size_t mirrored_address)
         : ConstCSR(hart, PrivilegeLevel::U, 0), address_(address),
-          mirrored_address_(mirrored_address) {
-        mcounteren_ =
-            dynamic_cast<MCOUNTEREN*>(hart_->csrs[MCOUNTEREN::ADDRESS].get());
-        scounteren_ =
-            dynamic_cast<SCOUNTEREN*>(hart_->csrs[SCOUNTEREN::ADDRESS].get());
+          mirrored_address_(mirrored_address),
+          mcounteren_(dynamic_cast<MCOUNTEREN*>(
+              hart_->csrs[MCOUNTEREN::ADDRESS].get())),
+          scounteren_(dynamic_cast<SCOUNTEREN*>(
+              hart_->csrs[SCOUNTEREN::ADDRESS].get())) {
         assert(mcounteren_ && scounteren_);
     }
 
-    reg_t read_unchecked() const noexcept override {
+    [[nodiscard]] reg_t read_unchecked() const noexcept override {
         return hart_->csrs[mirrored_address_]->read_unchecked();
     }
 
 protected:
-    bool check_permissions() const noexcept override {
+    [[nodiscard]] bool check_permissions() const noexcept override {
         if (hart_->priv == PrivilegeLevel::M)
             return true;
 
@@ -1150,18 +1173,19 @@ class TIME final : public ConstCSR {
 public:
     static constexpr size_t ADDRESS = 0xC01;
 
-    TIME(Hart* hart) : ConstCSR(hart, PrivilegeLevel::U, 0) {
-        mcounteren_ =
-            dynamic_cast<MCOUNTEREN*>(hart_->csrs[MCOUNTEREN::ADDRESS].get());
-        scounteren_ =
-            dynamic_cast<SCOUNTEREN*>(hart_->csrs[SCOUNTEREN::ADDRESS].get());
+    TIME(Hart* hart)
+        : ConstCSR(hart, PrivilegeLevel::U, 0),
+          mcounteren_(dynamic_cast<MCOUNTEREN*>(
+              hart_->csrs[MCOUNTEREN::ADDRESS].get())),
+          scounteren_(dynamic_cast<SCOUNTEREN*>(
+              hart_->csrs[SCOUNTEREN::ADDRESS].get())) {
         assert(mcounteren_ && scounteren_);
     }
 
-    reg_t read_unchecked() const noexcept override;
+    [[nodiscard]] reg_t read_unchecked() const noexcept override;
 
 protected:
-    bool check_permissions() const noexcept override {
+    [[nodiscard]] bool check_permissions() const noexcept override {
         if (hart_->priv == PrivilegeLevel::M)
             return true;
 
@@ -1221,7 +1245,7 @@ public:
 
     FFLAGS(Hart* hart) : CSR(hart, PrivilegeLevel::U, 0) {}
 
-    bool check_permissions() const noexcept override {
+    [[nodiscard]] bool check_permissions() const noexcept override {
         if (!(hart_->csrs[MSTATUS::ADDRESS]->read_unchecked() &
               MSTATUS::Field::FS)) [[unlikely]]
             return false;
@@ -1229,7 +1253,9 @@ public:
         return CSR::check_permissions();
     }
 
-    reg_t read_unchecked() const noexcept override { return value_ & 0b11111; }
+    [[nodiscard]] reg_t read_unchecked() const noexcept override {
+        return value_ & 0b11111;
+    }
 
     void write_unchecked(reg_t v) noexcept override { value_ = v & 0b11111; }
 
@@ -1256,7 +1282,7 @@ public:
 
     FRM(Hart* hart) : CSR(hart, PrivilegeLevel::U, 0) {}
 
-    bool check_permissions() const noexcept override {
+    [[nodiscard]] bool check_permissions() const noexcept override {
         if (!(hart_->csrs[MSTATUS::ADDRESS]->read_unchecked() &
               MSTATUS::Field::FS)) [[unlikely]]
             return false;
@@ -1264,7 +1290,9 @@ public:
         return CSR::check_permissions();
     }
 
-    reg_t read_unchecked() const noexcept override { return value_ & 0b111; }
+    [[nodiscard]] reg_t read_unchecked() const noexcept override {
+        return value_ & 0b111;
+    }
 
     void write_unchecked(reg_t v) noexcept override { value_ = v & 0b111; }
 
@@ -1280,13 +1308,14 @@ class FCSR final : public CSR {
 public:
     static constexpr size_t ADDRESS = 0x003;
 
-    FCSR(Hart* hart) : CSR(hart, PrivilegeLevel::U, 0) {
-        fflags_ = dynamic_cast<FFLAGS*>(hart->csrs[FFLAGS::ADDRESS].get());
-        frm_ = dynamic_cast<FRM*>(hart_->csrs[FRM::ADDRESS].get());
+    FCSR(Hart* hart)
+        : CSR(hart, PrivilegeLevel::U, 0),
+          fflags_(dynamic_cast<FFLAGS*>(hart->csrs[FFLAGS::ADDRESS].get())),
+          frm_(dynamic_cast<FRM*>(hart_->csrs[FRM::ADDRESS].get())) {
         assert(fflags_ && frm_);
     }
 
-    bool check_permissions() const noexcept override {
+    [[nodiscard]] bool check_permissions() const noexcept override {
         if (!(hart_->csrs[MSTATUS::ADDRESS]->read_unchecked() &
               MSTATUS::Field::FS)) [[unlikely]]
             return false;
@@ -1294,7 +1323,7 @@ public:
         return CSR::check_permissions();
     }
 
-    reg_t read_unchecked() const noexcept override {
+    [[nodiscard]] reg_t read_unchecked() const noexcept override {
         return fflags_->read_unchecked() | (frm_->read_unchecked() << 5);
     }
 

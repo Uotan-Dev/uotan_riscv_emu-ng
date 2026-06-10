@@ -27,12 +27,12 @@ Clint::Clint(std::shared_ptr<core::Hart> hart, uint64_t freq_hz)
 }
 
 void Clint::tick() {
-    std::lock_guard<std::mutex> lock(clint_mutex_);
+    std::scoped_lock lock(clint_mutex_);
     tick_internal();
 }
 
 uint64_t Clint::get_mtime() noexcept {
-    std::lock_guard<std::mutex> lock(clint_mutex_);
+    std::scoped_lock lock(clint_mutex_);
     tick_internal();
     return mtime_;
 }
@@ -50,13 +50,17 @@ std::optional<uint64_t> Clint::read_internal(addr_t offset, size_t size) {
         uint64_t result = 0;
         read_little_endian(&msip_val, offset - MSIP_OFFSET, size, &result);
         return result;
-    } else if (offset >= MTIMECMP_OFFSET && offset < MTIMECMP_OFFSET + 8) {
+    }
+
+    if (offset >= MTIMECMP_OFFSET && offset < MTIMECMP_OFFSET + 8) {
         // MTIMECMP
         uint64_t result = 0;
-        std::lock_guard<std::mutex> lock(clint_mutex_);
+        std::scoped_lock lock(clint_mutex_);
         read_little_endian(&mtimecmp_, offset - MTIMECMP_OFFSET, size, &result);
         return result;
-    } else if (offset >= MTIME_OFFSET && offset < MTIME_OFFSET + 8) {
+    }
+
+    if (offset >= MTIME_OFFSET && offset < MTIME_OFFSET + 8) {
         // MTIME
         uint64_t cur_mtime = get_mtime();
         uint64_t result = 0;
@@ -75,17 +79,17 @@ bool Clint::write_internal(addr_t offset, size_t size, uint64_t value) {
         hart_->set_interrupt_pending(core::MIP::Field::MSIP, (msip_val & 1));
     } else if (offset >= MTIMECMP_OFFSET && offset < MTIMECMP_OFFSET + 8) {
         // MTIMECMP
-        std::lock_guard<std::mutex> lock(clint_mutex_);
+        std::scoped_lock lock(clint_mutex_);
         write_little_endian(&mtimecmp_, offset - MTIMECMP_OFFSET, size, value);
         tick_internal();
     } else if (offset >= MTIME_OFFSET && offset < MTIME_OFFSET + 8) {
         // MTIME
-        std::lock_guard<std::mutex> lock(clint_mutex_);
+        std::scoped_lock lock(clint_mutex_);
         write_little_endian(&mtime_, offset - MTIME_OFFSET, size, value);
 
         auto now = std::chrono::steady_clock::now();
-        std::chrono::duration<double> new_elapsed(static_cast<double>(mtime_) /
-                                                  freq_hz_);
+        std::chrono::duration<double> new_elapsed(
+            static_cast<double>(static_cast<int64_t>(mtime_)) / freq_hz_);
         start_time_ =
             now -
             std::chrono::duration_cast<std::chrono::steady_clock::duration>(
@@ -104,7 +108,8 @@ void Clint::tick_internal() {
     auto now = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed = now - start_time_;
 
-    mtime_ = static_cast<uint64_t>(elapsed.count() * freq_hz_);
+    mtime_ =
+        static_cast<uint64_t>(elapsed.count() * static_cast<double>(freq_hz_));
     handle_mtimecmp();
     handle_stimecmp();
 }

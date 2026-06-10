@@ -22,21 +22,13 @@
 namespace uemu::device {
 
 PFlashCFI01::PFlashCFI01(addr_t base, uint64_t sector_len, uint32_t num_blocks)
-    : Device("pflash-cfi01", base, sector_len * num_blocks) {
-    num_blocks_ = num_blocks;
-    sector_len_ = sector_len;
-    total_size_ = sector_len * num_blocks;
-    bank_width_ = 4;
-    device_width_ = max_device_width_ = 2;
-    ident0_ = 0x89; // Intel manufacturer ID
-    ident1_ = 0x18; // Intel 28F128J3A device ID
-    ident2_ = ident3_ = 0;
-    wcycle_ = 0;
-    cmd_ = 0;
-    status_ = 0x80;
-    counter_ = 0;
-    blk_offset_ = -1;
-    read_mode_ = true;
+    : Device("pflash-cfi01", base, sector_len * num_blocks),
+      num_blocks_(num_blocks), sector_len_(sector_len),
+      total_size_(sector_len * num_blocks), bank_width_(4), device_width_(2),
+      max_device_width_(2), ident0_(0x89) /* Intel manufacturer ID */,
+      ident1_(0x18) /* Intel 28F128J3A device ID */, ident2_(0), ident3_(0),
+      cfi_table_{}, wcycle_(0), cmd_(0), status_(0x80), counter_(0),
+      blk_offset_(-1), read_mode_(true) {
     storage_.resize(total_size_, 0xFF);
 
     int num_devices = 2;
@@ -44,7 +36,6 @@ PFlashCFI01::PFlashCFI01(addr_t base, uint64_t sector_len, uint32_t num_blocks)
     uint64_t sector_len_per_device = sector_len_ / num_devices;
     uint64_t device_len = sector_len_per_device * blocks_per_device;
 
-    cfi_table_.fill(0);
     cfi_table_[0x10] = 'Q';
     cfi_table_[0x11] = 'R';
     cfi_table_[0x12] = 'Y';
@@ -143,6 +134,7 @@ std::optional<uint64_t> PFlashCFI01::read_internal(addr_t offset, size_t size) {
             // device_width_ is always 2
             if (size > device_width_) {
                 size_t shift = device_width_ * 8;
+
                 while (shift + device_width_ * 8 <= size * 8) {
                     ret |= static_cast<uint32_t>(status_) << shift;
                     shift += device_width_ * 8;
@@ -304,13 +296,14 @@ uint32_t PFlashCFI01::cfi_query(addr_t offset) {
 
     uint32_t resp = cfi_table_[boff];
 
-    for (int i = device_width_; i < bank_width_; i += device_width_)
+    for (int i = device_width_; std::cmp_less(i, bank_width_);
+         i += device_width_)
         resp = deposit(resp, 8 * i, 8 * device_width_, resp);
 
     return resp;
 }
 
-uint32_t PFlashCFI01::device_id_query(addr_t offset) {
+uint32_t PFlashCFI01::device_id_query(addr_t offset) const {
     addr_t boff = offset >> (ctz(bank_width_) + ctz(max_device_width_) -
                              ctz(device_width_));
     uint32_t resp = 0;
@@ -321,7 +314,8 @@ uint32_t PFlashCFI01::device_id_query(addr_t offset) {
         default: return 0;
     }
 
-    for (int i = device_width_; i < bank_width_; i += device_width_)
+    for (int i = device_width_; std::cmp_less(i, bank_width_);
+         i += device_width_)
         resp = deposit(resp, 8 * i, 8 * device_width_, resp);
 
     return resp;
@@ -343,7 +337,7 @@ void PFlashCFI01::data_write(addr_t offset, uint32_t value, size_t width) {
     uint8_t* p = nullptr;
 
     if (blk_offset_ != -1) {
-        if (offset < static_cast<uint64_t>(blk_offset_) ||
+        if (std::cmp_less(offset, blk_offset_) ||
             offset + width >
                 static_cast<uint64_t>(blk_offset_) + writeblock_size_) {
             status_ |= 0x10; // Programming error

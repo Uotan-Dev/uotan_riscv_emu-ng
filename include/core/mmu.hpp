@@ -41,10 +41,7 @@ public:
     };
 
     explicit MMU(Hart* hart, std::shared_ptr<Bus> bus)
-        : reservation_address(0), reservation_valid(false), hart_(hart),
-          bus_(std::move(bus)) {
-        tlb_flush_all();
-    }
+        : hart_(hart), bus_(std::move(bus)) {}
 
     // Read a value of type T from `addr` during instruction execution.
     // When `is_amo` is true, translation and access faults use Store/AMO
@@ -203,8 +200,8 @@ public:
             itlb_[idx].valid = false;
     }
 
-    addr_t reservation_address;
-    bool reservation_valid;
+    addr_t reservation_address = 0;
+    bool reservation_valid = false;
 
 private:
     static constexpr reg_t PTE_V = 1 << 0;
@@ -227,16 +224,16 @@ private:
     Hart* hart_;
     std::shared_ptr<Bus> bus_;
 
-    TLBEntry itlb_[TLB_ENTRIES];
-    TLBEntry dtlb_[TLB_ENTRIES];
+    TLBEntry itlb_[TLB_ENTRIES]{};
+    TLBEntry dtlb_[TLB_ENTRIES]{};
 
     // Check if an instruction at pc may cross pages
     static bool may_cross_page(addr_t pc) noexcept {
         return (pc & (PGSIZE - 1)) == PGSIZE - 2;
     }
 
-    [[noreturn]] void raise_page_fault(addr_t pc, addr_t vaddr,
-                                       AccessType type) {
+    [[noreturn]] static void raise_page_fault(addr_t pc, addr_t vaddr,
+                                              AccessType type) {
         switch (type) {
             case AccessType::Fetch:
                 Trap::raise_exception(pc, TrapCause::InstructionPageFault,
@@ -250,8 +247,8 @@ private:
         std::unreachable();
     }
 
-    [[noreturn]] void raise_access_fault(addr_t pc, addr_t vaddr,
-                                         AccessType type) {
+    [[noreturn]] static void raise_access_fault(addr_t pc, addr_t vaddr,
+                                                AccessType type) {
         switch (type) {
             case AccessType::Fetch:
                 Trap::raise_exception(pc, TrapCause::InstructionAccessFault,
@@ -289,6 +286,8 @@ private:
             std::terminate();
 
         int64_t t = static_cast<int64_t>(vaddr << (64 - 39)) >> (64 - 39);
+
+        // NOLINTNEXTLINE(modernize-use-integer-sign-comparison)
         if (static_cast<addr_t>(t) != vaddr) [[unlikely]]
             raise_page_fault(pc, vaddr, type);
 
@@ -412,7 +411,7 @@ private:
             }
 
             // Construct physical address and fill TLB
-            uint64_t final_ppn;
+            uint64_t final_ppn; // NOLINT(cppcoreguidelines-init-variables)
 
             if (i > 0) {
                 // Superpage

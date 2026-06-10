@@ -49,7 +49,7 @@ TEST(BusTest, DramRouting) {
     auto val = bus.read<uint32_t>(addr);
 
     ASSERT_TRUE(val.has_value());
-    EXPECT_EQ(*val, 0x11223344);
+    EXPECT_EQ(val.value(), 0x11223344);
 }
 
 TEST(BusTest, DeviceRouting) {
@@ -61,7 +61,7 @@ TEST(BusTest, DeviceRouting) {
     // Test reading from device
     auto val = bus.read<uint8_t>(0x1000);
     ASSERT_TRUE(val.has_value());
-    EXPECT_EQ(*val, 0x42);
+    EXPECT_EQ(val.value(), 0x42);
 
     // Test writing to device
     bool res = bus.write<uint32_t>(0x1004, 0x99);

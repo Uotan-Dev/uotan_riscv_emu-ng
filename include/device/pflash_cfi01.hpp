@@ -35,7 +35,7 @@ private:
     bool write_internal(addr_t offset, size_t size, uint64_t value) override;
 
     uint32_t cfi_query(addr_t offset);
-    uint32_t device_id_query(addr_t offset);
+    [[nodiscard]] uint32_t device_id_query(addr_t offset) const;
 
     uint32_t data_read(addr_t offset, size_t width);
     void data_write(addr_t offset, uint32_t value, size_t width);

@@ -17,6 +17,7 @@
 #pragma once
 
 #include <functional>
+#include <utility>
 
 #include "device/device.hpp"
 
@@ -32,7 +33,8 @@ public:
     using ShutdownCallback = std::function<void(int, Status)>;
 
     SiFiveTest(ShutdownCallback on_shutdown)
-        : Device("SiFiveTest", DEFAULT_BASE, SIZE), on_shutdown_(on_shutdown) {}
+        : Device("SiFiveTest", DEFAULT_BASE, SIZE),
+          on_shutdown_(std::move(on_shutdown)) {}
 
 private:
     std::optional<uint64_t> read_internal(addr_t offset, size_t size) override;

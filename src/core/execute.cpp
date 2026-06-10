@@ -25,8 +25,10 @@
 namespace uemu::core {
 
 #define EXTRACT_OPRAND()                                                       \
-    [[maybe_unused]] const auto rd = d->rd, rs1 = d->rs1, rs2 = d->rs2,        \
-                                rs3 = d->rs3;                                  \
+    [[maybe_unused]] const auto rd = d->rd;                                    \
+    [[maybe_unused]] const auto rs1 = d->rs1;                                  \
+    [[maybe_unused]] const auto rs2 = d->rs2;                                  \
+    [[maybe_unused]] const auto rs3 = d->rs3;                                  \
     [[maybe_unused]] const auto imm = d->imm;                                  \
     [[maybe_unused]] const size_t csr = imm & 0xFFF;                           \
     [[maybe_unused]] const auto pc = d->pc;                                    \
@@ -356,7 +358,7 @@ IMPL(div, {
     if (static_cast<int64_t>(R[rs2]) == 0) [[unlikely]]
         R.write(rd, ~0ULL);
     else if (static_cast<int64_t>(R[rs1]) == INT64_MIN &&
-             static_cast<int64_t>(R[rs2]) == -1) [[unlikely]]
+             std::cmp_equal(static_cast<int64_t>(R[rs2]), -1)) [[unlikely]]
         R.write(rd, static_cast<int64_t>(R[rs1]));
     else
         R.write(rd,
@@ -400,7 +402,7 @@ IMPL(rem, {
     if (static_cast<int64_t>(R[rs2]) == 0) [[unlikely]]
         R.write(rd, (int64_t)R[rs1]);
     else if (static_cast<int64_t>(R[rs1]) == INT64_MIN &&
-             static_cast<int64_t>(R[rs2]) == -1) [[unlikely]]
+             std::cmp_equal(static_cast<int64_t>(R[rs2]), -1)) [[unlikely]]
         R.write(rd, 0);
     else
         R.write(rd,
@@ -1163,17 +1165,17 @@ IMPL(c_fldsp, {
     F[rd] = float64_t{v};
 })
 IMPL(c_lwsp, {
-    if (rd == 0) [[unlikely]]
+    if (rd == 0) [[unlikely]] {
         Trap::raise_exception(pc, TrapCause::IllegalInstruction, d->insn);
-    else {
+    } else {
         uint32_t v = mmu->read<uint32_t>(pc, R[2] + imm);
         R.write(rd, sext(v, 32));
     }
 })
 IMPL(c_ldsp, {
-    if (rd == 0) [[unlikely]]
+    if (rd == 0) [[unlikely]] {
         Trap::raise_exception(pc, TrapCause::IllegalInstruction, d->insn);
-    else {
+    } else {
         uint64_t v = mmu->read<uint64_t>(pc, R[2] + imm);
         R.write(rd, v);
     }
@@ -1192,9 +1194,9 @@ IMPL(c_mv, {
 })
 IMPL(c_ebreak, exec_ebreak(hart, mmu, d))
 IMPL(c_jalr, {
-    if (rs1 == 0) [[unlikely]]
+    if (rs1 == 0) [[unlikely]] {
         Trap::raise_exception(pc, TrapCause::IllegalInstruction, d->insn);
-    else {
+    } else {
         uint64_t t = pc + 2;
         hart->pc = R[rs1] & ~1ULL;
         R.write(1, t);

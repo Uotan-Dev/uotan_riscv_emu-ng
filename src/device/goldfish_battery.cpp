@@ -20,7 +20,7 @@ namespace uemu::device {
 
 GoldfishBattery::GoldfishBattery(IrqCallback irq_callback,
                                  uint32_t interrupt_id, uint32_t init_capacity)
-    : IrqDevice("GoldfishBattery", DEFAULT_BASE, SIZE, irq_callback,
+    : IrqDevice("GoldfishBattery", DEFAULT_BASE, SIZE, std::move(irq_callback),
                 interrupt_id),
       int_status_(0), int_enable_(0), ac_online_(1),
       status_(POWER_SUPPLY_STATUS_CHARGING), health_(POWER_SUPPLY_HEALTH_GOOD),

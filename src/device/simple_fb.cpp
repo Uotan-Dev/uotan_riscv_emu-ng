@@ -25,7 +25,7 @@ std::optional<uint64_t> SimpleFB::read_internal(addr_t offset, size_t size) {
     uint64_t v = 0;
 
     {
-        std::lock_guard<std::mutex> lock(simple_fb_mutex_);
+        std::scoped_lock lock(simple_fb_mutex_);
 
         for (size_t i = 0; i < size; i++)
             v |= static_cast<uint64_t>(vram_[offset + i]) << (8 * i);
@@ -39,7 +39,7 @@ bool SimpleFB::write_internal(addr_t offset, size_t size, uint64_t value) {
         return false;
 
     {
-        std::lock_guard<std::mutex> lock(simple_fb_mutex_);
+        std::scoped_lock lock(simple_fb_mutex_);
 
         for (size_t i = 0; i < size; i++)
             vram_[offset + i] = static_cast<uint8_t>((value >> (8 * i)) & 0xFF);

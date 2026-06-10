@@ -48,7 +48,7 @@ private:
     bool write_internal(addr_t offset, size_t size, uint64_t value) override;
 
     // Get current emulated time in nanoseconds
-    uint64_t get_count() const;
+    [[nodiscard]] uint64_t get_count() const;
 
     // Get host monotonic time in nanoseconds
     static uint64_t get_host_time_ns();

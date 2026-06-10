@@ -20,12 +20,10 @@ namespace uemu::device {
 
 GoldfishEvents::GoldfishEvents(IrqCallback irq_callback, uint32_t interrupt_id,
                                const std::string& device_name)
-    : IrqDevice("GoldfishEvents", DEFAULT_BASE, SIZE, irq_callback,
+    : IrqDevice("GoldfishEvents", DEFAULT_BASE, SIZE, std::move(irq_callback),
                 interrupt_id),
-      device_name_(device_name), page_(0), state_(STATE_INIT), first_(0),
-      last_(0) {
-    events_.fill(0);
-
+      device_name_(device_name), page_(0), state_(STATE_INIT), events_{},
+      first_(0), last_(0) {
     // Set up event capabilities
     // Enable EV_SYN and EV_KEY
     set_event_bit(EV_SYN, EV_KEY);
@@ -38,7 +36,7 @@ GoldfishEvents::GoldfishEvents(IrqCallback irq_callback, uint32_t interrupt_id,
 }
 
 void GoldfishEvents::push_key_event(KeyEvent event) {
-    std::lock_guard<std::mutex> lock(goldfish_events_mutex_);
+    std::scoped_lock lock(goldfish_events_mutex_);
 
     const auto [keycode, action] = event;
     enqueue_event(EV_KEY, static_cast<uint32_t>(keycode),
@@ -47,7 +45,7 @@ void GoldfishEvents::push_key_event(KeyEvent event) {
 
 std::optional<uint64_t>
 GoldfishEvents::read_internal(addr_t offset, [[maybe_unused]] size_t size) {
-    std::lock_guard<std::mutex> lock(goldfish_events_mutex_);
+    std::scoped_lock lock(goldfish_events_mutex_);
 
     // This hack ensures we only raise IRQ when kernel driver is ready
     if (offset == REG_LEN && page_ == PAGE_ABSDATA) {
@@ -59,9 +57,11 @@ GoldfishEvents::read_internal(addr_t offset, [[maybe_unused]] size_t size) {
 
     if (offset == REG_READ)
         return dequeue_event();
-    else if (offset == REG_LEN)
+
+    if (offset == REG_LEN)
         return get_page_len();
-    else if (offset >= REG_DATA)
+
+    if (offset >= REG_DATA)
         return get_page_data(offset - REG_DATA);
 
     return 0; // Do not fail the read
@@ -69,7 +69,7 @@ GoldfishEvents::read_internal(addr_t offset, [[maybe_unused]] size_t size) {
 
 bool GoldfishEvents::write_internal(addr_t offset, [[maybe_unused]] size_t size,
                                     uint64_t value) {
-    std::lock_guard<std::mutex> lock(goldfish_events_mutex_);
+    std::scoped_lock lock(goldfish_events_mutex_);
 
     if (offset == REG_SET_PAGE)
         page_ = static_cast<uint32_t>(value);

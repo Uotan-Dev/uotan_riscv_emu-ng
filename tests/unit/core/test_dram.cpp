@@ -48,7 +48,7 @@ TEST_F(DramTest, AddressValidation) {
     // Invalid addresses beyond size
     EXPECT_FALSE(dram->is_valid_addr(core::Dram::DRAM_BASE + TEST_DRAM_SIZE));
     EXPECT_FALSE(
-        dram->is_valid_addr(core::Dram::DRAM_BASE + TEST_DRAM_SIZE * 2));
+        dram->is_valid_addr(core::Dram::DRAM_BASE + (TEST_DRAM_SIZE * 2)));
 
     // Multi-byte length validation
     EXPECT_TRUE(dram->is_valid_addr(core::Dram::DRAM_BASE, 8));

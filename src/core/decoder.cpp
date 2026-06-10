@@ -30,9 +30,11 @@ struct PatternData {
     uint64_t shift = 0;
 };
 
-static inline constexpr PatternData parse_pattern(std::string_view pattern) {
+static constexpr PatternData parse_pattern(std::string_view pattern) {
     PatternData d{};
-    uint64_t __key = 0, __mask = 0, __shift = 0;
+    uint64_t __key = 0;
+    uint64_t __mask = 0;
+    uint64_t __shift = 0;
 
     for (char c : pattern) {
         if (c != ' ') {
@@ -310,10 +312,10 @@ DecodedInsn Decoder::decode(uint32_t insn, Ilen len, addr_t pc) {
 }
 
 void Decoder::decode_operand_32(DecodedInsn& s) {
-    s.rs1 = bits(s.insn, 19, 15);
-    s.rs2 = bits(s.insn, 24, 20);
-    s.rs3 = bits(s.insn, 31, 27);
-    s.rd = bits(s.insn, 11, 7);
+    s.rs1 = static_cast<int8_t>(bits(s.insn, 19, 15));
+    s.rs2 = static_cast<int8_t>(bits(s.insn, 24, 20));
+    s.rs3 = static_cast<int8_t>(bits(s.insn, 31, 27));
+    s.rd = static_cast<int8_t>(bits(s.insn, 11, 7));
     switch (s.type) {
         case Itype::I: s.imm = sext(bits(s.insn, 31, 20), 12); break;
         case Itype::U: s.imm = sext(bits(s.insn, 31, 12), 20) << 12; break;
@@ -340,15 +342,15 @@ void Decoder::decode_operand_16(DecodedInsn& s) {
 #define REG_C(x) ((x) + 8)
 
     uint32_t i = s.insn;
-    uint8_t funct3, opcode;
+    uint8_t funct3, opcode; // NOLINT(cppcoreguidelines-init-variables)
 
     switch (s.type) {
         case Itype::CR:
-            s.rd = s.rs1 = bits(i, 11, 7);
-            s.rs2 = bits(i, 6, 2);
+            s.rd = s.rs1 = static_cast<int8_t>(bits(i, 11, 7));
+            s.rs2 = static_cast<int8_t>(bits(i, 6, 2));
             break;
         case Itype::CI:
-            s.rd = s.rs1 = bits(i, 11, 7);
+            s.rd = s.rs1 = static_cast<int8_t>(bits(i, 11, 7));
             funct3 = bits(i, 15, 13);
             opcode = bits(i, 1, 0);
             if (opcode == 0b01) {
@@ -389,7 +391,7 @@ void Decoder::decode_operand_16(DecodedInsn& s) {
             break;
         case Itype::CSS:
             s.rs1 = 2; // sp
-            s.rs2 = bits(i, 6, 2);
+            s.rs2 = static_cast<int8_t>(bits(i, 6, 2));
             funct3 = bits(i, 15, 13);
             if (funct3 == 0b110) { // C.SWSP
                 s.imm = bits(i, 8, 7) << 6 | bits(i, 12, 9) << 2;

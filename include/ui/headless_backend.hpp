@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "host/console.hpp"
+#include "ui/host_console.hpp"
 #include "ui/ui_backend.hpp"
 
 namespace uemu::ui {
@@ -24,13 +24,13 @@ namespace uemu::ui {
 class HeadlessBackend : public UIBackend {
 public:
     HeadlessBackend(Endpoints endpoints) : UIBackend(std::move(endpoints)) {
-        host_console_.apply_to_endpoint(*endpoints_.console_endpoint);
+        HostConsole::apply_to_endpoint(*endpoints_.console_endpoint);
     }
 
     void update() override {}
 
 private:
-    host::HostConsole host_console_;
+    HostConsole host_console_;
 };
 
 } // namespace uemu::ui

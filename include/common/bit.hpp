@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <limits>
 #include <type_traits>
+#include <utility>
 
 namespace uemu {
 
@@ -30,7 +31,7 @@ constexpr T bitmask(int bits) {
     if (bits <= 0)
         return 0;
 
-    if (bits >= static_cast<int>(sizeof(T) * 8))
+    if (std::cmp_greater_equal(bits, sizeof(T) * 8))
         return std::numeric_limits<T>::max();
 
     return (T(1) << bits) - 1;

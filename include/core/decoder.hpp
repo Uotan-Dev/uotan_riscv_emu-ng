@@ -136,7 +136,8 @@ enum class Ilen : uint8_t {
 
 class Decoder;
 
-class DecodedInsn {
+class
+    DecodedInsn { // NOLINT(cppcoreguidelines-pro-type-member-init,hicpp-member-init)
 public:
     void operator()(Hart& hart, MMU& mmu) const {
         if (!exec) [[unlikely]]

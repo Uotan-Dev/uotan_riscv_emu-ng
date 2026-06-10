@@ -33,7 +33,7 @@ protected:
 
     std::shared_ptr<device::SimpleFB> fb;
     std::atomic<int> update_count;
-    const uint8_t* last_update_data;
+    const uint8_t* last_update_data{};
 };
 
 TEST_F(SimpleFBTest, SingleByteAccess) {
@@ -43,7 +43,7 @@ TEST_F(SimpleFBTest, SingleByteAccess) {
 
     auto val = fb->read<uint8_t>(base);
     ASSERT_TRUE(val.has_value());
-    EXPECT_EQ(*val, 0xFF);
+    EXPECT_EQ(val.value(), 0xFF);
 }
 
 TEST_F(SimpleFBTest, MultiByteAccess) {
@@ -56,7 +56,7 @@ TEST_F(SimpleFBTest, MultiByteAccess) {
     // Read back
     auto val = fb->read<uint32_t>(base);
     ASSERT_TRUE(val.has_value());
-    EXPECT_EQ(*val, pixel);
+    EXPECT_EQ(val.value(), pixel);
 }
 
 TEST_F(SimpleFBTest, 64BitAccess) {
@@ -69,7 +69,7 @@ TEST_F(SimpleFBTest, 64BitAccess) {
     // Read back
     auto val = fb->read<uint64_t>(base);
     ASSERT_TRUE(val.has_value());
-    EXPECT_EQ(*val, value);
+    EXPECT_EQ(val.value(), value);
 }
 
 TEST_F(SimpleFBTest, OutOfBoundsAccess) {
@@ -99,7 +99,7 @@ TEST_F(SimpleFBTest, UnalignedAccess) {
     // Read back
     auto val = fb->read<uint32_t>(base + 1);
     ASSERT_TRUE(val.has_value());
-    EXPECT_EQ(*val, 0xAABBCCDD);
+    EXPECT_EQ(val.value(), 0xAABBCCDD);
 
     // Verify byte layout (little-endian)
     auto b0 = fb->read<uint8_t>(base + 1);
@@ -109,10 +109,10 @@ TEST_F(SimpleFBTest, UnalignedAccess) {
 
     ASSERT_TRUE(b0.has_value() && b1.has_value() && b2.has_value() &&
                 b3.has_value());
-    EXPECT_EQ(*b0, 0xDD);
-    EXPECT_EQ(*b1, 0xCC);
-    EXPECT_EQ(*b2, 0xBB);
-    EXPECT_EQ(*b3, 0xAA);
+    EXPECT_EQ(b0.value(), 0xDD);
+    EXPECT_EQ(b1.value(), 0xCC);
+    EXPECT_EQ(b2.value(), 0xBB);
+    EXPECT_EQ(b3.value(), 0xAA);
 }
 
 } // namespace uemu::test

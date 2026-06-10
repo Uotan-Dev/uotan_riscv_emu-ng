@@ -24,11 +24,11 @@ class PixelSource {
 public:
     virtual ~PixelSource() = default;
 
-    virtual size_t get_width() const = 0;
-    virtual size_t get_height() const = 0;
-    virtual size_t get_size() const = 0;
+    [[nodiscard]] virtual size_t get_width() const = 0;
+    [[nodiscard]] virtual size_t get_height() const = 0;
+    [[nodiscard]] virtual size_t get_size() const = 0;
 
-    virtual const uint8_t* get_pixels() const = 0;
+    [[nodiscard]] virtual const uint8_t* get_pixels() const = 0;
 
     [[nodiscard]] virtual std::unique_lock<std::mutex> acquire_lock() const = 0;
 };
