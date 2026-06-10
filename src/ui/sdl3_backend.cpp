@@ -137,6 +137,10 @@ void SDL3Backend::update() {
                 break;
             }
 
+            case SDL_EVENT_WINDOW_MOUSE_ENTER: SDL_HideCursor(); break;
+
+            case SDL_EVENT_WINDOW_MOUSE_LEAVE: SDL_ShowCursor(); break;
+
             default: break;
         }
     }
