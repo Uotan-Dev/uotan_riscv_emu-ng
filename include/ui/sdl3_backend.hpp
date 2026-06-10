@@ -18,7 +18,7 @@
 
 #include <SDL3/SDL.h>
 
-#include "host/console.hpp"
+#include "ui/host_console.hpp"
 #include "ui/ui_backend.hpp"
 
 namespace uemu::ui {
@@ -44,7 +44,7 @@ private:
     size_t display_height_ = 0;
     std::vector<uint8_t> pixel_buffer_;
 
-    host::HostConsole host_console_;
+    HostConsole host_console_;
 };
 
 } // namespace uemu::ui

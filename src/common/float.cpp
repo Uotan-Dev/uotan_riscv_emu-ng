@@ -26,8 +26,8 @@ extern "C" {
 namespace uemu {
 
 uint_fast16_t f32_classify(float32_t a) {
-    union ui32_f32 uA;
-    uint_fast32_t uiA;
+    union ui32_f32 uA{};
+    uint_fast32_t uiA; // NOLINT(cppcoreguidelines-init-variables)
 
     uA.f = a;
     uiA = uA.ui;
@@ -51,8 +51,8 @@ uint_fast16_t f32_classify(float32_t a) {
 }
 
 uint_fast16_t f64_classify(float64_t a) {
-    union ui64_f64 uA;
-    uint_fast64_t uiA;
+    union ui64_f64 uA{};
+    uint_fast64_t uiA; // NOLINT(cppcoreguidelines-init-variables)
 
     uA.f = a;
     uiA = uA.ui;

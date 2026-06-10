@@ -70,7 +70,7 @@ SDL3Backend::SDL3Backend(Endpoints endpoints)
         }
     }
 
-    host_console_.apply_to_endpoint(*endpoints_.console_endpoint);
+    HostConsole::apply_to_endpoint(*endpoints_.console_endpoint);
 
     return;
 
@@ -125,7 +125,8 @@ void SDL3Backend::update() {
                 auto linux_code = sdl_scancode_to_linux(event.key.scancode);
                 if (linux_code != KEY_RESERVED && input_sink)
                     input_sink->push_key_event(
-                        {linux_code, InputSink::KeyAction::Press});
+                        {.input_event_code = linux_code,
+                         .action = InputSink::KeyAction::Press});
                 break;
             }
 
@@ -133,7 +134,8 @@ void SDL3Backend::update() {
                 auto linux_code = sdl_scancode_to_linux(event.key.scancode);
                 if (linux_code != KEY_RESERVED && input_sink)
                     input_sink->push_key_event(
-                        {linux_code, InputSink::KeyAction::Release});
+                        {.input_event_code = linux_code,
+                         .action = InputSink::KeyAction::Release});
                 break;
             }
 

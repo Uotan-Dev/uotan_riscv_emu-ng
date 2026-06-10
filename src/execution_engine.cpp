@@ -23,19 +23,13 @@ ExecutionEngine::ExecutionEngine(std::shared_ptr<core::Hart> hart,
                                  std::shared_ptr<core::Bus> bus,
                                  std::shared_ptr<core::MMU> mmu)
     : hart_(std::move(hart)), dram_(std::move(dram)), bus_(std::move(bus)),
-      mmu_(std::move(mmu)) {
-    cpu_thread_running_ = false;
-
-    shutdown_from_guest_ = true;
-    shutdown_code_ = shutdown_status_ = 0;
-
+      mmu_(std::move(mmu)), cpu_thread_running_(false),
+      shutdown_from_guest_(true), shutdown_code_(0), shutdown_status_(0),
+      mcycle_(dynamic_cast<core::MCYCLE*>(
+          hart_->csrs[core::MCYCLE::ADDRESS].get())),
+      minstret_(dynamic_cast<core::MINSTRET*>(
+          hart_->csrs[core::MINSTRET::ADDRESS].get())) {
     shutdown_from_host_.store(false, std::memory_order::relaxed);
-
-    // cache the pointers for faster emulation
-    mcycle_ =
-        dynamic_cast<core::MCYCLE*>(hart_->csrs[core::MCYCLE::ADDRESS].get());
-    minstret_ = dynamic_cast<core::MINSTRET*>(
-        hart_->csrs[core::MINSTRET::ADDRESS].get());
     assert(mcycle_ && minstret_);
 }
 
@@ -72,7 +66,7 @@ void ExecutionEngine::execute_until_halt(std::chrono::milliseconds timeout) {
 
     while (true) {
         {
-            std::lock_guard<std::mutex> lock(cpu_mutex_);
+            std::scoped_lock lock(cpu_mutex_);
             if (!cpu_thread_running_)
                 break;
         }
@@ -117,7 +111,7 @@ void ExecutionEngine::request_shutdown_from_host() noexcept {
 
 void ExecutionEngine::cpu_thread() {
     {
-        std::lock_guard<std::mutex> lock(cpu_mutex_);
+        std::scoped_lock lock(cpu_mutex_);
         cpu_thread_running_ = true;
     }
     cpu_cond_.notify_all();
@@ -181,7 +175,7 @@ void ExecutionEngine::cpu_thread() {
     }
 
     {
-        std::lock_guard<std::mutex> lock(cpu_mutex_);
+        std::scoped_lock lock(cpu_mutex_);
         cpu_thread_running_ = false;
     }
     cpu_cond_.notify_all();

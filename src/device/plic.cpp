@@ -43,7 +43,7 @@ void Plic::set_interrupt_level(uint32_t id, bool lvl) {
     uint32_t id_word = id / 32;
     uint32_t id_mask = 1 << (id % 32);
 
-    std::lock_guard<std::mutex> lock(plic_mutex_);
+    std::scoped_lock lock(plic_mutex_);
 
     if (lvl)
         level_[id_word] |= id_mask;
@@ -84,18 +84,22 @@ std::optional<uint64_t> Plic::read_internal(addr_t offset, size_t size) {
     if (size != 4)
         return std::nullopt;
 
-    std::lock_guard<std::mutex> lock(plic_mutex_);
+    std::scoped_lock lock(plic_mutex_);
 
-    if (PRIORITY_BASE <= offset && offset < PENDING_BASE) {
+    if (PRIORITY_BASE <= offset && offset < PENDING_BASE)
         return priority_read(offset);
-    } else if (PENDING_BASE <= offset && offset < ENABLE_BASE) {
+
+    if (PENDING_BASE <= offset && offset < ENABLE_BASE)
         return pending_read(offset - PENDING_BASE);
-    } else if (ENABLE_BASE <= offset && offset < CONTEXT_BASE) {
+
+    if (ENABLE_BASE <= offset && offset < CONTEXT_BASE) {
         uint32_t cntx = (offset - ENABLE_BASE) / ENABLE_PER_HART;
         offset -= cntx * ENABLE_PER_HART + ENABLE_BASE;
         if (cntx < contexts_.size())
             return context_enable_read(&contexts_[cntx], offset);
-    } else if (CONTEXT_BASE <= offset && offset < SIZE) {
+    }
+
+    if (CONTEXT_BASE <= offset && offset < SIZE) {
         uint32_t cntx = (offset - CONTEXT_BASE) / CONTEXT_PER_HART;
         offset -= cntx * CONTEXT_PER_HART + CONTEXT_BASE;
         if (cntx < contexts_.size())
@@ -113,21 +117,27 @@ bool Plic::write_internal(addr_t offset, size_t size, uint64_t value) {
     if (size != 4)
         return false;
 
-    std::lock_guard<std::mutex> lock(plic_mutex_);
+    std::scoped_lock lock(plic_mutex_);
 
     if (PRIORITY_BASE <= offset && offset < ENABLE_BASE) {
         priority_write(offset, value);
         return true;
-    } else if (ENABLE_BASE <= offset && offset < CONTEXT_BASE) {
+    }
+
+    if (ENABLE_BASE <= offset && offset < CONTEXT_BASE) {
         uint32_t cntx = (offset - ENABLE_BASE) / ENABLE_PER_HART;
         offset -= cntx * ENABLE_PER_HART + ENABLE_BASE;
+
         if (cntx < contexts_.size()) {
             context_enable_write(&contexts_[cntx], offset, value);
             return true;
         }
-    } else if (CONTEXT_BASE <= offset && offset < SIZE) {
+    }
+
+    if (CONTEXT_BASE <= offset && offset < SIZE) {
         uint32_t cntx = (offset - CONTEXT_BASE) / CONTEXT_PER_HART;
         offset -= cntx * CONTEXT_PER_HART + CONTEXT_BASE;
+
         if (cntx < contexts_.size())
             return context_write(&contexts_[cntx], offset, value);
     }
@@ -135,7 +145,7 @@ bool Plic::write_internal(addr_t offset, size_t size, uint64_t value) {
     return false;
 }
 
-uint32_t Plic::context_best_pending(const Context* ctx) {
+uint32_t Plic::context_best_pending(const Context* ctx) const {
     uint8_t best_id_prio = 0;
     uint32_t best_id = 0;
 
@@ -211,7 +221,7 @@ uint32_t Plic::pending_read(reg_t offset) {
     return val;
 }
 
-uint32_t Plic::context_enable_read(const Context* ctx, reg_t offset) {
+uint32_t Plic::context_enable_read(const Context* ctx, reg_t offset) const {
     uint32_t id_word = offset >> 2;
 
     if (id_word < num_ids_word_)
@@ -227,7 +237,7 @@ void Plic::context_enable_write(Context* ctx, reg_t offset, uint32_t val) {
         return;
 
     uint32_t old_val = ctx->enable[id_word];
-    uint32_t new_val = id_word == 0 ? val & ~(uint32_t)1 : val;
+    uint32_t new_val = id_word == 0 ? val & ~static_cast<uint32_t>(1) : val;
 
     ctx->enable[id_word] = new_val;
 

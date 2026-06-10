@@ -185,7 +185,7 @@ private:
 
     // Disk storage
     std::fstream disk_file_;
-    size_t disk_size_;
+    size_t disk_size_ = 0;
     VirtioBlkConfig config_;
 
     std::filesystem::path disk_path_;

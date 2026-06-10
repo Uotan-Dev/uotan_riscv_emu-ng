@@ -21,7 +21,8 @@
 namespace uemu::device {
 
 GoldfishRTC::GoldfishRTC(IrqCallback irq_callback, uint32_t interrupt_id)
-    : IrqDevice("GoldfishRTC", DEFAULT_BASE, SIZE, irq_callback, interrupt_id),
+    : IrqDevice("GoldfishRTC", DEFAULT_BASE, SIZE, std::move(irq_callback),
+                interrupt_id),
       tick_offset_(0), alarm_next_(0), alarm_running_(0), irq_pending_(0),
       irq_enabled_(0), time_high_(0) {
     auto now = std::chrono::system_clock::now();
@@ -31,7 +32,7 @@ GoldfishRTC::GoldfishRTC(IrqCallback irq_callback, uint32_t interrupt_id)
 }
 
 void GoldfishRTC::tick() {
-    std::lock_guard<std::mutex> lock(goldfish_rtc_mutex_);
+    std::scoped_lock lock(goldfish_rtc_mutex_);
 
     if (alarm_running_ && get_count() >= alarm_next_)
         trigger_interrupt();
@@ -55,7 +56,7 @@ std::optional<uint64_t> GoldfishRTC::read_internal(addr_t offset, size_t size) {
     if (size != 4) [[unlikely]]
         return std::nullopt;
 
-    std::lock_guard<std::mutex> lock(goldfish_rtc_mutex_);
+    std::scoped_lock lock(goldfish_rtc_mutex_);
 
     switch (offset) {
         case TIME_LOW: {
@@ -84,7 +85,7 @@ bool GoldfishRTC::write_internal(addr_t offset, size_t size, uint64_t value) {
 
     value &= 0xFFFFFFFF;
 
-    std::lock_guard<std::mutex> lock(goldfish_rtc_mutex_);
+    std::scoped_lock lock(goldfish_rtc_mutex_);
 
     switch (offset) {
         case TIME_LOW: {
@@ -151,7 +152,7 @@ void GoldfishRTC::trigger_interrupt() {
 }
 
 void GoldfishRTC::update_irq() {
-    bool level = (irq_pending_ && irq_enabled_) ? true : false;
+    bool level = irq_pending_ && irq_enabled_;
     IrqDevice::update_irq(level);
 }
 

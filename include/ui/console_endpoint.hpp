@@ -31,10 +31,10 @@ class ConsoleEndpoint {
 public:
     /// Non-blocking read: returns a character, or std::nullopt if none
     /// available.
-    std::function<std::optional<char>(void)> read_char{};
+    std::function<std::optional<char>(void)> read_char;
 
     /// Write a single character to the console output.
-    std::function<void(char)> write_char{};
+    std::function<void(char)> write_char;
 
 protected:
     ConsoleEndpoint() = default;

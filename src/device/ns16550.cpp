@@ -30,13 +30,14 @@ namespace uemu::device {
 
 NS16550::NS16550(IrqCallback irq_callback, uint32_t interrupt_id,
                  uint32_t reg_shift, uint32_t reg_io_width)
-    : IrqDevice("NS16550", DEFAULT_BASE, SIZE, irq_callback, interrupt_id),
+    : IrqDevice("NS16550", DEFAULT_BASE, SIZE, std::move(irq_callback),
+                interrupt_id),
       reg_shift_(reg_shift), reg_io_width_(reg_io_width), dll_(0x0C), dlm_(0),
       iir_(IIR_NO_INT), ier_(0), fcr_(0), lcr_(0), mcr_(MCR_OUT2),
       lsr_(LSR_TEMT | LSR_THRE), msr_(MSR_DCD | MSR_DSR | MSR_CTS), scr_(0) {}
 
 void NS16550::tick() {
-    std::lock_guard<std::mutex> lock(ns16550_mutex_);
+    std::scoped_lock lock(ns16550_mutex_);
 
     if (!(fcr_ & FCR_ENABLE_FIFO) || (mcr_ & MCR_LOOP) ||
         QUEUE_SIZE <= rx_queue_.size())
@@ -55,8 +56,6 @@ void NS16550::tick() {
 }
 
 std::optional<uint64_t> NS16550::read_internal(addr_t offset, size_t size) {
-    uint8_t val;
-
     if (reg_io_width_ != size) [[unlikely]]
         return std::nullopt;
 
@@ -67,13 +66,14 @@ std::optional<uint64_t> NS16550::read_internal(addr_t offset, size_t size) {
     offset &= 7;
 
     {
-        std::lock_guard<std::mutex> lock(ns16550_mutex_);
+        std::scoped_lock lock(ns16550_mutex_);
 
         switch (offset) {
-            case RX:
-                val = (lcr_ & LCR_DLAB) ? dll_ : rx_byte();
+            case RX: {
+                uint8_t val = (lcr_ & LCR_DLAB) ? dll_ : rx_byte();
                 update_interrupt();
                 return val;
+            }
             case IER: return (lcr_ & LCR_DLAB) ? dlm_ : ier_;
             case IIR: return iir_ | IIR_TYPE_BITS;
             case LCR: return lcr_;
@@ -100,7 +100,7 @@ bool NS16550::write_internal(addr_t offset, size_t size, uint64_t value) {
     value &= 0xFF;
 
     {
-        std::lock_guard<std::mutex> lock(ns16550_mutex_);
+        std::scoped_lock lock(ns16550_mutex_);
 
         switch (offset) {
             case TX:

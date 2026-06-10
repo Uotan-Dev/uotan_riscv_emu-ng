@@ -16,6 +16,7 @@
 
 #include <cstring>
 #include <print>
+#include <utility>
 
 #include "utils/elfloader.hpp"
 #include "utils/fileloader.hpp"
@@ -45,7 +46,7 @@ uint64_t ElfLoader::load(const std::filesystem::path& p, core::Dram& dram) {
     const auto* phdr =
         reinterpret_cast<const Elf64_Phdr*>(data.data() + hdr->e_phoff);
 
-    for (int i = 0; i < hdr->e_phnum; i++) {
+    for (int i = 0; std::cmp_less(i, hdr->e_phnum); i++) {
         if (phdr[i].p_type != PT_LOAD)
             continue;
 
@@ -81,7 +82,7 @@ const Elf64_Shdr* ElfLoader::get_section_header(const uint8_t* file_data,
     const char* sh_str_tbl =
         reinterpret_cast<const char*>(file_data + str_sh.sh_offset);
 
-    for (int i = 0; i < hdr->e_shnum; i++) {
+    for (int i = 0; std::cmp_less(i, hdr->e_shnum); i++) {
         const char* sname = &sh_str_tbl[sh_tbl[i].sh_name];
         if (std::strcmp(name, sname) == 0)
             return &sh_tbl[i];

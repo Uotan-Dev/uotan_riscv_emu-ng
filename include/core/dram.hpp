@@ -36,9 +36,10 @@ public:
     Dram(Dram&&) = default;
     Dram& operator=(Dram&&) = default;
 
-    size_t size() const { return size_; }
+    [[nodiscard]] size_t size() const { return size_; }
 
-    inline bool is_valid_addr(addr_t addr, size_t len = 1) const noexcept {
+    [[nodiscard]] bool is_valid_addr(addr_t addr,
+                                     size_t len = 1) const noexcept {
         if (addr < DRAM_BASE) [[unlikely]]
             return false;
 

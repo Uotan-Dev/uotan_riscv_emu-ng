@@ -54,9 +54,11 @@ public:
             load(addr, data.data(), sizeof(T) * data.size());
     }
 
-    uint16_t shutdown_code() const noexcept { return engine_->shutdown_code(); }
+    [[nodiscard]] uint16_t shutdown_code() const noexcept {
+        return engine_->shutdown_code();
+    }
 
-    uint16_t shutdown_status() const noexcept {
+    [[nodiscard]] uint16_t shutdown_status() const noexcept {
         return engine_->shutdown_status();
     }
 

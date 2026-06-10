@@ -84,13 +84,13 @@ private:
     std::optional<uint64_t> read_internal(addr_t offset, size_t size) override;
     bool write_internal(addr_t offset, size_t size, uint64_t value) override;
 
-    uint32_t context_best_pending(const Context* ctx);
+    uint32_t context_best_pending(const Context* ctx) const;
     void context_update(const Context* ctx);
     uint32_t context_claim(Context* ctx);
     uint32_t priority_read(reg_t offset);
     void priority_write(reg_t offset, uint32_t val);
     uint32_t pending_read(reg_t offset);
-    uint32_t context_enable_read(const Context* ctx, reg_t offset);
+    uint32_t context_enable_read(const Context* ctx, reg_t offset) const;
     void context_enable_write(Context* ctx, reg_t offset, uint32_t val);
     uint32_t context_read(Context* ctx, reg_t offset);
     bool context_write(Context* ctx, reg_t offset, uint32_t val);

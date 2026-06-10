@@ -49,7 +49,7 @@ public:
     virtual void update() = 0;
 
 protected:
-    void request_exit() {
+    void request_exit() const {
         if (endpoints_.exit_callback)
             endpoints_.exit_callback();
     }

@@ -101,11 +101,8 @@ public:
         if (dram_->is_valid_addr(addr)) [[likely]]
             return true;
 
-        for (const auto& dev : devices_)
-            if (dev->contains(addr))
-                return true;
-
-        return false;
+        return std::ranges::any_of(
+            devices_, [addr](const auto& dev) { return dev->contains(addr); });
     }
 
     void tick_devices() {
@@ -114,8 +111,7 @@ public:
     }
 
 private:
-    static inline bool check_overlap(addr_t s1, addr_t e1, addr_t s2,
-                                     addr_t e2) {
+    static bool check_overlap(addr_t s1, addr_t e1, addr_t s2, addr_t e2) {
         return std::max(s1, s2) <= std::min(e1, e2);
     }
 

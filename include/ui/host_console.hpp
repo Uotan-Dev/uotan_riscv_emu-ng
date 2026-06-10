@@ -26,7 +26,7 @@
 
 #include "ui/console_endpoint.hpp"
 
-namespace uemu::host {
+namespace uemu::ui {
 
 class HostConsole {
 public:
@@ -34,8 +34,8 @@ public:
 
     ~HostConsole() { restore_mode(); }
 
-    std::optional<char> read_char() const noexcept {
-        unsigned char c;
+    [[nodiscard]] static std::optional<char> read_char() noexcept {
+        unsigned char c; // NOLINT(cppcoreguidelines-init-variables)
         ssize_t nread = ::read(STDIN_FILENO, &c, 1);
 
         if (nread > 0)
@@ -44,14 +44,16 @@ public:
         return std::nullopt;
     }
 
-    void write_char(char ch) const noexcept { ::write(STDOUT_FILENO, &ch, 1); }
+    static void write_char(char ch) noexcept { ::write(STDOUT_FILENO, &ch, 1); }
 
-    void apply_to_endpoint(ui::ConsoleEndpoint& endpoint) const noexcept {
-        endpoint.read_char = [this]() -> std::optional<char> {
-            return this->read_char();
+    static void apply_to_endpoint(ui::ConsoleEndpoint& endpoint) noexcept {
+        endpoint.read_char = []() -> std::optional<char> {
+            return HostConsole::read_char();
         };
 
-        endpoint.write_char = [this](char ch) -> void { this->write_char(ch); };
+        endpoint.write_char = [](char ch) -> void {
+            HostConsole::write_char(ch);
+        };
     }
 
 private:
@@ -77,8 +79,8 @@ private:
         fcntl(STDIN_FILENO, F_SETFL, originalFlags_);
     }
 
-    struct termios originalTermios_;
-    int originalFlags_;
+    struct termios originalTermios_{};
+    int originalFlags_ = 0;
 };
 
-} // namespace uemu::host
+} // namespace uemu::ui

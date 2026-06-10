@@ -16,14 +16,16 @@
 
 #include "device/virtio_blk.hpp"
 
+#include <utility>
+
 namespace uemu::device {
 
 VirtioBlk::VirtioBlk(std::shared_ptr<core::Dram> dram,
                      const std::filesystem::path& disk_path,
                      IrqCallback irq_callback, uint32_t interrupt_id)
-    : IrqDevice("VirtIO-Block", DEFAULT_BASE, SIZE, irq_callback, interrupt_id),
-      dram_(std::move(dram)), disk_path_(disk_path) {
-    std::memset(&config_, 0, sizeof(config_));
+    : IrqDevice("VirtIO-Block", DEFAULT_BASE, SIZE, std::move(irq_callback),
+                interrupt_id),
+      dram_(std::move(dram)), config_{}, disk_path_(disk_path) {
     config_.blk_size = DISK_BLK_SIZE;
 
     if (!open_disk(disk_path_))
@@ -156,7 +158,7 @@ int VirtioBlk::desc_handler(const VirtioBlkQueue& queue, uint16_t desc_idx,
                             uint32_t* plen) {
     VirtqDesc vq_desc[3];
 
-    for (int i = 0; i < 3; i++) {
+    for (auto& i : vq_desc) {
         static_assert(sizeof(VirtqDesc) == sizeof(uint32_t) * 4);
 
         addr_t desc_addr = queue.queue_desc + desc_idx * 16;
@@ -166,8 +168,8 @@ int VirtioBlk::desc_handler(const VirtioBlkQueue& queue, uint16_t desc_idx,
             return -1;
         }
 
-        dram_->read_bytes(desc_addr, &vq_desc[i], sizeof(VirtqDesc));
-        desc_idx = vq_desc[i].next;
+        dram_->read_bytes(desc_addr, &i, sizeof(VirtqDesc));
+        desc_idx = i.next;
     }
 
     if (!(vq_desc[0].flags & VIRTIO_DESC_F_NEXT) ||

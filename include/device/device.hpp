@@ -20,6 +20,7 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include <utility>
 
 #include "common/types.hpp"
 
@@ -37,15 +38,15 @@ public:
     Device(Device&&) = default;
     Device& operator=(Device&&) = default;
 
-    std::string name() const noexcept { return name_; }
+    [[nodiscard]] std::string name() const noexcept { return name_; }
 
-    addr_t start() const noexcept { return start_; }
+    [[nodiscard]] addr_t start() const noexcept { return start_; }
 
-    addr_t end() const noexcept { return end_; }
+    [[nodiscard]] addr_t end() const noexcept { return end_; }
 
-    size_t size() const noexcept { return end_ - start_ + 1; }
+    [[nodiscard]] size_t size() const noexcept { return end_ - start_ + 1; }
 
-    inline bool contains(addr_t addr, size_t len = 1) const noexcept {
+    [[nodiscard]] bool contains(addr_t addr, size_t len = 1) const noexcept {
         if (addr < start_ || addr > end_) [[unlikely]]
             return false;
         if (len > 0 && addr + len - 1 > end_) [[unlikely]]
@@ -113,7 +114,7 @@ public:
 
     explicit IrqDevice(const std::string& name, addr_t start, size_t size,
                        IrqCallback irq_callback, uint32_t interrupt_id)
-        : Device(name, start, size), irq_callback_(irq_callback),
+        : Device(name, start, size), irq_callback_(std::move(irq_callback)),
           interrupt_id_(interrupt_id) {}
 
 protected:

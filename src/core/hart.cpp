@@ -281,15 +281,17 @@ void Hart::check_interrupts() const {
         reg_t bit;
         TrapCause cause;
     } constexpr prio[] = {
-        {MIP::Field::MEIP, TrapCause::MachineExternalInterrupt},
-        {MIP::Field::MSIP, TrapCause::MachineSoftwareInterrupt},
-        {MIP::Field::MTIP, TrapCause::MachineTimerInterrupt},
-        {MIP::Field::SEIP, TrapCause::SupervisorExternalInterrupt},
-        {MIP::Field::SSIP, TrapCause::SupervisorSoftwareInterrupt},
-        {MIP::Field::STIP, TrapCause::SupervisorTimerInterrupt},
+        {.bit = MIP::Field::MEIP, .cause = TrapCause::MachineExternalInterrupt},
+        {.bit = MIP::Field::MSIP, .cause = TrapCause::MachineSoftwareInterrupt},
+        {.bit = MIP::Field::MTIP, .cause = TrapCause::MachineTimerInterrupt},
+        {.bit = MIP::Field::SEIP,
+         .cause = TrapCause::SupervisorExternalInterrupt},
+        {.bit = MIP::Field::SSIP,
+         .cause = TrapCause::SupervisorSoftwareInterrupt},
+        {.bit = MIP::Field::STIP, .cause = TrapCause::SupervisorTimerInterrupt},
     };
 
-    for (auto& p : prio) {
+    for (const auto& p : prio) {
         if (!(pending & p.bit))
             continue;
 

@@ -31,7 +31,8 @@ int main(int argc, char* argv[]) {
 
     std::filesystem::path elf_file;
     std::filesystem::path disk_file;
-    std::filesystem::path flash0_file, flash1_file;
+    std::filesystem::path flash0_file;
+    std::filesystem::path flash1_file;
     size_t dram_size_mb = 512;
     uint64_t timeout_ms = 0;
     bool headless = false;
@@ -51,10 +52,10 @@ int main(int argc, char* argv[]) {
         ->default_val(0);
     app.add_flag("--headless", headless, "Run in headless mode (no UI window)");
 
-    // Parse command line
-    CLI11_PARSE(app, argc, argv);
-
     try {
+        // Parse command line
+        CLI11_PARSE(app, argc, argv);
+
         size_t dram_size = dram_size_mb * 1024 * 1024;
 
         std::println("Initializing emulator...");

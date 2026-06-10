@@ -45,9 +45,13 @@ public:
     void request_shutdown_from_guest(uint16_t code, uint16_t status) noexcept;
     void request_shutdown_from_host() noexcept;
 
-    uint16_t shutdown_code() const noexcept { return shutdown_code_; }
+    [[nodiscard]] uint16_t shutdown_code() const noexcept {
+        return shutdown_code_;
+    }
 
-    uint16_t shutdown_status() const noexcept { return shutdown_status_; }
+    [[nodiscard]] uint16_t shutdown_status() const noexcept {
+        return shutdown_status_;
+    }
 
     core::Hart& get_hart() noexcept { return *hart_.get(); }
 

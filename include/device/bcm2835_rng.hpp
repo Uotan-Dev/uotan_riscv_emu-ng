@@ -32,9 +32,7 @@ public:
     static constexpr addr_t RNG_STATUS = 0x4;
     static constexpr addr_t RNG_DATA = 0x8;
 
-    BCM2835Rng()
-        : Device("BCM2835Rng", DEFAULT_BASE, SIZE), rd_(), gen_(rd_()),
-          rng_ctrl_(0), rng_status_(0) {}
+    BCM2835Rng() : Device("BCM2835Rng", DEFAULT_BASE, SIZE), gen_(rd_()) {}
 
 private:
     std::optional<uint64_t> read_internal(addr_t offset, size_t size) override;
@@ -44,8 +42,8 @@ private:
 
     mutable std::random_device rd_;
     mutable std::mt19937 gen_;
-    uint32_t rng_ctrl_;
-    uint32_t rng_status_;
+    uint32_t rng_ctrl_ = 0;
+    uint32_t rng_status_ = 0;
 };
 
 } // namespace uemu::device
