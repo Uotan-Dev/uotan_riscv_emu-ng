@@ -595,16 +595,22 @@ public:
 
     // For csr instructions
     void write_unchecked(reg_t v) noexcept override {
+        reg_t write_mask = write_mask_;
+
+        if (!(menvcfg_->read_unchecked() & MENVCFG::Field::STCE))
+            write_mask |= Field::STIP;
+
+        write_masked(v, write_mask);
+    }
+
+    // Update only the selected writable bits, preserving hardware-controlled
+    // pending bits even when a CSR shadow (such as SIP) is written.
+    void write_masked(reg_t v, reg_t mask) noexcept {
         reg_t old_val = value_atomic_.load(std::memory_order_relaxed);
-        reg_t new_val; // NOLINT(cppcoreguidelines-init-variables)
+        reg_t new_val;
 
         do {
-            reg_t write_mask = write_mask_;
-
-            if (!(menvcfg_->read_unchecked() & MENVCFG::Field::STCE))
-                write_mask |= Field::STIP;
-
-            new_val = (old_val & ~write_mask) | (v & write_mask);
+            new_val = (old_val & ~mask) | (v & mask);
         } while (!value_atomic_.compare_exchange_weak(
             old_val, new_val, std::memory_order_relaxed));
     }
@@ -928,7 +934,7 @@ public:
         // Only SSIP is writable through SIP, matching Spike's ip_write_mask
         // (MIP_SSIP | MIP_LCOFIP). STIP and SEIP are hardware-controlled
         // from S-mode's perspective.
-        mip_->write_unchecked(v & write_mask_ & mideleg_->read_unchecked());
+        mip_->write_masked(v, write_mask_ & mideleg_->read_unchecked());
     }
 
 private:
