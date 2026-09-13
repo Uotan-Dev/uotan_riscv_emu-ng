@@ -206,7 +206,7 @@
   "platform": {
     "vendorid": 0,
     "archid": 0,
-    "impid": 1,
+    "impid": 16,
     "hartid": 0,
     "cache_block_size_exp": 6,
     "reservation": {
