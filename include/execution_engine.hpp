@@ -19,18 +19,24 @@
 #include <thread>
 
 #include "core/mmu.hpp"
+#include "time_source.hpp"
 #include "ui/ui_backend.hpp"
 
 namespace uemu {
 
 class Emulator;
 
+namespace device {
+class Clint;
+}
+
 class ExecutionEngine {
 public:
     ExecutionEngine(std::shared_ptr<core::Hart> hart,
                     std::shared_ptr<core::Dram> dram,
                     std::shared_ptr<core::Bus> bus,
-                    std::shared_ptr<core::MMU> mmu);
+                    std::shared_ptr<core::MMU> mmu,
+                    std::shared_ptr<device::Clint> clint);
 
     ~ExecutionEngine();
 
@@ -62,12 +68,16 @@ public:
     }
 
 private:
+    static constexpr uint64_t TIMER_INTERLEAVE = 5000;
+
     void cpu_thread();
+    void advance_timer(uint64_t simulation_steps) noexcept;
 
     std::shared_ptr<core::Hart> hart_;
     std::shared_ptr<core::Dram> dram_;
     std::shared_ptr<core::Bus> bus_;
     std::shared_ptr<core::MMU> mmu_;
+    std::shared_ptr<device::Clint> clint_;
 
     std::shared_ptr<ui::UIBackend> ui_backend_;
 
@@ -85,6 +95,9 @@ private:
 
     core::MCYCLE* mcycle_;
     core::MINSTRET* minstret_;
+
+    const bool deterministic_timer_;
+    TimerStepDivider timer_step_divider_;
 };
 
 } // namespace uemu

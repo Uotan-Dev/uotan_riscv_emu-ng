@@ -16,6 +16,8 @@
 
 #include <gtest/gtest.h>
 
+#include <limits>
+
 #include "core/hart.hpp"
 #include "device/clint.hpp"
 
@@ -67,6 +69,51 @@ TEST(ClintTest, MSIPWrite) {
     r = clint.write<uint32_t>(MSIP_ADDR, 0);
     EXPECT_TRUE(r);
     EXPECT_FALSE(mip->read_unchecked() & core::MIP::MSIP);
+}
+
+TEST(ClintTest, DeterministicTimer) {
+    constexpr size_t MTIME_ADDR =
+        device::Clint::DEFAULT_BASE + device::Clint::MTIME_OFFSET;
+    constexpr size_t MTIMECMP_ADDR =
+        device::Clint::DEFAULT_BASE + device::Clint::MTIMECMP_OFFSET;
+
+    auto hart = std::make_shared<core::Hart>();
+    auto* mip = dynamic_cast<core::MIP*>(hart->csrs[core::MIP::ADDRESS].get());
+    auto* menvcfg =
+        dynamic_cast<core::MENVCFG*>(hart->csrs[core::MENVCFG::ADDRESS].get());
+    auto* stimecmp = dynamic_cast<core::STIMECMP*>(
+        hart->csrs[core::STIMECMP::ADDRESS].get());
+    auto* time =
+        dynamic_cast<core::TIME*>(hart->csrs[core::TIME::ADDRESS].get());
+    ASSERT_NE(mip, nullptr);
+    ASSERT_NE(menvcfg, nullptr);
+    ASSERT_NE(stimecmp, nullptr);
+    ASSERT_NE(time, nullptr);
+
+    device::Clint clint(hart, device::Clint::DEFAULT_FREQ,
+                        TimerMode::Deterministic);
+    ASSERT_TRUE(clint.write<uint64_t>(MTIMECMP_ADDR,
+                                      std::numeric_limits<uint64_t>::max()));
+
+    clint.advance_timer(3);
+    EXPECT_EQ(clint.get_mtime(), 3);
+    EXPECT_EQ(time->read_unchecked(), 3);
+
+    ASSERT_TRUE(clint.write<uint64_t>(MTIME_ADDR, 42));
+    clint.advance_timer(1);
+    EXPECT_EQ(clint.get_mtime(), 43);
+
+    ASSERT_TRUE(clint.write<uint64_t>(MTIMECMP_ADDR, 43));
+    EXPECT_NE(mip->read_unchecked() & core::MIP::Field::MTIP, 0);
+    ASSERT_TRUE(clint.write<uint64_t>(MTIMECMP_ADDR,
+                                      std::numeric_limits<uint64_t>::max()));
+    EXPECT_EQ(mip->read_unchecked() & core::MIP::Field::MTIP, 0);
+
+    menvcfg->write_unchecked(core::MENVCFG::Field::STCE);
+    stimecmp->write_unchecked(44);
+    EXPECT_EQ(mip->read_unchecked() & core::MIP::Field::STIP, 0);
+    clint.advance_timer(1);
+    EXPECT_NE(mip->read_unchecked() & core::MIP::Field::STIP, 0);
 }
 
 } // namespace uemu::test
