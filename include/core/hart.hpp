@@ -503,9 +503,11 @@ public:
     void write_unchecked(reg_t v) noexcept override { value_ = v & mask_; }
 
 private:
-    // medeleg[11] (ECALL from M) and medeleg[16] (double trap) are read-only
-    // zero
-    static constexpr reg_t mask_ = ~((1ULL << 11) | (1ULL << 16));
+    // Only exceptions implemented by this hart and possible in a lower
+    // privilege mode may be delegated.  In particular, instruction-address
+    // misaligned (IALIGN=16), ECALL from M, reserved causes, software check,
+    // hardware error, and double trap are read-only zero here.
+    static constexpr reg_t mask_ = 0xB3FE;
 };
 
 class MIDELEG final : public CSR {
