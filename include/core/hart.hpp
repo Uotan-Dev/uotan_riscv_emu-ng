@@ -960,22 +960,26 @@ public:
 
     SIE(Hart* hart)
         : CSR(hart, PrivilegeLevel::S, 0),
-          mie_(dynamic_cast<MIE*>(hart->csrs[MIE::ADDRESS].get())) {
-        assert(mie_);
+          mie_(dynamic_cast<MIE*>(hart->csrs[MIE::ADDRESS].get())),
+          mideleg_(dynamic_cast<MIDELEG*>(hart->csrs[MIDELEG::ADDRESS].get())) {
+        assert(mie_ && mideleg_);
     }
 
     [[nodiscard]] reg_t read_unchecked() const noexcept override {
-        return mie_->read_unchecked() & mask_;
+        return mie_->read_unchecked() & mask_ & mideleg_->read_unchecked();
     }
 
     void write_unchecked(reg_t v) noexcept override {
-        mie_->write_unchecked(v & mask_);
+        const reg_t delegated = mask_ & mideleg_->read_unchecked();
+        const reg_t old_value = mie_->read_unchecked();
+        mie_->write_unchecked((old_value & ~delegated) | (v & delegated));
     }
 
 private:
     static constexpr reg_t mask_ = Field::SSIE | Field::STIE | Field::SEIE;
 
     MIE* mie_;
+    MIDELEG* mideleg_;
 };
 
 class SCOUNTEREN final : public CSR {
