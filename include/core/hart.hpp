@@ -448,6 +448,12 @@ public:
     void write_unchecked(reg_t v) noexcept override {
         v = (value_ & ~write_mask_) | (v & write_mask_);
 
+        // MPP=0b10 is reserved when only M/S/U privilege modes are
+        // implemented.  Legalize the WARL field to U-mode rather than
+        // retaining an invalid privilege encoding.
+        if (((v & Field::MPP) >> Shift::MPP_SHIFT) == 2)
+            v &= ~Field::MPP;
+
         if (((v & Field::FS) >> Shift::FS_SHIFT) == 3)
             v |= Field::SD;
         else
