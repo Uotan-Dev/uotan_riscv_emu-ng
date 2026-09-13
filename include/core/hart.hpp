@@ -766,6 +766,12 @@ public:
 
     MCOUNTEREN(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {}
 
+    [[nodiscard]] reg_t read_unchecked() const noexcept override {
+        return value_ & mask_;
+    }
+
+    void write_unchecked(reg_t v) noexcept override { value_ = v & mask_; }
+
     // Check the availability of the hardware performance-monitoring counters
     // (0xC00 to 0xC1F)
     [[nodiscard]] bool
@@ -778,6 +784,11 @@ public:
 
         return value_ & (1ULL << (csr_addr - 0xC00));
     }
+
+private:
+    // This hart implements only the base cycle, time, and instret counters;
+    // all HPM counter enable fields are WARL read-only zero.
+    static constexpr reg_t mask_ = Field::CY | Field::TM | Field::IR;
 };
 
 class MSCRATCH final : public CSR {
