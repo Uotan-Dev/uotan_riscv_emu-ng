@@ -53,6 +53,7 @@ dkms.conf
 
 .vscode
 build
+build-act4/
 *.bin
 *.dtb
 testbins

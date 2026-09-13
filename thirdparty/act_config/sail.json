@@ -12,6 +12,24 @@
       "len": 32,
       "value": "0x0000_0000"
     },
+    "mcounteren_writable_bits": {
+      "len": 32,
+      "value": "0x0000_0000"
+    },
+    "mtvec": {
+      "direct": { "supported": true, "base_alignment": 2 },
+      "vectored": { "supported": true, "base_alignment": 6 }
+    },
+    "stvec": {
+      "direct": { "supported": true },
+      "vectored": { "supported": true, "base_alignment": 2 }
+    },
+    "medeleg": {
+      "delegatable_bits": { "len": 64, "value": "0x0000_0000_0000_b3FF" }
+    },
+    "mideleg": {
+      "delegatable_bits": { "len": "xlen", "value": "0x0000_0000_0000_0222" }
+    },
     "xtval_nonzero": {
       "illegal_instruction": true,
       "software_breakpoint": true,
@@ -35,9 +53,15 @@
       "xenvcfg_cbie": "Xenvcfg_ClearPermissions",
       "xtvec_mode": "Xtvec_Ignore",
       "rv32zdinx_odd_register": "Zdinx_Illegal"
-    }
+    },
+    "mstatus": {
+      "fs_legal_states": "ExtContext_FourState",
+      "vs_legal_states": "ExtContext_Off"
+    },
+    "privileged_isa_version": "Privileged_ISA_1_12"
   },
   "memory": {
+    "physaddr_bits": 56,
     "pmp": {
       "grain": 0,
       "count": 0,
@@ -55,9 +79,9 @@
           "None": null
         },
         "lrsc": "AccessFault",
-        "amo": "AccessFault"
+        "amo": { "Some": "AccessFault" }
       },
-      "allowed_within_exp": 0,
+      "default_allowed_within_exp": 0,
       "byte_by_byte": false,
       "order_decreasing": false
     },
@@ -94,6 +118,8 @@
             "amo": "AccessFault"
           },
           "atomic_support": "AMONone",
+          "misaligned_atomicity_granule_size_exp": 0,
+          "vector_misaligned_atomicity_granule_size_exp": 0,
           "reservability": "RsrvNone",
           "supports_cbo_zero": false,
           "supports_pte_read": false,
@@ -129,6 +155,8 @@
             "amo": "AccessFault"
           },
           "atomic_support": "AMONone",
+          "misaligned_atomicity_granule_size_exp": 0,
+          "vector_misaligned_atomicity_granule_size_exp": 0,
           "reservability": "RsrvNone",
           "supports_cbo_zero": false,
           "supports_pte_read": false,
@@ -164,6 +192,8 @@
             "amo": "AccessFault"
           },
           "atomic_support": "AMOArithmetic",
+          "misaligned_atomicity_granule_size_exp": 0,
+          "vector_misaligned_atomicity_granule_size_exp": 0,
           "reservability": "RsrvEventual",
           "supports_cbo_zero": false,
           "supports_pte_read": true,
@@ -181,18 +211,22 @@
     "cache_block_size_exp": 6,
     "reservation": {
       "reservation_set_size_exp": 3,
-      "require_exact_reservation_addr": false
+      "require_exact_reservation_addr": false,
+      "invalidate_on_same_hart_store": false
     },
     "clint": {
+      "supported": true,
       "base": 33554432,
       "size": 65536
     },
     "simple_interrupt_generator": {
+      "supported": true,
       "base": 201326592
     },
     "clock_frequency": 10000000,
     "instructions_per_tick": 2,
     "wfi_is_nop": false,
+    "wfi_available_to_user_mode": true,
     "max_time_to_wait": 200
   },
   "extensions": {
@@ -203,7 +237,8 @@
       "supported": true
     },
     "F": {
-      "supported": true
+      "supported": true,
+      "fflags_dirty_policy": "Fflags_Dirty_Precise"
     },
     "D": {
       "supported": true
@@ -212,13 +247,36 @@
       "support_level": "Disabled",
       "vlen_exp": 7,
       "elen_exp": 6,
-      "vl_use_ceil": false
+      "vl_use_ceil": false,
+      "max_index_eew_exp": 6,
+      "reserved_behavior": {
+        "illegal_vtype": "IllegalVtype_SetVill",
+        "vstart_out_of_bounds": "Vstart_Illegal"
+      },
+      "vstart": {
+        "zero_required": { "arith": true, "scalar_move": true }
+      }
     },
     "B": {
       "supported": false
     },
     "S": {
       "supported": true
+    },
+    "Ssnpm": {
+      "supported": false,
+      "supported_pmlen_7": true,
+      "supported_pmlen_16": true
+    },
+    "Smnpm": {
+      "supported": false,
+      "supported_pmlen_7": true,
+      "supported_pmlen_16": true
+    },
+    "Smmpm": {
+      "supported": false,
+      "supported_pmlen_7": true,
+      "supported_pmlen_16": true
     },
     "U": {
       "supported": true
@@ -297,6 +355,9 @@
     },
     "Zalrsc": {
       "supported": true
+    },
+    "Zama16b": {
+      "supported": false
     },
     "Zawrs": {
       "supported": false,
