@@ -22,15 +22,18 @@
 namespace uemu::test {
 
 TEST(ClintTest, MTIMECMPTrigger) {
-    constexpr size_t MTIMECMP_ADDR =
-        device::Clint::DEFAULT_BASE + device::Clint::MTIMECMP_OFFSET;
+    // A 1 kHz timebase keeps the test short.
+    ClintConfig config;
+    config.freq_hz = 1000;
 
     auto hart = std::make_shared<uemu::core::Hart>();
     core::MIP* mip =
         dynamic_cast<core::MIP*>(hart->csrs[core::MIP::ADDRESS].get());
     ASSERT_NE(mip, nullptr);
 
-    device::Clint clint(hart, 1000);
+    device::Clint clint(config, hart);
+
+    const addr_t MTIMECMP_ADDR = clint.start() + device::Clint::MTIMECMP_OFFSET;
 
     std::ignore = clint.write(MTIMECMP_ADDR, 1145141919810ull);
     clint.tick();
@@ -48,15 +51,17 @@ TEST(ClintTest, MTIMECMPTrigger) {
 }
 
 TEST(ClintTest, MSIPWrite) {
-    constexpr size_t MSIP_ADDR =
-        device::Clint::DEFAULT_BASE + device::Clint::MSIP_OFFSET;
+    ClintConfig config;
+    config.freq_hz = 1000;
 
     auto hart = std::make_shared<uemu::core::Hart>();
     core::MIP* mip =
         dynamic_cast<core::MIP*>(hart->csrs[core::MIP::ADDRESS].get());
     ASSERT_NE(mip, nullptr);
 
-    device::Clint clint(hart, 1000);
+    device::Clint clint(config, hart);
+
+    const addr_t MSIP_ADDR = clint.start() + device::Clint::MSIP_OFFSET;
 
     // Write 1 to MSIP
     bool r = clint.write<uint32_t>(MSIP_ADDR, 1);

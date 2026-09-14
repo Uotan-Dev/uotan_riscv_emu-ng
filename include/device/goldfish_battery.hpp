@@ -16,16 +16,13 @@
 
 #pragma once
 
+#include "board_config.hpp"
 #include "device/device.hpp"
 
 namespace uemu::device {
 
 class GoldfishBattery : public IrqDevice {
 public:
-    static constexpr addr_t DEFAULT_BASE = 0x10003000;
-    static constexpr size_t SIZE = 0x1000;
-    static constexpr uint32_t DEFAULT_INTERRUPT_ID = 3;
-
     // Register offsets
     static constexpr addr_t INT_STATUS = 0x00;
     static constexpr addr_t INT_ENABLE = 0x04;
@@ -44,9 +41,8 @@ public:
     static constexpr int POWER_SUPPLY_STATUS_CHARGING = 1;
     static constexpr int POWER_SUPPLY_HEALTH_GOOD = 1;
 
-    GoldfishBattery(IrqCallback irq_callback,
-                    uint32_t interrupt_id = DEFAULT_INTERRUPT_ID,
-                    uint32_t init_capacity = 96);
+    GoldfishBattery(const GoldfishBatteryConfig& config,
+                    IrqCallback irq_callback);
 
 private:
     std::optional<uint64_t> read_internal(addr_t offset, size_t size) override;

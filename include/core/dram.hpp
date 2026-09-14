@@ -29,7 +29,12 @@ class Dram {
 public:
     static constexpr addr_t DRAM_BASE = 0x80000000;
 
-    explicit Dram(size_t size) : mem_(new uint8_t[size]()), size_(size) {}
+    explicit Dram(size_t size) : mem_(new uint8_t[size]()), size_(size) {
+        // An empty DRAM would leave the bus unable to detect devices that
+        // overlap the (empty) memory range.
+        if (size == 0)
+            throw std::invalid_argument("Dram size must not be zero");
+    }
 
     Dram(const Dram&) = delete;
     Dram& operator=(const Dram&) = delete;

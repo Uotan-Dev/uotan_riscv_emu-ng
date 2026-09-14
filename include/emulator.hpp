@@ -25,6 +25,7 @@
 #include <string_view>
 #include <vector>
 
+#include "board_config.hpp"
 #include "common/types.hpp"
 #include "core/cpu.hpp"
 #include "core/device_thread.hpp"
@@ -45,6 +46,9 @@ namespace uemu {
 // The emulated machine: hart, memory, MMU, bus and devices, plus the two
 // worker threads that drive them.
 //
+// The board it builds is described by `config` (see board_config.hpp), which is
+// the single source of truth for the address map and the device parameters.
+//
 // Thread ownership:
 //   * CPU thread    - core::Cpu, guest instruction execution.
 //   * device thread - core::DeviceThread, device progress.
@@ -56,10 +60,7 @@ namespace uemu {
 // single-use.
 class Emulator {
 public:
-    explicit Emulator(size_t dram_size,
-                      const std::filesystem::path& disk_path = "",
-                      const std::filesystem::path& flash0_path = "",
-                      const std::filesystem::path& flash1_path = "");
+    explicit Emulator(const BoardConfig& config);
     ~Emulator();
 
     Emulator(const Emulator&) = delete;

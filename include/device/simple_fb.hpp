@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "board_config.hpp"
 #include "core/framebuffer.hpp"
 #include "device/device.hpp"
 
@@ -23,21 +24,22 @@ namespace uemu::device {
 
 class SimpleFB : public Device, public core::Framebuffer {
 public:
-    static constexpr size_t DEFAULT_WIDTH = 1024;
-    static constexpr size_t DEFAULT_HEIGHT = 768;
     static constexpr size_t BPP = 4; // Bytes per pixel (32-bit color)
 
-    static constexpr addr_t DEFAULT_BASE = 0x50000000;
-    static constexpr size_t SIZE = DEFAULT_WIDTH * DEFAULT_HEIGHT * BPP;
+    // The framebuffer is its geometry: the address window is
+    // width * height * BPP, with no separately reserved size.
+    explicit SimpleFB(const SimpleFBConfig& config)
+        : Device("SimpleFB", config.base, config.width * config.height * BPP),
+          width_(config.width), height_(config.height) {
+        vram_.resize(byte_size());
+    }
 
-    SimpleFB() : Device("SimpleFB", DEFAULT_BASE, SIZE) { vram_.resize(SIZE); }
+    size_t width() const noexcept override { return width_; }
 
-    size_t width() const noexcept override { return DEFAULT_WIDTH; }
-
-    size_t height() const noexcept override { return DEFAULT_HEIGHT; }
+    size_t height() const noexcept override { return height_; }
 
     size_t byte_size() const noexcept override {
-        return DEFAULT_WIDTH * DEFAULT_HEIGHT * BPP;
+        return width_ * height_ * BPP;
     }
 
     const uint8_t* pixels() const override { return vram_.data(); }
@@ -49,6 +51,9 @@ public:
 private:
     std::optional<uint64_t> read_internal(addr_t offset, size_t size) override;
     bool write_internal(addr_t offset, size_t size, uint64_t value) override;
+
+    const size_t width_;
+    const size_t height_;
 
     mutable std::mutex simple_fb_mutex_;
     std::vector<uint8_t> vram_;

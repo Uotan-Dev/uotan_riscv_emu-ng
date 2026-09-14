@@ -23,20 +23,26 @@
  * https://opensource.org/licenses/BSD-3-Clause
  */
 
-#include "device/ns16550.hpp"
+#include <stdexcept>
+
 #include "core/mmu.hpp"
+#include "device/ns16550.hpp"
 
 namespace uemu::device {
 
-NS16550::NS16550(IrqCallback irq_callback, ConsoleChannel& console_channel,
-                 uint32_t interrupt_id, uint32_t reg_shift,
-                 uint32_t reg_io_width)
-    : IrqDevice("NS16550", DEFAULT_BASE, SIZE, std::move(irq_callback),
-                interrupt_id),
-      console_channel_(console_channel), reg_shift_(reg_shift),
-      reg_io_width_(reg_io_width), dll_(0x0C), dlm_(0), iir_(IIR_NO_INT),
+NS16550::NS16550(const NS16550Config& config, IrqCallback irq_callback,
+                 ConsoleChannel& console_channel)
+    : IrqDevice("NS16550", config.base, config.size, std::move(irq_callback),
+                config.interrupt_id),
+      console_channel_(console_channel), reg_shift_(config.reg_shift),
+      reg_io_width_(config.reg_io_width), dll_(0x0C), dlm_(0), iir_(IIR_NO_INT),
       ier_(0), fcr_(0), lcr_(0), mcr_(MCR_OUT2), lsr_(LSR_TEMT | LSR_THRE),
-      msr_(MSR_DCD | MSR_DSR | MSR_CTS), scr_(0) {}
+      msr_(MSR_DCD | MSR_DSR | MSR_CTS), scr_(0) {
+    // Register offsets are shifted right by reg_shift_, which is undefined
+    // once it reaches the width of an offset.
+    if (reg_shift_ >= 64)
+        throw std::invalid_argument("NS16550: reg_shift must be below 64");
+}
 
 void NS16550::tick() {
     std::scoped_lock lock(ns16550_mutex_);

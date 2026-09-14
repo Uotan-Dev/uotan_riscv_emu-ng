@@ -31,11 +31,13 @@ int main(int argc, char* argv[]) {
     CLI::App app{"uemu-ng: RISC-V Emulator"};
     app.set_version_flag("-v,--version", "1.1.0");
 
+    // The board is described once (see board_config.hpp); the options below
+    // only override the fields the user asked for.
+    uemu::BoardConfig config;
+
     std::filesystem::path elf_file;
-    std::filesystem::path disk_file;
-    std::filesystem::path flash0_file;
-    std::filesystem::path flash1_file;
-    size_t dram_size_mb = 512;
+    // The option default is the board's DRAM size, so it stays in one place.
+    size_t dram_size_mb = config.dram.size / (1024 * 1024);
     int64_t timeout_ms = 0;
     bool headless = false;
 
@@ -44,11 +46,11 @@ int main(int argc, char* argv[]) {
         ->required()
         ->check(CLI::ExistingFile);
     app.add_option("-m,--memory", dram_size_mb, "DRAM size in MB")
-        ->default_val(512)
+        ->capture_default_str()
         ->check(CLI::Range(64, 16384));
-    app.add_option("-d,--disk", disk_file, "Disk file to use");
-    app.add_option("--flash0", flash0_file, "Flash0 file to use");
-    app.add_option("--flash1", flash1_file, "Flash1 file to use");
+    app.add_option("-d,--disk", config.virtio_blk.image, "Disk file to use");
+    app.add_option("--flash0", config.flash0.image, "Flash0 file to use");
+    app.add_option("--flash1", config.flash1.image, "Flash1 file to use");
     app.add_option("-t,--timeout", timeout_ms,
                    "Execution timeout in milliseconds (0 = no timeout)")
         ->default_val(0)
@@ -59,17 +61,17 @@ int main(int argc, char* argv[]) {
         // Parse command line
         CLI11_PARSE(app, argc, argv);
 
-        size_t dram_size = dram_size_mb * 1024 * 1024;
+        config.dram.size = dram_size_mb * 1024 * 1024;
 
         uemu::log::info("Initializing emulator...");
         uemu::log::info("  DRAM size: {} MB ({} bytes)", dram_size_mb,
-                        dram_size);
+                        config.dram.size);
         uemu::log::info("  ELF file: {}", elf_file.string());
 
         if (timeout_ms > 0)
             uemu::log::info("  Timeout: {} ms", timeout_ms);
 
-        uemu::Emulator emulator(dram_size, disk_file, flash0_file, flash1_file);
+        uemu::Emulator emulator(config);
 
         emulator.loadelf(elf_file);
 

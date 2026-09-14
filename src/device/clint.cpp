@@ -14,13 +14,19 @@
  * limitations under the License.
  */
 
+#include <stdexcept>
+
 #include "device/clint.hpp"
 
 namespace uemu::device {
 
-Clint::Clint(std::shared_ptr<core::Hart> hart, uint64_t freq_hz)
-    : Device("CLINT", DEFAULT_BASE, SIZE), hart_(std::move(hart)), mtime_(0),
-      mtimecmp_(0), freq_hz_(freq_hz) {
+Clint::Clint(const ClintConfig& config, std::shared_ptr<core::Hart> hart)
+    : Device("CLINT", config.base, config.size), hart_(std::move(hart)),
+      mtime_(0), mtimecmp_(0), freq_hz_(config.freq_hz) {
+    // A zero timebase would freeze mtime at zero and never fire the timer.
+    if (freq_hz_ == 0)
+        throw std::invalid_argument("Clint: freq_hz must not be zero");
+
     start_time_ = std::chrono::steady_clock::now();
     hart_->set_clint(this);
     tick();

@@ -39,10 +39,8 @@
 
 namespace uemu {
 
-Emulator::Emulator(size_t dram_size, const std::filesystem::path& disk,
-                   const std::filesystem::path& flash0_path,
-                   const std::filesystem::path& flash1_path)
-    : dram_(std::make_shared<core::Dram>(dram_size)),
+Emulator::Emulator(const BoardConfig& config)
+    : dram_(std::make_shared<core::Dram>(config.dram.size)),
       hart_(std::make_shared<core::Hart>()),
       bus_(std::make_shared<core::Bus>(dram_)),
       mmu_(std::make_shared<core::MMU>(hart_.get(), bus_)),
@@ -50,13 +48,14 @@ Emulator::Emulator(size_t dram_size, const std::filesystem::path& disk,
     hart_->connect_mmu(mmu_.get());
 
     // Clint
-    bus_->add_device(std::make_shared<device::Clint>(hart_));
+    bus_->add_device(std::make_shared<device::Clint>(config.clint, hart_));
 
     // TestIntrGen — Sail-style simple interrupt generator for ACT tests
-    bus_->add_device(std::make_shared<device::TestIntrGen>(hart_));
+    bus_->add_device(
+        std::make_shared<device::TestIntrGen>(config.test_intr_gen, hart_));
 
     // Plic
-    auto plic = std::make_shared<device::Plic>(hart_);
+    auto plic = std::make_shared<device::Plic>(config.plic, hart_);
     bus_->add_device(plic);
     auto request_irq = [plic](uint32_t id, bool lvl) -> void {
         plic->set_interrupt_level(id, lvl);
@@ -64,52 +63,48 @@ Emulator::Emulator(size_t dram_size, const std::filesystem::path& disk,
 
     // SiFiveTest
     bus_->add_device(std::make_shared<device::SiFiveTest>(
+        config.sifive_test,
         [this](uint16_t code, device::SiFiveTest::Status status) -> void {
             halt_from_guest(code, static_cast<uint16_t>(status));
         }));
 
     // NS16550; console bytes reach the host through the frontend
-    console_ = std::make_shared<device::NS16550>(request_irq, console_channel_);
+    console_ = std::make_shared<device::NS16550>(config.uart, request_irq,
+                                                 console_channel_);
     bus_->add_device(console_);
 
     // SimpleFB
-    framebuffer_ = std::make_shared<device::SimpleFB>();
+    framebuffer_ = std::make_shared<device::SimpleFB>(config.framebuffer);
     bus_->add_device(framebuffer_);
 
-    // VirtioBLK
-    if (!disk.empty())
-        bus_->add_device(
-            std::make_shared<device::VirtioBlk>(dram_, disk, request_irq));
+    // VirtioBLK; absent unless the board names a disk image
+    if (!config.virtio_blk.image.empty())
+        bus_->add_device(std::make_shared<device::VirtioBlk>(
+            config.virtio_blk, dram_, request_irq));
 
-    // pflash_cfi01
-    auto flash0 =
-        std::make_shared<device::PFlashCFI01>(0x20000000, 0x10000, 512);
-    auto flash1 =
-        std::make_shared<device::PFlashCFI01>(0x22000000, 0x10000, 512);
-
-    if (!flash0_path.empty())
-        flash0->load(flash0_path, 0);
-    if (!flash1_path.empty())
-        flash1->load(flash1_path, 0);
-
-    bus_->add_device(flash0);
-    bus_->add_device(flash1);
+    // pflash_cfi01, the two banks of the one cfi-flash node
+    bus_->add_device(std::make_shared<device::PFlashCFI01>(config.flash0));
+    bus_->add_device(std::make_shared<device::PFlashCFI01>(config.flash1));
 
     // GoldfishEvents
-    input_ = std::make_shared<device::GoldfishEvents>(request_irq);
+    input_ =
+        std::make_shared<device::GoldfishEvents>(config.input, request_irq);
     bus_->add_device(input_);
 
     // GoldfishRTC
-    bus_->add_device(std::make_shared<device::GoldfishRTC>(request_irq));
+    bus_->add_device(
+        std::make_shared<device::GoldfishRTC>(config.rtc, request_irq));
 
     // GoldfishBattery
-    bus_->add_device(std::make_shared<device::GoldfishBattery>(request_irq));
+    bus_->add_device(
+        std::make_shared<device::GoldfishBattery>(config.battery, request_irq));
 
     // BCM2835Rng
-    bus_->add_device(std::make_shared<device::BCM2835Rng>());
+    bus_->add_device(std::make_shared<device::BCM2835Rng>(config.rng));
 
     // NemuConsole
-    bus_->add_device(std::make_shared<device::NemuConsole>(console_channel_));
+    bus_->add_device(std::make_shared<device::NemuConsole>(config.nemu_console,
+                                                           console_channel_));
 }
 
 Emulator::~Emulator() {

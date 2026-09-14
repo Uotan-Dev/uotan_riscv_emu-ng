@@ -19,6 +19,7 @@
 #include <cstring>
 #include <functional>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <utility>
 
@@ -29,7 +30,13 @@ namespace uemu::device {
 class Device {
 public:
     explicit Device(const std::string& name, addr_t start, size_t size)
-        : name_(name), start_(start), end_(start + size - 1) {}
+        : name_(name), start_(start), end_(start + size - 1) {
+        // A zero-sized window would wrap end_ below start_ and stop the bus
+        // from detecting that the address range is claimed at all.
+        if (size == 0)
+            throw std::invalid_argument("Device '" + name +
+                                        "' has a zero-sized address window");
+    }
 
     virtual ~Device() = default;
 

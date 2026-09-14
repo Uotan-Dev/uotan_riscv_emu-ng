@@ -29,7 +29,8 @@ namespace uemu::test {
 
 namespace {
 
-constexpr addr_t BASE = device::GoldfishEvents::DEFAULT_BASE;
+constexpr GoldfishEventsConfig EVENTS{};
+constexpr addr_t BASE = EVENTS.base;
 
 struct IrqRecorder {
     bool level = false;
@@ -39,7 +40,7 @@ struct IrqRecorder {
 } // namespace
 
 TEST(GoldfishEventsTest, KeyEventsBecomeInputTriples) {
-    device::GoldfishEvents events([](uint32_t, bool) {});
+    device::GoldfishEvents events(EVENTS, [](uint32_t, bool) {});
 
     events.push_key_event(
         {.code = KEY_A, .action = core::KeyEvent::Action::Press});
@@ -67,7 +68,7 @@ TEST(GoldfishEventsTest, KeyEventsBecomeInputTriples) {
 
 TEST(GoldfishEventsTest, BufferedEventsRaiseIrqWhenTheGuestIsReady) {
     IrqRecorder irq;
-    device::GoldfishEvents events([&irq](uint32_t, bool level) {
+    device::GoldfishEvents events(EVENTS, [&irq](uint32_t, bool level) {
         irq.level = level;
         irq.count++;
     });

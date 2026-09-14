@@ -21,14 +21,15 @@
 
 namespace uemu::device {
 
-PFlashCFI01::PFlashCFI01(addr_t base, uint64_t sector_len, uint32_t num_blocks)
-    : Device("pflash-cfi01", base, sector_len * num_blocks),
-      num_blocks_(num_blocks), sector_len_(sector_len),
-      total_size_(sector_len * num_blocks), bank_width_(4), device_width_(2),
-      max_device_width_(2), ident0_(0x89) /* Intel manufacturer ID */,
-      ident1_(0x18) /* Intel 28F128J3A device ID */, ident2_(0), ident3_(0),
-      cfi_table_{}, wcycle_(0), cmd_(0), status_(0x80), counter_(0),
-      blk_offset_(-1), read_mode_(true) {
+PFlashCFI01::PFlashCFI01(const PFlashConfig& config)
+    : Device("pflash-cfi01", config.base,
+             config.sector_len * config.num_blocks),
+      num_blocks_(config.num_blocks), sector_len_(config.sector_len),
+      total_size_(config.sector_len * config.num_blocks), bank_width_(4),
+      device_width_(2), max_device_width_(2),
+      ident0_(0x89) /* Intel manufacturer ID */,
+      ident1_(0x18) /* Intel 28F128J3A device ID */, cfi_table_{}, wcycle_(0),
+      cmd_(0), status_(0x80), counter_(0), blk_offset_(-1), read_mode_(true) {
     storage_.resize(total_size_, 0xFF);
 
     int num_devices = 2;
@@ -85,6 +86,9 @@ PFlashCFI01::PFlashCFI01(addr_t base, uint64_t sector_len, uint32_t num_blocks)
 
     writeblock_size_ = (1U << cfi_table_[0x2A]) * num_devices;
     blk_bytes_.resize(writeblock_size_);
+
+    if (!config.image.empty())
+        load(config.image, 0);
 }
 
 void PFlashCFI01::load(const std::filesystem::path& path, size_t offset) {

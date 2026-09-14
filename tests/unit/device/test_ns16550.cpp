@@ -25,7 +25,8 @@ namespace uemu::test {
 
 namespace {
 
-constexpr addr_t BASE = device::NS16550::DEFAULT_BASE;
+constexpr NS16550Config UART{};
+constexpr addr_t BASE = UART.base;
 
 struct IrqRecorder {
     uint32_t id = 0;
@@ -37,7 +38,7 @@ struct IrqRecorder {
 
 TEST(NS16550Test, ReceiveRequiresEnabledFifo) {
     device::ConsoleChannel channel;
-    device::NS16550 uart([](uint32_t, bool) {}, channel);
+    device::NS16550 uart(UART, [](uint32_t, bool) {}, channel);
 
     // Without the FIFO the device does not consume host input at all.
     channel.push_input('w');
@@ -66,6 +67,7 @@ TEST(NS16550Test, ReceiveRaisesInterrupt) {
     device::ConsoleChannel channel;
     IrqRecorder irq;
     device::NS16550 uart(
+        UART,
         [&irq](uint32_t id, bool level) {
             irq.id = id;
             irq.level = level;
@@ -84,13 +86,13 @@ TEST(NS16550Test, ReceiveRaisesInterrupt) {
     uart.tick();
 
     EXPECT_EQ(irq.raised, 1u);
-    EXPECT_EQ(irq.id, device::NS16550::DEFAULT_INTERRUPT_ID);
+    EXPECT_EQ(irq.id, UART.interrupt_id);
     EXPECT_TRUE(irq.level);
 }
 
 TEST(NS16550Test, TransmitUsesTheConsoleChannel) {
     device::ConsoleChannel channel;
-    device::NS16550 uart([](uint32_t, bool) {}, channel);
+    device::NS16550 uart(UART, [](uint32_t, bool) {}, channel);
 
     ASSERT_TRUE(uart.write<uint8_t>(BASE + device::NS16550::TX, 'A'));
     ASSERT_TRUE(uart.write<uint8_t>(BASE + device::NS16550::TX, 'B'));

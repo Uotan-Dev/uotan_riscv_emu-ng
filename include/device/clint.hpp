@@ -19,6 +19,7 @@
 #include <chrono>
 #include <mutex>
 
+#include "board_config.hpp"
 #include "core/hart.hpp"
 #include "device/device.hpp"
 
@@ -26,14 +27,11 @@ namespace uemu::device {
 
 class Clint final : public Device {
 public:
-    static constexpr addr_t DEFAULT_BASE = 0x2000000;
-    static constexpr size_t SIZE = 0x10000;            // 64KB
-    static constexpr uint64_t DEFAULT_FREQ = 10000000; // 10 MHz
     static constexpr addr_t MSIP_OFFSET = 0x0;
     static constexpr addr_t MTIMECMP_OFFSET = 0x4000;
     static constexpr addr_t MTIME_OFFSET = 0xBFF8;
 
-    Clint(std::shared_ptr<core::Hart> hart, uint64_t freq_hz = DEFAULT_FREQ);
+    Clint(const ClintConfig& config, std::shared_ptr<core::Hart> hart);
 
     void tick() override;
     uint64_t get_mtime() noexcept;

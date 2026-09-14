@@ -18,13 +18,13 @@
 
 namespace uemu::device {
 
-GoldfishBattery::GoldfishBattery(IrqCallback irq_callback,
-                                 uint32_t interrupt_id, uint32_t init_capacity)
-    : IrqDevice("GoldfishBattery", DEFAULT_BASE, SIZE, std::move(irq_callback),
-                interrupt_id),
+GoldfishBattery::GoldfishBattery(const GoldfishBatteryConfig& config,
+                                 IrqCallback irq_callback)
+    : IrqDevice("GoldfishBattery", config.base, config.size,
+                std::move(irq_callback), config.interrupt_id),
       int_status_(0), int_enable_(0), ac_online_(1),
       status_(POWER_SUPPLY_STATUS_CHARGING), health_(POWER_SUPPLY_HEALTH_GOOD),
-      present_(1), capacity_(init_capacity) {}
+      present_(1), capacity_(config.capacity) {}
 
 std::optional<uint64_t>
 GoldfishBattery::read_internal(addr_t offset, [[maybe_unused]] size_t size) {

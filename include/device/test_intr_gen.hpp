@@ -18,6 +18,7 @@
 
 #include <memory>
 
+#include "board_config.hpp"
 #include "core/hart.hpp"
 #include "device/device.hpp"
 
@@ -28,9 +29,6 @@ namespace uemu::device {
 // setting/clearing external and software interrupts in ACT compliance tests.
 class TestIntrGen final : public Device {
 public:
-    static constexpr addr_t DEFAULT_BASE = 0x40000000;
-    static constexpr size_t SIZE = 0x1000;
-
     // Register offsets (match Sail's SIG_VERSION_OFFSET / SIG_PLATFORM_OFFSET).
     static constexpr addr_t VERSION_OFFSET = 0x0;
     static constexpr addr_t PLATFORM_OFFSET = 0x4;
@@ -50,7 +48,8 @@ public:
     // Mask of all supported interrupt bits.
     static constexpr reg_t INTR_MASK = MEI_BIT | SEI_BIT | MSI_BIT | SSI_BIT;
 
-    explicit TestIntrGen(std::shared_ptr<core::Hart> hart);
+    explicit TestIntrGen(const TestIntrGenConfig& config,
+                         std::shared_ptr<core::Hart> hart);
 
 private:
     std::optional<uint64_t> read_internal(addr_t offset, size_t size) override;

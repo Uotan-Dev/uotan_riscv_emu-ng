@@ -20,12 +20,11 @@
 
 namespace uemu::device {
 
-VirtioBlk::VirtioBlk(std::shared_ptr<core::Dram> dram,
-                     const std::filesystem::path& disk_path,
-                     IrqCallback irq_callback, uint32_t interrupt_id)
-    : IrqDevice("VirtIO-Block", DEFAULT_BASE, SIZE, std::move(irq_callback),
-                interrupt_id),
-      dram_(std::move(dram)), config_{}, disk_path_(disk_path) {
+VirtioBlk::VirtioBlk(const VirtioBlkConfig& config,
+                     std::shared_ptr<core::Dram> dram, IrqCallback irq_callback)
+    : IrqDevice("VirtIO-Block", config.base, config.size,
+                std::move(irq_callback), config.interrupt_id),
+      dram_(std::move(dram)), config_{}, disk_path_(config.image) {
     config_.blk_size = DISK_BLK_SIZE;
 
     if (!open_disk(disk_path_))

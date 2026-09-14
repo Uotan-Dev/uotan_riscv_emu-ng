@@ -28,6 +28,7 @@
 #include <mutex>
 #include <vector>
 
+#include "board_config.hpp"
 #include "core/hart.hpp"
 #include "device/device.hpp"
 
@@ -35,9 +36,6 @@ namespace uemu::device {
 
 class Plic final : public Device {
 public:
-    static constexpr addr_t DEFAULT_BASE = 0xC000000;
-    static constexpr size_t SIZE = 0x1000000;
-
     // Each interrupt source has a priority register associated with it.
     static constexpr addr_t PRIORITY_BASE = 0;
     static constexpr size_t PRIORITY_PER_ID = 4;
@@ -63,7 +61,7 @@ public:
 
     static constexpr size_t PRIO_BITS = 4;
 
-    Plic(std::shared_ptr<core::Hart> hart, uint32_t ndev = 31);
+    Plic(const PlicConfig& config, std::shared_ptr<core::Hart> hart);
 
     void set_interrupt_level(uint32_t id, bool lvl);
 

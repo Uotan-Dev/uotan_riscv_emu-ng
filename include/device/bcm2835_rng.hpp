@@ -18,21 +18,20 @@
 
 #include <random>
 
+#include "board_config.hpp"
 #include "device/device.hpp"
 
 namespace uemu::device {
 
 class BCM2835Rng : public Device {
 public:
-    static constexpr addr_t DEFAULT_BASE = 0x10004000;
-    static constexpr size_t SIZE = 0x10;
-
     // Register offsets
     static constexpr addr_t RNG_CTRL = 0x0;
     static constexpr addr_t RNG_STATUS = 0x4;
     static constexpr addr_t RNG_DATA = 0x8;
 
-    BCM2835Rng() : Device("BCM2835Rng", DEFAULT_BASE, SIZE), gen_(rd_()) {}
+    explicit BCM2835Rng(const Bcm2835RngConfig& config)
+        : Device("BCM2835Rng", config.base, config.size), gen_(rd_()) {}
 
 private:
     std::optional<uint64_t> read_internal(addr_t offset, size_t size) override;

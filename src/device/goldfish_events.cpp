@@ -18,11 +18,11 @@
 
 namespace uemu::device {
 
-GoldfishEvents::GoldfishEvents(IrqCallback irq_callback, uint32_t interrupt_id,
-                               const std::string& device_name)
-    : IrqDevice("GoldfishEvents", DEFAULT_BASE, SIZE, std::move(irq_callback),
-                interrupt_id),
-      device_name_(device_name), page_(0), state_(STATE_INIT), events_{},
+GoldfishEvents::GoldfishEvents(const GoldfishEventsConfig& config,
+                               IrqCallback irq_callback)
+    : IrqDevice("GoldfishEvents", config.base, config.size,
+                std::move(irq_callback), config.interrupt_id),
+      device_name_(config.device_name), page_(0), state_(STATE_INIT), events_{},
       first_(0), last_(0) {
     // Set up event capabilities
     // Enable EV_SYN and EV_KEY

@@ -19,7 +19,7 @@
 namespace uemu::device {
 
 std::optional<uint64_t> SimpleFB::read_internal(addr_t offset, size_t size) {
-    if (size > 8 || offset + size > SIZE) [[unlikely]]
+    if (size > 8 || offset + size > byte_size()) [[unlikely]]
         return std::nullopt;
 
     uint64_t v = 0;
@@ -35,7 +35,7 @@ std::optional<uint64_t> SimpleFB::read_internal(addr_t offset, size_t size) {
 }
 
 bool SimpleFB::write_internal(addr_t offset, size_t size, uint64_t value) {
-    if (size > 8 || offset + size > SIZE) [[unlikely]]
+    if (size > 8 || offset + size > byte_size()) [[unlikely]]
         return false;
 
     {

@@ -24,6 +24,13 @@ namespace uemu::test {
 
 constexpr size_t TEST_DRAM_SIZE = 32 * 1024 * 1024;
 
+// The custom tests all run on the default board with a smaller DRAM.
+BoardConfig test_board() {
+    BoardConfig config;
+    config.dram.size = TEST_DRAM_SIZE;
+    return config;
+}
+
 // Execute a simple program for 64 times
 TEST(CustomISATest, BasicExecution) {
     constexpr size_t REPEAT_TIMES = 64;
@@ -57,7 +64,7 @@ TEST(CustomISATest, BasicExecution) {
     };
 
     for (size_t i = 0; i < REPEAT_TIMES; i++) {
-        Emulator emulator(TEST_DRAM_SIZE);
+        Emulator emulator(test_board());
         emulator.load(core::Dram::DRAM_BASE, firmware);
         emulator.run();
         ASSERT_EQ(emulator.shutdown_code(), 0);
@@ -77,7 +84,7 @@ TEST(CustomISATest, MachineModeException) {
         0x73, 0x10, 0x13, 0x34, 0x73, 0x00, 0x20, 0x30,
     };
 
-    Emulator emulator(TEST_DRAM_SIZE);
+    Emulator emulator(test_board());
 
     emulator.load(core::Dram::DRAM_BASE, firmware);
     emulator.run();
@@ -343,7 +350,7 @@ TEST(CustomISATest, Sv39Test) {
         0x67, 0x45, 0x23, 0x01, 0xef, 0xbe, 0xad, 0xde, 0x00, 0x00, 0x00, 0x00,
     };
 
-    Emulator emulator(TEST_DRAM_SIZE);
+    Emulator emulator(test_board());
 
     emulator.load(core::Dram::DRAM_BASE, firmware);
     emulator.run();

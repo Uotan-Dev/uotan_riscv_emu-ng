@@ -29,7 +29,9 @@ constexpr size_t TEST_DRAM_SIZE = 32 * 1024 * 1024;
 
 void test_file(const std::string& file, std::vector<std::string>& failed,
                uint16_t expected_status, uint16_t expected_code) {
-    Emulator emulator(TEST_DRAM_SIZE);
+    BoardConfig config;
+    config.dram.size = TEST_DRAM_SIZE;
+    Emulator emulator(config);
 
     try {
         std::filesystem::path test_path = RISCV_TEST_DIR;

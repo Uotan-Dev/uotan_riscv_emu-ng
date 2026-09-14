@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "board_config.hpp"
 #include "device/console_channel.hpp"
 #include "device/device.hpp"
 
@@ -23,11 +24,9 @@ namespace uemu::device {
 
 class NemuConsole : public Device {
 public:
-    static constexpr size_t DEFAULT_BASE = 0x10008000;
-    static constexpr size_t SIZE = 8;
-
-    explicit NemuConsole(ConsoleChannel& console_channel)
-        : Device("NemuConsole", DEFAULT_BASE, SIZE),
+    explicit NemuConsole(const NemuConsoleConfig& config,
+                         ConsoleChannel& console_channel)
+        : Device("NemuConsole", config.base, config.size),
           console_channel_(console_channel) {}
 
 private:

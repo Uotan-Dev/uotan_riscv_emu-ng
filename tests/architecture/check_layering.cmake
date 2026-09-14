@@ -26,7 +26,11 @@ endif()
 set(_layers "include/core" "include/device" "src/core" "src/device")
 
 # Core-side files that live outside those directories.
-set(_extra_files "include/emulator.hpp" "src/emulator.cpp")
+set(_extra_files
+    "include/board_config.hpp"
+    "include/emulator.hpp"
+    "src/emulator.cpp"
+)
 
 # Host-only headers the core must not include.
 set(_forbidden_includes

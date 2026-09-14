@@ -18,8 +18,9 @@
 
 namespace uemu::device {
 
-TestIntrGen::TestIntrGen(std::shared_ptr<core::Hart> hart)
-    : Device("TestIntrGen", DEFAULT_BASE, SIZE), hart_(std::move(hart)) {}
+TestIntrGen::TestIntrGen(const TestIntrGenConfig& config,
+                         std::shared_ptr<core::Hart> hart)
+    : Device("TestIntrGen", config.base, config.size), hart_(std::move(hart)) {}
 
 std::optional<uint64_t> TestIntrGen::read_internal(addr_t offset, size_t size) {
     // Sail SIG only supports 4-byte aligned accesses.

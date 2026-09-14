@@ -18,6 +18,7 @@
 
 #include <filesystem>
 
+#include "board_config.hpp"
 #include "device/device.hpp"
 
 namespace uemu::device {
@@ -26,8 +27,11 @@ class PFlashCFI01 : public Device {
 public:
     static constexpr size_t CFI_TABLE_SIZE = 0x52;
 
-    PFlashCFI01(addr_t base, uint64_t sector_len, uint32_t num_blocks);
+    // Loads config.image into offset 0 when it names a file; an empty image
+    // leaves the bank erased (0xff).
+    explicit PFlashCFI01(const PFlashConfig& config);
 
+    // Load a flash image; throws when the file does not fit in the bank.
     void load(const std::filesystem::path& path, size_t offset);
 
 private:
@@ -52,8 +56,6 @@ private:
     uint8_t max_device_width_; // Max width device supports
     uint16_t ident0_;          // Manufacturer ID (Intel = 0x89)
     uint16_t ident1_;          // Device ID
-    uint16_t ident2_;          // Additional ID
-    uint16_t ident3_;          // Additional ID
 
     // Flash storage
     std::vector<uint8_t> storage_;

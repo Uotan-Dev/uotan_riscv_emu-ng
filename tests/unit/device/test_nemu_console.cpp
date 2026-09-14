@@ -22,12 +22,14 @@
 namespace uemu::test {
 
 TEST(NemuConsoleTest, BasicTest) {
+    constexpr NemuConsoleConfig CONSOLE{};
+
     device::ConsoleChannel channel;
-    device::NemuConsole console(channel);
+    device::NemuConsole console(CONSOLE, channel);
 
     std::string in = "Hello, uemu-ng";
     for (char c : in) {
-        bool r = console.write(device::NemuConsole::DEFAULT_BASE, c);
+        bool r = console.write(CONSOLE.base, c);
         ASSERT_TRUE(r);
     }
 

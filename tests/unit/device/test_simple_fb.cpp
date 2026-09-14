@@ -26,7 +26,7 @@ protected:
         update_count = 0;
         last_update_data = nullptr;
 
-        fb = std::make_shared<device::SimpleFB>();
+        fb = std::make_shared<device::SimpleFB>(SimpleFBConfig{});
     }
 
     void TearDown() override { fb.reset(); }

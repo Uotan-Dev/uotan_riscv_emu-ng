@@ -18,6 +18,7 @@
 
 #include <mutex>
 
+#include "board_config.hpp"
 #include "core/input.hpp"
 #include "device/device.hpp"
 
@@ -29,10 +30,6 @@ namespace uemu::device {
 
 class GoldfishEvents : public IrqDevice {
 public:
-    static constexpr addr_t DEFAULT_BASE = 0x10002000;
-    static constexpr size_t SIZE = 0x1000;
-    static constexpr uint32_t DEFAULT_INTERRUPT_ID = 2;
-
     // Register offsets
     static constexpr addr_t REG_READ = 0x00;
     static constexpr addr_t REG_SET_PAGE = 0x00;
@@ -47,9 +44,8 @@ public:
     // Maximum events in queue
     static constexpr size_t MAX_EVENTS = 256 * 4;
 
-    GoldfishEvents(IrqCallback irq_callback,
-                   uint32_t interrupt_id = DEFAULT_INTERRUPT_ID,
-                   const std::string& device_name = "qwerty2");
+    GoldfishEvents(const GoldfishEventsConfig& config,
+                   IrqCallback irq_callback);
 
     void push_key_event(core::KeyEvent event);
 

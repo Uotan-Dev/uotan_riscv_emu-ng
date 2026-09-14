@@ -18,16 +18,13 @@
 
 #include <mutex>
 
+#include "board_config.hpp"
 #include "device/device.hpp"
 
 namespace uemu::device {
 
 class GoldfishRTC : public IrqDevice {
 public:
-    static constexpr addr_t DEFAULT_BASE = 0x101000;
-    static constexpr size_t SIZE = 0x100;
-    static constexpr uint32_t DEFAULT_INTERRUPT_ID = 11;
-
     // Register offsets
     static constexpr addr_t TIME_LOW = 0x00;
     static constexpr addr_t TIME_HIGH = 0x04;
@@ -38,8 +35,7 @@ public:
     static constexpr addr_t ALARM_STATUS = 0x18;
     static constexpr addr_t CLEAR_INTERRUPT = 0x1c;
 
-    GoldfishRTC(IrqCallback irq_callback,
-                uint32_t interrupt_id = DEFAULT_INTERRUPT_ID);
+    GoldfishRTC(const GoldfishRtcConfig& config, IrqCallback irq_callback);
 
     void tick() override;
 

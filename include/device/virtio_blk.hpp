@@ -19,6 +19,7 @@
 #include <filesystem>
 #include <fstream>
 
+#include "board_config.hpp"
 #include "core/dram.hpp"
 #include "device/device.hpp"
 
@@ -90,7 +91,9 @@ struct VirtqDesc {
     uint16_t next;
 };
 
-struct VirtioBlkConfig {
+// The guest-visible virtio-blk configuration space (virtio spec 5.2.4), served
+// verbatim over the MMIO config region.
+struct VirtioBlkConfigSpace {
     uint64_t capacity;
     uint32_t size_max;
     uint32_t seg_max;
@@ -141,13 +144,8 @@ struct VirtioBlkQueue {
 
 class VirtioBlk : public IrqDevice {
 public:
-    static constexpr addr_t DEFAULT_BASE = 0x10001000;
-    static constexpr size_t SIZE = 0x1000;
-    static constexpr uint32_t DEFAULT_INTERRUPT_ID = 12;
-
-    VirtioBlk(std::shared_ptr<core::Dram> dram,
-              const std::filesystem::path& disk_path, IrqCallback irq_callback,
-              uint32_t interrupt_id = DEFAULT_INTERRUPT_ID);
+    VirtioBlk(const VirtioBlkConfig& config, std::shared_ptr<core::Dram> dram,
+              IrqCallback irq_callback);
 
     VirtioBlk(const VirtioBlk&) = delete;
     VirtioBlk& operator=(const VirtioBlk&) = delete;
@@ -186,7 +184,7 @@ private:
     // Disk storage
     std::fstream disk_file_;
     size_t disk_size_ = 0;
-    VirtioBlkConfig config_;
+    VirtioBlkConfigSpace config_;
 
     std::filesystem::path disk_path_;
 };

@@ -20,9 +20,10 @@
 
 namespace uemu::device {
 
-GoldfishRTC::GoldfishRTC(IrqCallback irq_callback, uint32_t interrupt_id)
-    : IrqDevice("GoldfishRTC", DEFAULT_BASE, SIZE, std::move(irq_callback),
-                interrupt_id),
+GoldfishRTC::GoldfishRTC(const GoldfishRtcConfig& config,
+                         IrqCallback irq_callback)
+    : IrqDevice("GoldfishRTC", config.base, config.size,
+                std::move(irq_callback), config.interrupt_id),
       tick_offset_(0), alarm_next_(0), alarm_running_(0), irq_pending_(0),
       irq_enabled_(0), time_high_(0) {
     auto now = std::chrono::system_clock::now();

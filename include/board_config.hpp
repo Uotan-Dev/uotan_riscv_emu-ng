@@ -1,0 +1,150 @@
+/*
+ * Copyright 2025-2026 Nuo Shen, Nanjing University
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#pragma once
+
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <string>
+
+#include "common/types.hpp"
+
+namespace uemu {
+
+// The virtual board: where every device sits and how it is parameterised.
+// Emulator turns this into runtime devices, and a device tree generator can
+// describe the same machine from the same values, so the defaults below are the
+// board's single source of truth.
+//
+// Every default is the guest-visible machine ABI documented in README.md and
+// misc/uemu.dts; changing one changes what firmware sees.  A device keeps what
+// its own protocol defines (register offsets, bit fields, virtio constants) and
+// only reads its placement and parameters from here.
+//
+// DRAM itself lives at the architectural address core::Dram::DRAM_BASE, which
+// is also the hart's reset PC, so the board only chooses its size.
+
+struct DramConfig {
+    size_t size = 512 * 1024 * 1024;
+};
+
+struct NS16550Config {
+    addr_t base = 0x10000000; // uart@10000000, "ns16550a"
+    size_t size = 0x100;
+    uint32_t interrupt_id = 10;
+    uint32_t reg_shift = 0;
+    uint32_t reg_io_width = 1;
+};
+
+struct ClintConfig {
+    addr_t base = 0x2000000; // clint@2000000, "riscv,clint0"
+    size_t size = 0x10000;
+    uint64_t freq_hz = 10000000; // timebase-frequency
+};
+
+struct PlicConfig {
+    addr_t base = 0xc000000; // interrupt-controller@c000000, "riscv,plic0"
+    size_t size = 0x1000000;
+    uint32_t ndev = 31; // riscv,ndev
+};
+
+struct PFlashConfig {
+    addr_t base = 0x20000000;      // flash@20000000, "cfi-flash"
+    uint64_t sector_len = 0x10000; // 64 KiB sectors
+    uint32_t num_blocks = 512;     // 512 * 64 KiB = 32 MiB
+    std::filesystem::path image;   // empty: an erased (0xff) bank
+};
+
+struct SimpleFBConfig {
+    // The window is width * height * SimpleFB::BPP; the geometry is the
+    // framebuffer, there is no separate reserved size to disagree with.
+    addr_t base = 0x50000000; // frame-buffer@50000000, "simple-framebuffer"
+    size_t width = 1024;
+    size_t height = 768;
+};
+
+struct VirtioBlkConfig {
+    addr_t base = 0x10001000; // virtio_blk@10001000, "virtio,mmio"
+    size_t size = 0x1000;
+    uint32_t interrupt_id = 12;
+    std::filesystem::path image; // empty: no block device
+};
+
+struct GoldfishRtcConfig {
+    addr_t base = 0x101000; // rtc@101000, "google,goldfish-rtc"
+    size_t size = 0x100;
+    uint32_t interrupt_id = 11;
+};
+
+struct GoldfishEventsConfig {
+    addr_t base = 0x10002000; // events@10002000
+    size_t size = 0x1000;
+    uint32_t interrupt_id = 2;
+    std::string device_name = "qwerty2"; // reported to the guest
+};
+
+struct GoldfishBatteryConfig {
+    addr_t base = 0x10003000; // goldfish_battery@10003000
+    size_t size = 0x1000;
+    uint32_t interrupt_id = 3;
+    uint32_t capacity = 96;
+};
+
+struct Bcm2835RngConfig {
+    addr_t base = 0x10004000; // rng@10004000, "brcm,bcm2835-rng"
+    size_t size = 0x10;
+};
+
+struct NemuConsoleConfig {
+    addr_t base = 0x10008000; // Debug console, see NEMU
+    size_t size = 8;
+};
+
+struct SiFiveTestConfig {
+    addr_t base = 0x100000; // sifive_test@100000, "sifive,test1"
+    size_t size = 0x1000;
+};
+
+struct TestIntrGenConfig {
+    addr_t base = 0x40000000; // Sail-style interrupt generator, ACT tests only
+    size_t size = 0x1000;
+};
+
+// The default uemu-ng board.
+struct BoardConfig {
+    DramConfig dram;
+    NS16550Config uart;
+    ClintConfig clint;
+    PlicConfig plic;
+    PFlashConfig flash0;
+    PFlashConfig flash1;
+    SimpleFBConfig framebuffer;
+    VirtioBlkConfig virtio_blk;
+    GoldfishRtcConfig rtc;
+    GoldfishEventsConfig input;
+    GoldfishBatteryConfig battery;
+    Bcm2835RngConfig rng;
+    NemuConsoleConfig nemu_console;
+    SiFiveTestConfig sifive_test;
+    TestIntrGenConfig test_intr_gen;
+
+    // flash0/flash1 are the two 32 MiB banks of one cfi-flash node: they share
+    // the geometry above and differ only in the window the board wires them to.
+    BoardConfig() { flash1.base = 0x22000000; }
+};
+
+} // namespace uemu

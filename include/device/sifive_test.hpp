@@ -19,21 +19,19 @@
 #include <functional>
 #include <utility>
 
+#include "board_config.hpp"
 #include "device/device.hpp"
 
 namespace uemu::device {
 
 class SiFiveTest : public Device {
 public:
-    static constexpr addr_t DEFAULT_BASE = 0x100000;
-    static constexpr size_t SIZE = 0x1000;
-
     enum Status : uint16_t { FAIL = 0x3333, PASS = 0x5555, RESET = 0x7777 };
 
     using ShutdownCallback = std::function<void(int, Status)>;
 
-    SiFiveTest(ShutdownCallback on_shutdown)
-        : Device("SiFiveTest", DEFAULT_BASE, SIZE),
+    SiFiveTest(const SiFiveTestConfig& config, ShutdownCallback on_shutdown)
+        : Device("SiFiveTest", config.base, config.size),
           on_shutdown_(std::move(on_shutdown)) {}
 
 private:

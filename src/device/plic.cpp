@@ -23,14 +23,22 @@
  * https://opensource.org/licenses/BSD-3-Clause
  */
 
+#include <stdexcept>
+
 #include "device/plic.hpp"
 
 namespace uemu::device {
 
-Plic::Plic(std::shared_ptr<core::Hart> hart, uint32_t ndev)
-    : Device("PLIC", DEFAULT_BASE, SIZE), hart_(std::move(hart)),
-      num_ids_(ndev + 1), num_ids_word_(((ndev + 1) + (32 - 1)) / 32),
+Plic::Plic(const PlicConfig& config, std::shared_ptr<core::Hart> hart)
+    : Device("PLIC", config.base, config.size), hart_(std::move(hart)),
+      num_ids_(config.ndev + 1),
+      num_ids_word_(((config.ndev + 1) + (32 - 1)) / 32),
       max_prio_((1u << PRIO_BITS) - 1), priority_{}, level_{} {
+    // priority_/pending_priority are MAX_DEVICES entries and are indexed by
+    // interrupt id, which set_interrupt_level() bounds with num_ids_.
+    if (config.ndev >= MAX_DEVICES)
+        throw std::invalid_argument("Plic: ndev must be below MAX_DEVICES");
+
     contexts_.emplace_back(hart_.get(), true);
     contexts_.emplace_back(hart_.get(), false);
 }
@@ -99,7 +107,8 @@ std::optional<uint64_t> Plic::read_internal(addr_t offset, size_t size) {
             return context_enable_read(&contexts_[cntx], offset);
     }
 
-    if (CONTEXT_BASE <= offset && offset < SIZE) {
+    // this->size(): the access-size parameter above shadows Device::size().
+    if (CONTEXT_BASE <= offset && offset < this->size()) {
         uint32_t cntx = (offset - CONTEXT_BASE) / CONTEXT_PER_HART;
         offset -= cntx * CONTEXT_PER_HART + CONTEXT_BASE;
         if (cntx < contexts_.size())
@@ -134,7 +143,8 @@ bool Plic::write_internal(addr_t offset, size_t size, uint64_t value) {
         }
     }
 
-    if (CONTEXT_BASE <= offset && offset < SIZE) {
+    // this->size(): the access-size parameter above shadows Device::size().
+    if (CONTEXT_BASE <= offset && offset < this->size()) {
         uint32_t cntx = (offset - CONTEXT_BASE) / CONTEXT_PER_HART;
         offset -= cntx * CONTEXT_PER_HART + CONTEXT_BASE;
 

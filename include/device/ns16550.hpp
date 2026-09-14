@@ -26,6 +26,7 @@
 #include <mutex>
 #include <queue>
 
+#include "board_config.hpp"
 #include "device/console_channel.hpp"
 #include "device/device.hpp"
 
@@ -35,13 +36,6 @@ namespace uemu::device {
 
 class NS16550 : public IrqDevice {
 public:
-    static constexpr addr_t DEFAULT_BASE = 0x10000000;
-    static constexpr size_t SIZE = 0x100;
-    static constexpr uint32_t DEFAULT_INTERRUPT_ID = 10;
-
-    static constexpr uint32_t DEFAULT_REG_SHIFT = 0;
-    static constexpr uint32_t DEFAULT_REG_IO_WIDTH = 1;
-
     static constexpr size_t QUEUE_SIZE = 64;
 
     static constexpr uint8_t RX = 0;  // Receive buffer (R)
@@ -117,10 +111,8 @@ public:
 
     // Guest console bytes are exchanged through `console_channel`; the device
     // never performs host I/O itself.
-    explicit NS16550(IrqCallback irq_callback, ConsoleChannel& console_channel,
-                     uint32_t interrupt_id = DEFAULT_INTERRUPT_ID,
-                     uint32_t reg_shift = DEFAULT_REG_SHIFT,
-                     uint32_t reg_io_width = DEFAULT_REG_IO_WIDTH);
+    explicit NS16550(const NS16550Config& config, IrqCallback irq_callback,
+                     ConsoleChannel& console_channel);
 
     void tick() override;
 
