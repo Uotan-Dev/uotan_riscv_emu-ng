@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#include <print>
 #include <stdexcept>
 #include <thread>
 
+#include "common/log.hpp"
 #include "core/mmu.hpp"
 #include "device/bcm2835_rng.hpp"
 #include "device/clint.hpp"
@@ -64,8 +64,6 @@ Emulator::Emulator(size_t dram_size, const std::filesystem::path& disk,
     // SiFiveTest
     bus_->add_device(std::make_shared<device::SiFiveTest>(
         [this](uint16_t code, device::SiFiveTest::Status status) -> void {
-            std::println("Emulator shutdown with code 0x{:x} and status 0x{:x}",
-                         code, static_cast<uint16_t>(status));
             halt_from_guest(code, static_cast<uint16_t>(status));
         }));
 
@@ -194,9 +192,9 @@ void Emulator::loadelf(const std::filesystem::path& path) {
     addr_t pc = utils::ElfLoader::load(path, *dram_);
 
     hart_->pc = pc;
-    std::println("ELF loaded: {}\n"
-                 "      entry PC = 0x{:016x}",
-                 path.string(), pc);
+    log::info("ELF loaded: {}\n"
+              "      entry PC = 0x{:016x}",
+              path.string(), pc);
 }
 
 void Emulator::load(addr_t addr, const void* p, size_t n) {

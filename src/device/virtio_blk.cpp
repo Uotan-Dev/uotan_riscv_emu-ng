@@ -87,8 +87,6 @@ void VirtioBlk::set_fail() {
         interrupt_status_ |= VIRTIO_INT_CONF_CHANGE;
         update_irq(true);
     }
-
-    // std::println(std::cerr, "fail");
 }
 
 void VirtioBlk::update_status(uint32_t status) {

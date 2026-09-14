@@ -18,10 +18,10 @@
 
 #include <algorithm>
 #include <format>
-#include <print>
 #include <stdexcept>
 #include <vector>
 
+#include "common/log.hpp"
 #include "core/dram.hpp"
 #include "device/device.hpp"
 
@@ -58,8 +58,8 @@ public:
             }
         }
 
-        std::println("Bus: Add device '{}' [{:#x}-{:#x}]", dev->name(),
-                     dev->start(), dev->end());
+        log::info("Bus: Add device '{}' [{:#x}-{:#x}]", dev->name(),
+                  dev->start(), dev->end());
 
         devices_.push_back(std::move(dev));
     }

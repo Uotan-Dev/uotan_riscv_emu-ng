@@ -16,9 +16,9 @@
 
 #include <chrono>
 #include <exception>
-#include <print>
 #include <thread>
 
+#include "common/log.hpp"
 #include "emulator.hpp"
 #include "frontend/frontend.hpp"
 
@@ -32,8 +32,8 @@ void Frontend::run(std::chrono::milliseconds timeout) {
 
     while (!emulator_.finished()) {
         if (timed && std::chrono::steady_clock::now() >= deadline) {
-            std::println("Execution timeout reached ({} ms), shutting down...",
-                         timeout.count());
+            log::warn("Execution timeout reached ({} ms), shutting down...",
+                      timeout.count());
             break;
         }
 
@@ -61,6 +61,10 @@ void Frontend::run(std::chrono::milliseconds timeout) {
 
     if (error)
         std::rethrow_exception(error);
+
+    // The frontend owns user-facing reporting of the run outcome.
+    log::info("Emulator shutdown with code 0x{:x} and status 0x{:x}",
+              emulator_.shutdown_code(), emulator_.shutdown_status());
 }
 
 } // namespace uemu::frontend

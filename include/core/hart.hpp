@@ -243,8 +243,7 @@ protected:
 // checked path will raise an exception (typically Illegal Instruction).
 class UnimplementedCSR final : public CSR {
 public:
-    UnimplementedCSR(Hart* hart, size_t address, bool trace)
-        : CSR(hart, PrivilegeLevel::M, 0), address_(address), trace_(trace) {}
+    explicit UnimplementedCSR(Hart* hart) : CSR(hart, PrivilegeLevel::M, 0) {}
 
     [[nodiscard]] reg_t read_unchecked() const noexcept override { return 0; }
 
@@ -253,10 +252,6 @@ public:
     [[noreturn]] reg_t read_checked(const DecodedInsn& insn) const override;
 
     [[noreturn]] void write_checked(const DecodedInsn& insn, reg_t v) override;
-
-private:
-    size_t address_;
-    bool trace_;
 };
 
 // Read-only CSR. Writes to this CSR via the checked path will raise an

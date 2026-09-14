@@ -16,12 +16,12 @@
 
 #include <cstdlib>
 #include <filesystem>
-#include <print>
 
 #include <SDL3/SDL_main.h>
 
 #include <CLI/CLI.hpp>
 
+#include "common/log.hpp"
 #include "emulator.hpp"
 #include "frontend/headless_frontend.hpp"
 #include "frontend/sdl3_frontend.hpp"
@@ -59,12 +59,13 @@ int main(int argc, char* argv[]) {
 
         size_t dram_size = dram_size_mb * 1024 * 1024;
 
-        std::println("Initializing emulator...");
-        std::println("  DRAM size: {} MB ({} bytes)", dram_size_mb, dram_size);
-        std::println("  ELF file: {}", elf_file.string());
+        uemu::log::info("Initializing emulator...");
+        uemu::log::info("  DRAM size: {} MB ({} bytes)", dram_size_mb,
+                        dram_size);
+        uemu::log::info("  ELF file: {}", elf_file.string());
 
         if (timeout_ms > 0)
-            std::println("  Timeout: {} ms", timeout_ms);
+            uemu::log::info("  Timeout: {} ms", timeout_ms);
 
         uemu::Emulator emulator(dram_size, disk_file, flash0_file, flash1_file);
 
@@ -78,13 +79,13 @@ int main(int argc, char* argv[]) {
             frontend.run(std::chrono::milliseconds(timeout_ms));
         }
     } catch (const std::runtime_error& e) {
-        std::println(stderr, "Runtime error: {}", e.what());
+        uemu::log::error("Runtime error: {}", e.what());
         return EXIT_FAILURE;
     } catch (const std::exception& e) {
-        std::println(stderr, "Exception: {}", e.what());
+        uemu::log::error("Exception: {}", e.what());
         return EXIT_FAILURE;
     } catch (...) {
-        std::println("Unknown Error");
+        uemu::log::error("Unknown Error");
         return EXIT_FAILURE;
     }
 

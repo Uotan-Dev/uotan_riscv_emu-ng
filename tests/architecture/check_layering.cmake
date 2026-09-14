@@ -13,7 +13,10 @@
 # limitations under the License.
 #
 # Fails when the emulator core or the device layer reaches into the host
-# frontend.  The dependency direction is frontend -> core, never the reverse.
+# frontend or touches the host streams directly.  The dependency direction is
+# frontend -> core, never the reverse; stdout is reserved for guest-visible
+# console output, and diagnostics go through uemu::log (include/common/log.hpp),
+# the only place allowed to write to stderr.
 # Run by CTest as Architecture.NoFrontendDependency.
 
 if(NOT DEFINED PROJECT_ROOT)
@@ -21,6 +24,9 @@ if(NOT DEFINED PROJECT_ROOT)
 endif()
 
 set(_layers "include/core" "include/device" "src/core" "src/device")
+
+# Core-side files that live outside those directories.
+set(_extra_files "include/emulator.hpp" "src/emulator.cpp")
 
 # Host-only headers the core must not include.
 set(_forbidden_includes
@@ -32,38 +38,49 @@ set(_forbidden_includes
     "#include[ \t]*<sys/ioctl\\.h>"
 )
 
-# Host-only symbols that must not be used, even without an include.
+# Host-only symbols that must not be used, even without an include.  Diagnostics
+# belong to uemu::log, not to the host streams.
 set(_forbidden_tokens
     "frontend::"
     "ui::"
     "SDL_[A-Za-z]"
     "std::cout"
+    "std::cerr"
     "std::ostream"
+    "std::print" # also matches std::println
+    "stderr"
+    "stdout"
 )
 
 set(_offenders "")
+set(_files "")
 
 foreach(_layer IN LISTS _layers)
-    file(GLOB_RECURSE _files
+    file(GLOB_RECURSE _layer_files
         "${PROJECT_ROOT}/${_layer}/*.h"
         "${PROJECT_ROOT}/${_layer}/*.hpp"
         "${PROJECT_ROOT}/${_layer}/*.cpp"
     )
+    list(APPEND _files ${_layer_files})
+endforeach()
 
-    foreach(_file IN LISTS _files)
-        file(READ "${_file}" _content)
+foreach(_extra IN LISTS _extra_files)
+    list(APPEND _files "${PROJECT_ROOT}/${_extra}")
+endforeach()
 
-        foreach(_pattern IN LISTS _forbidden_includes _forbidden_tokens)
-            if(_content MATCHES "${_pattern}")
-                file(RELATIVE_PATH _relative "${PROJECT_ROOT}" "${_file}")
-                list(APPEND _offenders "${_relative} matches '${_pattern}'")
-            endif()
-        endforeach()
+foreach(_file IN LISTS _files)
+    file(READ "${_file}" _content)
+
+    foreach(_pattern IN LISTS _forbidden_includes _forbidden_tokens)
+        if(_content MATCHES "${_pattern}")
+            file(RELATIVE_PATH _relative "${PROJECT_ROOT}" "${_file}")
+            list(APPEND _offenders "${_relative} matches '${_pattern}'")
+        endif()
     endforeach()
 endforeach()
 
 if(_offenders)
     list(JOIN _offenders "\n  " _report)
     message(FATAL_ERROR
-        "Frontend dependencies found in the emulator core:\n  ${_report}")
+        "Disallowed host dependencies found in the emulator core:\n  ${_report}")
 endif()

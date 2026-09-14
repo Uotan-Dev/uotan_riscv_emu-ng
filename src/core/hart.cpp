@@ -16,7 +16,6 @@
 
 #include <cassert>
 #include <exception>
-#include <print>
 
 #include "core/decoder.hpp"
 #include "core/hart.hpp"
@@ -43,17 +42,11 @@ void CSR::write_checked(const DecodedInsn& insn, reg_t v) {
 
 [[noreturn]] reg_t
 UnimplementedCSR::read_checked(const DecodedInsn& insn) const {
-    if (trace_)
-        std::println(stderr, "Unimplemented CSR: {:#010x}", address_);
-
     Trap::raise_exception(insn.pc, TrapCause::IllegalInstruction, insn.insn);
 }
 
 [[noreturn]] void UnimplementedCSR::write_checked(const DecodedInsn& insn,
                                                   [[maybe_unused]] reg_t v) {
-    if (trace_)
-        std::println(stderr, "Unimplemented CSR: {:#010x}", address_);
-
     Trap::raise_exception(insn.pc, TrapCause::IllegalInstruction, insn.insn);
 }
 
@@ -161,7 +154,7 @@ Hart::Hart(addr_t reset_pc)
     // Unimplemented CSR
     for (size_t i = 0; i < csrs.size(); i++)
         if (!csrs[i])
-            csrs[i] = std::make_unique<UnimplementedCSR>(this, i, false);
+            csrs[i] = std::make_unique<UnimplementedCSR>(this);
 
     // Start with Machine Mode
     priv = PrivilegeLevel::M;
