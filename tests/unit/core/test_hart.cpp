@@ -110,4 +110,61 @@ TEST_F(MipTest, CsrrcClearsOnlySoftwareSeip) {
     EXPECT_EQ(mip->read_unchecked() & core::MIP::SEIP, 0);
 }
 
+// Interrupt selection must consider M-mode destinations before S-mode ones:
+// a delegated supervisor interrupt may not preempt an interrupt that is
+// destined for M-mode.
+class InterruptPriorityTest : public testing::Test {
+protected:
+    InterruptPriorityTest() {
+        hart.priv = core::PrivilegeLevel::S;
+        hart.csrs[core::MSTATUS::ADDRESS]->write_unchecked(
+            core::MSTATUS::Field::SIE);
+    }
+
+    void enable_in_mie(reg_t bits) {
+        hart.csrs[core::MIE::ADDRESS]->write_unchecked(bits);
+    }
+
+    void delegate(reg_t bits) {
+        hart.csrs[core::MIDELEG::ADDRESS]->write_unchecked(bits);
+    }
+
+    [[nodiscard]] core::TrapCause take_interrupt() const {
+        try {
+            hart.check_interrupts();
+        } catch (const core::Trap& trap) { return trap.cause; }
+
+        return core::TrapCause::None;
+    }
+
+    core::Hart hart;
+};
+
+TEST_F(InterruptPriorityTest, MachineTargetedInterruptWinsOverDelegated) {
+    delegate(core::MIDELEG::Field::SSIP);
+    enable_in_mie(core::MIE::Field::SSIE | core::MIE::Field::STIE);
+    hart.set_interrupt_pending(core::MIP::Field::SSIP | core::MIP::Field::STIP,
+                               true);
+
+    EXPECT_EQ(take_interrupt(), core::TrapCause::SupervisorTimerInterrupt);
+}
+
+TEST_F(InterruptPriorityTest, DelegatedInterruptWinsWhenNoMachinePending) {
+    delegate(core::MIDELEG::Field::SSIP);
+    enable_in_mie(core::MIE::Field::SSIE | core::MIE::Field::STIE);
+    hart.set_interrupt_pending(core::MIP::Field::SSIP, true);
+
+    EXPECT_EQ(take_interrupt(), core::TrapCause::SupervisorSoftwareInterrupt);
+}
+
+TEST_F(InterruptPriorityTest, MachineModeWithoutMieDefersInterrupts) {
+    hart.priv = core::PrivilegeLevel::M;
+    hart.csrs[core::MSTATUS::ADDRESS]->write_unchecked(0);
+    delegate(0);
+    enable_in_mie(core::MIE::Field::STIE);
+    hart.set_interrupt_pending(core::MIP::Field::STIP, true);
+
+    EXPECT_EQ(take_interrupt(), core::TrapCause::None);
+}
+
 } // namespace uemu::test

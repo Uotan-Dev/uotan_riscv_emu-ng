@@ -273,7 +273,17 @@ void Hart::check_interrupts() const {
         (priv < PrivilegeLevel::S) ||
         (priv == PrivilegeLevel::S && (mstatus & MSTATUS::Field::SIE));
 
-    // Global interrupt priority order: MEI > MSI > MTI > SEI > SSI > STI.
+    // Interrupts destined for M-mode are serviced before interrupts destined
+    // for S-mode, so that a higher privilege mode can preempt a lower one.
+    // Only delegated bits (mideleg) may trap to S-mode.
+    const reg_t m_pending = m_enabled ? (pending & ~mideleg) : 0;
+    const reg_t s_pending = s_enabled ? (pending & mideleg) : 0;
+    const reg_t target_pending = m_pending ? m_pending : s_pending;
+
+    if (!target_pending)
+        return;
+
+    // Priority within a destination: MEI > MSI > MTI > SEI > SSI > STI.
     struct {
         reg_t bit;
         TrapCause cause;
@@ -289,16 +299,8 @@ void Hart::check_interrupts() const {
     };
 
     for (const auto& p : prio) {
-        if (!(pending & p.bit))
-            continue;
-
-        if (mideleg & p.bit) {
-            if (s_enabled)
-                throw Trap(pc, p.cause, 0);
-        } else {
-            if (m_enabled)
-                throw Trap(pc, p.cause, 0);
-        }
+        if (target_pending & p.bit)
+            throw Trap(pc, p.cause, 0);
     }
 }
 
