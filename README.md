@@ -111,11 +111,7 @@ OPTIONS:
 ## Known Issues
 
 * **No JIT**: It lacks Just-In-Time compilation; every instruction is fetched and decoded individually, so it is slower than **uemu**.
-* ~~**EDK2/UEFI Compatibility**: The `virtio-blk` device currently cannot be successfully probed or initialized by **edk2**, making it unavailable as a boot or storage device in UEFI environments.~~
-* **ACT Interrupt Tests**: The following ACT compliance tests currently fail:
-    * `InterruptsSm` — M-mode interrupt handling
-    * `InterruptsS` — S-mode interrupt handling
-    * `InterruptsU` — U-mode interrupt handling
+* **ACT4 compliance**: A few ACT4 compliance tests still fail; see [ACT4 Compliance Testing](#act4-compliance-testing).
 
 ## ACT4 Compliance Testing
 
@@ -124,6 +120,13 @@ OPTIONS:
 The following extensions are excluded from testing:
 * `SsstrictS`, `SsstrictSm`, `SsstrictU` — strict s-mode coverage
 * `Sscounterenw` — scounteren write behavior
+
+The following tests currently fail:
+
+* `Sm_mcsr_cntr` — covers `mtime`/`time` (`Zicntr`); the CLINT derives `mtime` from the host wall clock, so the time source is not deterministic and only intermittently matches the timer timing ACT4 assumes.
+* `InterruptsS`, `InterruptsSSm`, `InterruptsU` — interrupt delivery is still affected by interrupt latency and timer timing; upstream tracks related known issues in [riscv-arch-test#2146](https://github.com/riscv/riscv-arch-test/issues/2146).
+
+These failures are timing-dependent, so they are not all treated as confirmed architectural bugs in **uemu-ng**.
 
 ## TODO
 
