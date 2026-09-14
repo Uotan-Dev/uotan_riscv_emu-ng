@@ -101,6 +101,8 @@ public:
     // Joins both workers and rethrows an exception they reported.
     void wait();
 
+    // Valid once the run has finished: the guest-halt path writes them before
+    // requesting the stop, so read them after wait() (or once finished()).
     [[nodiscard]] uint16_t shutdown_code() const noexcept {
         return shutdown_code_;
     }

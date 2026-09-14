@@ -42,12 +42,9 @@ public:
     // Starts the CPU thread.  Throws std::logic_error when called twice.
     void start();
 
-    // Joins the CPU thread when it was started.
-    void join();
-
-    [[nodiscard]] std::exception_ptr exception() const noexcept {
-        return exception_;
-    }
+    // Joins the CPU thread when it was started and returns the exception it
+    // reported, if any.  Worker errors can only be observed after the join.
+    [[nodiscard]] std::exception_ptr join();
 
 private:
     void run();

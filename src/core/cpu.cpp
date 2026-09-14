@@ -31,7 +31,7 @@ Cpu::Cpu(Hart& hart, MMU& mmu, std::stop_source stop_source)
 
 Cpu::~Cpu() {
     stop_source_.request_stop();
-    join();
+    static_cast<void>(join());
 }
 
 void Cpu::start() {
@@ -41,9 +41,11 @@ void Cpu::start() {
     thread_ = std::thread(&Cpu::run, this);
 }
 
-void Cpu::join() {
+std::exception_ptr Cpu::join() {
     if (thread_.joinable())
         thread_.join();
+
+    return exception_;
 }
 
 void Cpu::run() {

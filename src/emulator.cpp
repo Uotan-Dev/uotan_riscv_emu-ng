@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <exception>
 #include <stdexcept>
 #include <thread>
 
@@ -128,7 +129,7 @@ void Emulator::start() {
         device_thread_.start();
     } catch (...) {
         stop_source_.request_stop();
-        cpu_.join();
+        static_cast<void>(cpu_.join());
         throw;
     }
 }
@@ -163,14 +164,14 @@ bool Emulator::finished() const noexcept {
 }
 
 void Emulator::wait() {
-    cpu_.join();
-    device_thread_.join();
+    std::exception_ptr cpu_error = cpu_.join();
+    std::exception_ptr device_error = device_thread_.join();
 
-    if (cpu_.exception())
-        std::rethrow_exception(cpu_.exception());
+    if (cpu_error)
+        std::rethrow_exception(cpu_error);
 
-    if (device_thread_.exception())
-        std::rethrow_exception(device_thread_.exception());
+    if (device_error)
+        std::rethrow_exception(device_error);
 }
 
 void Emulator::halt_from_guest(uint16_t code, uint16_t status) noexcept {

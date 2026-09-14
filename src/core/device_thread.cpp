@@ -25,7 +25,7 @@ DeviceThread::DeviceThread(Bus& bus, std::stop_source stop_source)
 
 DeviceThread::~DeviceThread() {
     stop_source_.request_stop();
-    join();
+    static_cast<void>(join());
 }
 
 void DeviceThread::start() {
@@ -35,9 +35,11 @@ void DeviceThread::start() {
     thread_ = std::thread(&DeviceThread::run, this);
 }
 
-void DeviceThread::join() {
+std::exception_ptr DeviceThread::join() {
     if (thread_.joinable())
         thread_.join();
+
+    return exception_;
 }
 
 void DeviceThread::run() {
