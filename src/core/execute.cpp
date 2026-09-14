@@ -207,7 +207,7 @@ IMPL(csrrc, {
     hart->interrupt_check_pending = true;
     reg_t t = csrs[csr]->read_checked(*d);
     if (rs1)
-        csrs[csr]->write_checked(*d, t & ~R[rs1]);
+        csrs[csr]->write_checked(*d, csrs[csr]->read_rmw_unchecked() & ~R[rs1]);
     R.write(rd, t);
 })
 IMPL(csrrci, {
@@ -215,14 +215,14 @@ IMPL(csrrci, {
     uint64_t zimm = bits(d->insn, 19, 15);
     reg_t t = csrs[csr]->read_checked(*d);
     if (zimm)
-        csrs[csr]->write_checked(*d, t & ~zimm);
+        csrs[csr]->write_checked(*d, csrs[csr]->read_rmw_unchecked() & ~zimm);
     R.write(rd, t);
 })
 IMPL(csrrs, {
     hart->interrupt_check_pending = true;
     uint64_t t = csrs[csr]->read_checked(*d);
     if (rs1)
-        csrs[csr]->write_checked(*d, t | R[rs1]);
+        csrs[csr]->write_checked(*d, csrs[csr]->read_rmw_unchecked() | R[rs1]);
     R.write(rd, t);
 })
 IMPL(csrrsi, {
@@ -230,7 +230,7 @@ IMPL(csrrsi, {
     uint64_t zimm = bits(d->insn, 19, 15);
     uint64_t t = csrs[csr]->read_checked(*d);
     if (zimm)
-        csrs[csr]->write_checked(*d, t | zimm);
+        csrs[csr]->write_checked(*d, csrs[csr]->read_rmw_unchecked() | zimm);
     R.write(rd, t);
 })
 IMPL(csrrw, {

@@ -215,6 +215,14 @@ public:
         return value_;
     }
 
+    // Return the old CSR value used to calculate CSRRS/CSRRC writeback.
+    // This normally equals the architectural read value.  MIP overrides it
+    // because an external SEIP signal is visible to rd but, by specification,
+    // must not participate in updating the software-writable SEIP bit.
+    [[nodiscard]] virtual reg_t read_rmw_unchecked() const noexcept {
+        return read_unchecked();
+    }
+
     virtual void write_unchecked(reg_t v) noexcept { value_ = v; }
 
     [[nodiscard]] virtual reg_t read_checked(const DecodedInsn& insn) const;
@@ -586,10 +594,21 @@ public:
           menvcfg_(
               dynamic_cast<MENVCFG*>(hart_->csrs[MENVCFG::ADDRESS].get())) {
         value_atomic_.store(0, std::memory_order_relaxed);
+        external_seip_.store(false, std::memory_order_relaxed);
         assert(menvcfg_);
     }
 
     [[nodiscard]] reg_t read_unchecked() const noexcept override {
+        reg_t value = value_atomic_.load(std::memory_order_relaxed);
+        if (external_seip_.load(std::memory_order_relaxed))
+            value |= Field::SEIP;
+
+        return value & read_mask_;
+    }
+
+    [[nodiscard]] reg_t read_rmw_unchecked() const noexcept override {
+        // The external interrupt-controller signal contributes to reads but
+        // not to the software-writable SEIP bit's read-modify-write value.
         return value_atomic_.load(std::memory_order_relaxed) & read_mask_;
     }
 
@@ -616,11 +635,19 @@ public:
     }
 
     void set_pending(reg_t mask) noexcept {
-        value_atomic_.fetch_or(mask & read_mask_, std::memory_order_relaxed);
+        if (mask & Field::SEIP)
+            external_seip_.store(true, std::memory_order_relaxed);
+
+        value_atomic_.fetch_or(mask & read_mask_ & ~Field::SEIP,
+                               std::memory_order_relaxed);
     }
 
     void clear_pending(reg_t mask) noexcept {
-        value_atomic_.fetch_and(~mask, std::memory_order_relaxed);
+        if (mask & Field::SEIP)
+            external_seip_.store(false, std::memory_order_relaxed);
+
+        value_atomic_.fetch_and(~(mask & ~Field::SEIP),
+                                std::memory_order_relaxed);
     }
 
 private:
@@ -631,6 +658,7 @@ private:
     static constexpr reg_t write_mask_ = Field::SSIP | Field::SEIP;
 
     std::atomic<reg_t> value_atomic_;
+    std::atomic<bool> external_seip_;
     MENVCFG* menvcfg_;
 };
 

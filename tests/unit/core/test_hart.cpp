@@ -18,7 +18,10 @@
 
 #include <gtest/gtest.h>
 
+#include "core/bus.hpp"
+#include "core/decoder.hpp"
 #include "core/hart.hpp"
+#include "core/mmu.hpp"
 
 namespace uemu::test {
 
@@ -43,6 +46,68 @@ TEST(RegisterFileTest, ReadWriteGeneralPurposeRegisters) {
         EXPECT_EQ(regs.read(i), v);
         EXPECT_EQ(regs[i], v);
     }
+}
+
+class MipTest : public testing::Test {
+protected:
+    static constexpr uint8_t RD = 5;
+    static constexpr uint8_t RS1 = 6;
+
+    MipTest()
+        : hart(), dram(std::make_shared<core::Dram>(4096)),
+          bus(std::make_shared<core::Bus>(dram)), mmu(&hart, bus),
+          mip(dynamic_cast<core::MIP*>(hart.csrs[core::MIP::ADDRESS].get())) {}
+
+    void execute_csr(uint32_t funct3, reg_t source) {
+        hart.gprs.write(RS1, source);
+        const uint32_t insn = (core::MIP::ADDRESS << 20) | (RS1 << 15) |
+                              (funct3 << 12) | (RD << 7) | 0x73;
+        const core::DecodedInsn decoded = core::Decoder::decode(
+            insn, core::Ilen::Normal, core::Dram::DRAM_BASE);
+        decoded(hart, mmu);
+    }
+
+    core::Hart hart;
+    std::shared_ptr<core::Dram> dram;
+    std::shared_ptr<core::Bus> bus;
+    core::MMU mmu;
+    core::MIP* mip;
+};
+
+TEST_F(MipTest, ExternalSeipSurvivesCsrWrite) {
+    ASSERT_NE(mip, nullptr);
+    mip->set_pending(core::MIP::SEIP);
+
+    execute_csr(0b001, 0); // CSRRW
+
+    EXPECT_EQ(hart.gprs[RD], core::MIP::SEIP);
+    EXPECT_EQ(mip->read_unchecked() & core::MIP::SEIP, core::MIP::SEIP);
+    mip->clear_pending(core::MIP::SEIP);
+    EXPECT_EQ(mip->read_unchecked() & core::MIP::SEIP, 0);
+}
+
+TEST_F(MipTest, CsrrsDoesNotLatchExternalSeip) {
+    ASSERT_NE(mip, nullptr);
+    mip->set_pending(core::MIP::SEIP);
+
+    execute_csr(0b010, 0); // CSRRS with a nonzero rs1 field
+
+    EXPECT_EQ(hart.gprs[RD], core::MIP::SEIP);
+    mip->clear_pending(core::MIP::SEIP);
+    EXPECT_EQ(mip->read_unchecked() & core::MIP::SEIP, 0);
+}
+
+TEST_F(MipTest, CsrrcClearsOnlySoftwareSeip) {
+    ASSERT_NE(mip, nullptr);
+    mip->write_unchecked(core::MIP::SEIP);
+    mip->set_pending(core::MIP::SEIP);
+
+    execute_csr(0b011, core::MIP::SEIP); // CSRRC
+
+    EXPECT_EQ(hart.gprs[RD], core::MIP::SEIP);
+    EXPECT_EQ(mip->read_unchecked() & core::MIP::SEIP, core::MIP::SEIP);
+    mip->clear_pending(core::MIP::SEIP);
+    EXPECT_EQ(mip->read_unchecked() & core::MIP::SEIP, 0);
 }
 
 } // namespace uemu::test
