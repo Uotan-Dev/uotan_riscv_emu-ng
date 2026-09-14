@@ -1005,10 +1005,8 @@ public:
 
     SCOUNTEREN(Hart* hart) : CSR(hart, PrivilegeLevel::S, 0) {}
 
-    // scounteren is WARL: mask matches mcounteren (Zicntr gives CY|TM|IR =
-    // 0x7). Without Sscounterenw, the spec says read-only zero, but Spike
-    // implements it as masked_csr_t(counteren_mask, 0). The ACT test expects
-    // WARL mask 0x7.
+    // scounteren is WARL.  This hart makes the implemented Zicntr fields
+    // writable and keeps the unavailable HPM counter fields read-only zero.
     [[nodiscard]] reg_t read_unchecked() const noexcept override {
         return value_ & mask_;
     }

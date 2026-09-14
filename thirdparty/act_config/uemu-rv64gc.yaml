@@ -96,8 +96,7 @@ params:
   PRECISE_SYNCHRONOUS_EXCEPTIONS: true
   TRAP_ON_ECALL_FROM_M: true
   TRAP_ON_EBREAK: true
-  MARCHID_IMPLEMENTED: true
-  ARCH_ID_VALUE: 0x1
+  MARCHID_IMPLEMENTED: false
   MIMPID_IMPLEMENTED: true
   IMP_ID_VALUE: 0x10
   VENDOR_ID_BANK: 0x0
@@ -140,7 +139,17 @@ params:
       false, false, false, false, false,
       false, false,
     ]
-  MCOUNTINHIBIT_IMPLEMENTED: false
+  MCOUNTINHIBIT_IMPLEMENTED: true
+  COUNTINHIBIT_EN:
+    [
+      true, false, true, false, false,
+      false, false, false, false, false,
+      false, false, false, false, false,
+      false, false, false, false, false,
+      false, false, false, false, false,
+      false, false, false, false, false,
+      false, false,
+    ]
   MCOUNTENABLE_EN:
     [
       true, true, true, false, false,
