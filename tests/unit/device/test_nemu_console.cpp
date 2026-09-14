@@ -14,17 +14,16 @@
  * limitations under the License.
  */
 
-#include <sstream>
-
 #include <gtest/gtest.h>
 
+#include "device/console_channel.hpp"
 #include "device/nemu_console.hpp"
 
 namespace uemu::test {
 
 TEST(NemuConsoleTest, BasicTest) {
-    std::stringstream ss;
-    device::NemuConsole console(ss);
+    device::ConsoleChannel channel;
+    device::NemuConsole console(channel);
 
     std::string in = "Hello, uemu-ng";
     for (char c : in) {
@@ -32,7 +31,7 @@ TEST(NemuConsoleTest, BasicTest) {
         ASSERT_TRUE(r);
     }
 
-    EXPECT_EQ(ss.str(), in);
+    EXPECT_EQ(channel.drain_output(), in);
 }
 
 } // namespace uemu::test

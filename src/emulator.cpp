@@ -15,8 +15,9 @@
  */
 
 #include <print>
+#include <stdexcept>
+#include <thread>
 
-#include "core/decoder.hpp"
 #include "core/mmu.hpp"
 #include "device/bcm2835_rng.hpp"
 #include "device/clint.hpp"
@@ -32,58 +33,54 @@
 #include "device/test_intr_gen.hpp"
 #include "device/virtio_blk.hpp"
 #include "emulator.hpp"
-#include "ui/headless_backend.hpp"
-#include "ui/sdl3_backend.hpp"
 #include "utils/elfloader.hpp"
 #include "utils/fileloader.hpp"
 
 namespace uemu {
 
-Emulator::Emulator(size_t dram_size, bool headless,
-                   const std::filesystem::path& disk,
+Emulator::Emulator(size_t dram_size, const std::filesystem::path& disk,
                    const std::filesystem::path& flash0_path,
-                   const std::filesystem::path& flash1_path) {
-    auto hart = std::make_shared<core::Hart>();
-    auto dram = std::make_shared<core::Dram>(dram_size);
-    auto bus = std::make_shared<core::Bus>(dram);
-    auto mmu = std::make_shared<core::MMU>(hart.get(), bus);
-
-    hart->connect_mmu(mmu.get());
+                   const std::filesystem::path& flash1_path)
+    : dram_(std::make_shared<core::Dram>(dram_size)),
+      hart_(std::make_shared<core::Hart>()),
+      bus_(std::make_shared<core::Bus>(dram_)),
+      mmu_(std::make_shared<core::MMU>(hart_.get(), bus_)),
+      cpu_(*hart_, *mmu_, stop_source_), device_thread_(*bus_, stop_source_) {
+    hart_->connect_mmu(mmu_.get());
 
     // Clint
-    bus->add_device(std::make_shared<device::Clint>(hart));
+    bus_->add_device(std::make_shared<device::Clint>(hart_));
 
     // TestIntrGen — Sail-style simple interrupt generator for ACT tests
-    bus->add_device(std::make_shared<device::TestIntrGen>(hart));
+    bus_->add_device(std::make_shared<device::TestIntrGen>(hart_));
 
     // Plic
-    auto plic = std::make_shared<device::Plic>(hart);
-    bus->add_device(plic);
+    auto plic = std::make_shared<device::Plic>(hart_);
+    bus_->add_device(plic);
     auto request_irq = [plic](uint32_t id, bool lvl) -> void {
         plic->set_interrupt_level(id, lvl);
     };
 
     // SiFiveTest
-    bus->add_device(std::make_shared<device::SiFiveTest>(
+    bus_->add_device(std::make_shared<device::SiFiveTest>(
         [this](uint16_t code, device::SiFiveTest::Status status) -> void {
             std::println("Emulator shutdown with code 0x{:x} and status 0x{:x}",
                          code, static_cast<uint16_t>(status));
-            engine_->request_shutdown_from_guest(code,
-                                                 static_cast<uint16_t>(status));
+            halt_from_guest(code, static_cast<uint16_t>(status));
         }));
 
-    // NS16550 and host console
-    auto ns16550 = std::make_shared<device::NS16550>(request_irq);
-    bus->add_device(ns16550);
+    // NS16550; console bytes reach the host through the frontend
+    console_ = std::make_shared<device::NS16550>(request_irq, console_channel_);
+    bus_->add_device(console_);
 
     // SimpleFB
-    auto simple_fb = std::make_shared<device::SimpleFB>();
-    bus->add_device(simple_fb);
+    framebuffer_ = std::make_shared<device::SimpleFB>();
+    bus_->add_device(framebuffer_);
 
     // VirtioBLK
     if (!disk.empty())
-        bus->add_device(
-            std::make_shared<device::VirtioBlk>(dram, disk, request_irq));
+        bus_->add_device(
+            std::make_shared<device::VirtioBlk>(dram_, disk, request_irq));
 
     // pflash_cfi01
     auto flash0 =
@@ -96,56 +93,107 @@ Emulator::Emulator(size_t dram_size, bool headless,
     if (!flash1_path.empty())
         flash1->load(flash1_path, 0);
 
-    bus->add_device(flash0);
-    bus->add_device(flash1);
+    bus_->add_device(flash0);
+    bus_->add_device(flash1);
 
     // GoldfishEvents
-    auto goldfish_events =
-        std::make_shared<device::GoldfishEvents>(request_irq);
-    bus->add_device(goldfish_events);
+    input_ = std::make_shared<device::GoldfishEvents>(request_irq);
+    bus_->add_device(input_);
 
     // GoldfishRTC
-    bus->add_device(std::make_shared<device::GoldfishRTC>(request_irq));
+    bus_->add_device(std::make_shared<device::GoldfishRTC>(request_irq));
 
     // GoldfishBattery
-    bus->add_device(std::make_shared<device::GoldfishBattery>(request_irq));
+    bus_->add_device(std::make_shared<device::GoldfishBattery>(request_irq));
 
     // BCM2835Rng
-    bus->add_device(std::make_shared<device::BCM2835Rng>());
+    bus_->add_device(std::make_shared<device::BCM2835Rng>());
 
     // NemuConsole
-    bus->add_device(std::make_shared<device::NemuConsole>());
+    bus_->add_device(std::make_shared<device::NemuConsole>(console_channel_));
+}
 
-    // ExecutionEngine
-    engine_ = std::make_unique<ExecutionEngine>(hart, dram, bus, mmu);
+Emulator::~Emulator() {
+    // The workers must stop before the objects they reference are destroyed;
+    // asking here also makes the shutdown explicit when the guest never halted.
+    stop_source_.request_stop();
+}
 
-    // UI backend
-    ui::UIBackend::Endpoints endpoints{
-        .console_endpoint = ns16550,
-        .input_sink = goldfish_events,
-        .pixel_source = simple_fb,
-        .exit_callback = [this]() -> void {
-            engine_->request_shutdown_from_host();
-        },
-    };
-    std::shared_ptr<ui::UIBackend> ui_backend;
+void Emulator::start() {
+    if (started_)
+        throw std::logic_error("Emulator::start() called twice");
 
-    if (headless)
-        ui_backend = std::make_shared<ui::HeadlessBackend>(endpoints);
-    else
-        ui_backend = std::make_shared<ui::SDL3Backend>(endpoints);
+    started_ = true;
+    cpu_.start();
 
-    engine_->set_ui_backend(ui_backend);
+    try {
+        device_thread_.start();
+    } catch (...) {
+        stop_source_.request_stop();
+        cpu_.join();
+        throw;
+    }
 }
 
 void Emulator::run(std::chrono::milliseconds timeout) {
-    engine_->execute_until_halt(timeout);
+    start();
+
+    const bool timed = timeout.count() > 0;
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+
+    while (!finished()) {
+        if (timed && std::chrono::steady_clock::now() >= deadline)
+            break;
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    request_shutdown();
+    wait();
 }
 
-void Emulator::loadelf(const std::filesystem::path& path) {
-    addr_t pc = utils::ElfLoader::load(path, engine_->get_dram());
+void Emulator::request_shutdown() noexcept { stop_source_.request_stop(); }
 
-    engine_->get_hart().pc = pc;
+bool Emulator::finished() const noexcept {
+    return stop_source_.stop_requested();
+}
+
+void Emulator::wait() {
+    cpu_.join();
+    device_thread_.join();
+
+    if (cpu_.exception())
+        std::rethrow_exception(cpu_.exception());
+
+    if (device_thread_.exception())
+        std::rethrow_exception(device_thread_.exception());
+}
+
+void Emulator::halt_from_guest(uint16_t code, uint16_t status) noexcept {
+    shutdown_code_ = code;
+    shutdown_status_ = status;
+    stop_source_.request_stop();
+}
+
+void Emulator::console_input(std::string_view bytes) {
+    for (char byte : bytes)
+        console_channel_.push_input(static_cast<uint8_t>(byte));
+}
+
+std::string Emulator::console_output() {
+    return console_channel_.drain_output();
+}
+
+void Emulator::push_key_event(core::KeyEvent event) {
+    input_->push_key_event(event);
+}
+
+core::Framebuffer& Emulator::framebuffer() noexcept { return *framebuffer_; }
+
+void Emulator::loadelf(const std::filesystem::path& path) {
+    addr_t pc = utils::ElfLoader::load(path, *dram_);
+
+    hart_->pc = pc;
     std::println("ELF loaded: {}\n"
                  "      entry PC = 0x{:016x}",
                  path.string(), pc);
@@ -158,7 +206,7 @@ void Emulator::load(addr_t addr, const void* p, size_t n) {
     if (n == 0)
         return;
 
-    engine_->get_dram().write_bytes(addr, p, n);
+    dram_->write_bytes(addr, p, n);
 }
 
 void Emulator::load(addr_t addr, const std::filesystem::path& path) {

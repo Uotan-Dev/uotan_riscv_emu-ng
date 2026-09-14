@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include <print>
-
 #include "device/nemu_console.hpp"
 
 namespace uemu::device {
@@ -29,8 +27,7 @@ NemuConsole::read_internal([[maybe_unused]] addr_t offset,
 bool NemuConsole::write_internal(addr_t offset, [[maybe_unused]] size_t size,
                                  uint64_t value) {
     if (offset == 0) {
-        char ch = static_cast<char>(value & 0xFF);
-        std::print(out_, "{}", ch);
+        console_channel_.push_output(static_cast<uint8_t>(value & 0xFF));
         return true;
     }
 

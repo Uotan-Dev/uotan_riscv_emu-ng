@@ -14,10 +14,23 @@
  * limitations under the License.
  */
 
-#include "ui/ui_backend.hpp"
+#include <string>
 
-namespace uemu::ui {
+#include "emulator.hpp"
+#include "frontend/headless_frontend.hpp"
 
-bool UIBackend::initialized_ = false;
+namespace uemu::frontend {
 
-} // namespace uemu::ui
+HeadlessFrontend::HeadlessFrontend(Emulator& emulator) : Frontend(emulator) {}
+
+void HeadlessFrontend::poll_input() {
+    if (std::string bytes = terminal_.read_input(); !bytes.empty())
+        emulator_.console_input(bytes);
+}
+
+void HeadlessFrontend::present() {
+    if (std::string bytes = emulator_.console_output(); !bytes.empty())
+        terminal_.write(bytes);
+}
+
+} // namespace uemu::frontend

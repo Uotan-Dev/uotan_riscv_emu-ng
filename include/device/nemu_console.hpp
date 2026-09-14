@@ -16,8 +16,7 @@
 
 #pragma once
 
-#include <iostream>
-
+#include "device/console_channel.hpp"
 #include "device/device.hpp"
 
 namespace uemu::device {
@@ -27,14 +26,15 @@ public:
     static constexpr size_t DEFAULT_BASE = 0x10008000;
     static constexpr size_t SIZE = 8;
 
-    NemuConsole(std::ostream& out = std::cout)
-        : Device("NemuConsole", DEFAULT_BASE, SIZE), out_(out) {}
+    explicit NemuConsole(ConsoleChannel& console_channel)
+        : Device("NemuConsole", DEFAULT_BASE, SIZE),
+          console_channel_(console_channel) {}
 
 private:
     std::optional<uint64_t> read_internal(addr_t offset, size_t size) override;
     bool write_internal(addr_t offset, size_t size, uint64_t value) override;
 
-    std::ostream& out_;
+    ConsoleChannel& console_channel_;
 };
 
 } // namespace uemu::device

@@ -16,21 +16,18 @@
 
 #pragma once
 
-#include <mutex>
+#include <cstdint>
 
-namespace uemu::ui {
+namespace uemu::core {
 
-class PixelSource {
-public:
-    virtual ~PixelSource() = default;
+// A host keyboard event.  `code` uses the Linux input-event-code space; the
+// concrete frontends translate their own key codes (for example SDL
+// scancodes) into it.
+struct KeyEvent {
+    enum class Action : uint8_t { Press, Release };
 
-    [[nodiscard]] virtual size_t get_width() const = 0;
-    [[nodiscard]] virtual size_t get_height() const = 0;
-    [[nodiscard]] virtual size_t get_size() const = 0;
-
-    [[nodiscard]] virtual const uint8_t* get_pixels() const = 0;
-
-    [[nodiscard]] virtual std::unique_lock<std::mutex> acquire_lock() const = 0;
+    uint32_t code;
+    Action action;
 };
 
-} // namespace uemu::ui
+} // namespace uemu::core

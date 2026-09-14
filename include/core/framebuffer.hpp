@@ -16,27 +16,24 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
+#include <mutex>
 
-extern "C" {
-#include "linux/input-event-codes.h" // IWYU pragma: keep
-}
+namespace uemu::core {
 
-namespace uemu::ui {
-
-class InputSink {
+// Read-only view of the guest framebuffer for the host frontend.  The pixel
+// bytes are only stable while the lock returned by lock() is held.
+class Framebuffer {
 public:
-    using linux_event_code_t = uint32_t;
+    virtual ~Framebuffer() = default;
 
-    enum class KeyAction : uint8_t { Press, Release };
+    [[nodiscard]] virtual size_t width() const noexcept = 0;
+    [[nodiscard]] virtual size_t height() const noexcept = 0;
+    [[nodiscard]] virtual size_t byte_size() const noexcept = 0;
 
-    struct KeyEvent {
-        linux_event_code_t input_event_code;
-        KeyAction action;
-    };
-
-    virtual ~InputSink() = default;
-    virtual void push_key_event(KeyEvent event) = 0;
+    [[nodiscard]] virtual std::unique_lock<std::mutex> lock() const = 0;
+    [[nodiscard]] virtual const uint8_t* pixels() const = 0;
 };
 
-} // namespace uemu::ui
+} // namespace uemu::core

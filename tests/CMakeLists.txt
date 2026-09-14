@@ -43,3 +43,10 @@ target_include_directories(uemu_test PRIVATE
 
 include(GoogleTest)
 gtest_discover_tests(uemu_test)
+
+# The frontend must not leak into the emulator core.
+add_test(
+    NAME Architecture.NoFrontendDependency
+    COMMAND ${CMAKE_COMMAND} -DPROJECT_ROOT=${CMAKE_SOURCE_DIR} -P
+            ${CMAKE_CURRENT_SOURCE_DIR}/architecture/check_layering.cmake
+)

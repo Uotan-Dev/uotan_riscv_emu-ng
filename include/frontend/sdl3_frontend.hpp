@@ -16,25 +16,37 @@
 
 #pragma once
 
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <vector>
+
 #include <SDL3/SDL.h>
 
-#include "ui/host_console.hpp"
-#include "ui/ui_backend.hpp"
+#include "frontend/frontend.hpp"
+#include "frontend/terminal.hpp"
 
-namespace uemu::ui {
+namespace uemu::frontend {
 
-class SDL3Backend : public UIBackend {
+// SDL3 window frontend: presents the guest framebuffer and translates SDL
+// input events into emulator input.  The host terminal is still used for the
+// guest console.
+class SDL3Frontend final : public Frontend {
 public:
-    SDL3Backend(Endpoints endpoints);
-    ~SDL3Backend() override;
+    explicit SDL3Frontend(Emulator& emulator);
+    ~SDL3Frontend() override;
 
-    void update() override;
+protected:
+    void poll_input() override;
+    void present() override;
 
 private:
+    void initialize_window();
     void update_view();
 
-    static constexpr InputSink::linux_event_code_t
-    sdl_scancode_to_linux(SDL_Scancode code) noexcept;
+    static constexpr uint32_t sdl_scancode_to_linux(SDL_Scancode code) noexcept;
+
+    Terminal terminal_;
 
     SDL_Window* window_ = nullptr;
     SDL_Renderer* renderer_ = nullptr;
@@ -44,7 +56,7 @@ private:
     size_t display_height_ = 0;
     std::vector<uint8_t> pixel_buffer_;
 
-    HostConsole host_console_;
+    std::chrono::steady_clock::time_point last_frame_time_;
 };
 
-} // namespace uemu::ui
+} // namespace uemu::frontend

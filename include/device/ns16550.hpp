@@ -26,14 +26,14 @@
 #include <mutex>
 #include <queue>
 
+#include "device/console_channel.hpp"
 #include "device/device.hpp"
-#include "ui/console_endpoint.hpp"
 
 #pragma once
 
 namespace uemu::device {
 
-class NS16550 : public IrqDevice, public ui::ConsoleEndpoint {
+class NS16550 : public IrqDevice {
 public:
     static constexpr addr_t DEFAULT_BASE = 0x10000000;
     static constexpr size_t SIZE = 0x100;
@@ -115,7 +115,9 @@ public:
     static constexpr uint8_t MSR_DCTS = 0x01; // Delta CTS
     static constexpr uint8_t MSR_ANY_DELTA = 0x0F;
 
-    explicit NS16550(IrqCallback irq_callback,
+    // Guest console bytes are exchanged through `console_channel`; the device
+    // never performs host I/O itself.
+    explicit NS16550(IrqCallback irq_callback, ConsoleChannel& console_channel,
                      uint32_t interrupt_id = DEFAULT_INTERRUPT_ID,
                      uint32_t reg_shift = DEFAULT_REG_SHIFT,
                      uint32_t reg_io_width = DEFAULT_REG_IO_WIDTH);
@@ -130,6 +132,8 @@ private:
 
     uint8_t rx_byte();
     void tx_byte(uint8_t val);
+
+    ConsoleChannel& console_channel_;
 
     uint32_t reg_shift_;
     uint32_t reg_io_width_;

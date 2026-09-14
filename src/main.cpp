@@ -18,12 +18,13 @@
 #include <filesystem>
 #include <print>
 
-#include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
 #include <CLI/CLI.hpp>
 
 #include "emulator.hpp"
+#include "frontend/headless_frontend.hpp"
+#include "frontend/sdl3_frontend.hpp"
 
 int main(int argc, char* argv[]) {
     CLI::App app{"uemu-ng: RISC-V Emulator"};
@@ -65,11 +66,17 @@ int main(int argc, char* argv[]) {
         if (timeout_ms > 0)
             std::println("  Timeout: {} ms", timeout_ms);
 
-        uemu::Emulator emulator(dram_size, headless, disk_file, flash0_file,
-                                flash1_file);
+        uemu::Emulator emulator(dram_size, disk_file, flash0_file, flash1_file);
 
         emulator.loadelf(elf_file);
-        emulator.run(std::chrono::milliseconds(timeout_ms));
+
+        if (headless) {
+            uemu::frontend::HeadlessFrontend frontend(emulator);
+            frontend.run(std::chrono::milliseconds(timeout_ms));
+        } else {
+            uemu::frontend::SDL3Frontend frontend(emulator);
+            frontend.run(std::chrono::milliseconds(timeout_ms));
+        }
     } catch (const std::runtime_error& e) {
         std::println(stderr, "Runtime error: {}", e.what());
         return EXIT_FAILURE;

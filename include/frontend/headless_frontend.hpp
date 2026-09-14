@@ -16,21 +16,24 @@
 
 #pragma once
 
-#include "ui/host_console.hpp"
-#include "ui/ui_backend.hpp"
+#include "frontend/frontend.hpp"
+#include "frontend/terminal.hpp"
 
-namespace uemu::ui {
+namespace uemu::frontend {
 
-class HeadlessBackend : public UIBackend {
+// Terminal-only frontend: host stdin feeds the guest console and guest console
+// output is written to host stdout.  This is the --headless mode used by the
+// ACT4 and riscv-tests runners.
+class HeadlessFrontend final : public Frontend {
 public:
-    HeadlessBackend(Endpoints endpoints) : UIBackend(std::move(endpoints)) {
-        HostConsole::apply_to_endpoint(*endpoints_.console_endpoint);
-    }
+    explicit HeadlessFrontend(Emulator& emulator);
 
-    void update() override {}
+protected:
+    void poll_input() override;
+    void present() override;
 
 private:
-    HostConsole host_console_;
+    Terminal terminal_;
 };
 
-} // namespace uemu::ui
+} // namespace uemu::frontend

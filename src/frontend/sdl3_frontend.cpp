@@ -16,28 +16,58 @@
 
 #include <chrono>
 #include <cstring>
+#include <mutex>
 #include <stdexcept>
+#include <string>
 
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_iostream.h>
 #include <SDL3_image/SDL_image.h>
 
-#include "ui/sdl3_backend.hpp"
+#include "core/input.hpp"
+#include "emulator.hpp"
+#include "frontend/sdl3_frontend.hpp"
+
+extern "C" {
+#include "linux/input-event-codes.h" // IWYU pragma: keep
+}
 
 extern "C" {
 extern const uint8_t uotan_icon_data[];
 extern const ptrdiff_t uotan_icon_size;
 }
 
-namespace uemu::ui {
+namespace uemu::frontend {
 
-SDL3Backend::SDL3Backend(Endpoints endpoints)
-    : UIBackend(std::move(endpoints)) {
-    const auto& pixel_source = endpoints_.pixel_source;
+SDL3Frontend::SDL3Frontend(Emulator& emulator) : Frontend(emulator) {
+    initialize_window();
+}
 
-    display_width_ = pixel_source->get_width();
-    display_height_ = pixel_source->get_height();
-    pixel_buffer_.resize(pixel_source->get_size());
+SDL3Frontend::~SDL3Frontend() {
+    if (texture_) {
+        SDL_DestroyTexture(texture_);
+        texture_ = nullptr;
+    }
+
+    if (renderer_) {
+        SDL_DestroyRenderer(renderer_);
+        renderer_ = nullptr;
+    }
+
+    if (window_) {
+        SDL_DestroyWindow(window_);
+        window_ = nullptr;
+    }
+
+    SDL_Quit();
+}
+
+void SDL3Frontend::initialize_window() {
+    const core::Framebuffer& framebuffer = emulator_.framebuffer();
+
+    display_width_ = framebuffer.width();
+    display_height_ = framebuffer.height();
+    pixel_buffer_.resize(framebuffer.byte_size());
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
         goto fail;
@@ -70,8 +100,7 @@ SDL3Backend::SDL3Backend(Endpoints endpoints)
         }
     }
 
-    HostConsole::apply_to_endpoint(*endpoints_.console_endpoint);
-
+    last_frame_time_ = std::chrono::steady_clock::now();
     return;
 
 fail:
@@ -87,55 +116,35 @@ fail:
     SDL_Quit();
 
     throw std::runtime_error(
-        std::string("SDL3 backend initialization failed: ") + sdl_error);
+        std::string("SDL3 frontend initialization failed: ") + sdl_error);
 }
 
-SDL3Backend::~SDL3Backend() {
-    if (texture_) {
-        SDL_DestroyTexture(texture_);
-        texture_ = nullptr;
-    }
-
-    if (renderer_) {
-        SDL_DestroyRenderer(renderer_);
-        renderer_ = nullptr;
-    }
-
-    if (window_) {
-        SDL_DestroyWindow(window_);
-        window_ = nullptr;
-    }
-
-    SDL_Quit();
-}
-
-void SDL3Backend::update() {
-    const auto& input_sink = endpoints_.input_sink;
-    const auto& pixel_source = endpoints_.pixel_source;
-
+void SDL3Frontend::poll_input() {
     SDL_Event event;
 
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
-            case SDL_EVENT_QUIT: request_exit(); return;
+            case SDL_EVENT_QUIT: emulator_.request_shutdown(); return;
 
             case SDL_EVENT_WINDOW_RESIZED: update_view(); break;
 
             case SDL_EVENT_KEY_DOWN: {
-                auto linux_code = sdl_scancode_to_linux(event.key.scancode);
-                if (linux_code != KEY_RESERVED && input_sink)
-                    input_sink->push_key_event(
-                        {.input_event_code = linux_code,
-                         .action = InputSink::KeyAction::Press});
+                uint32_t linux_code = sdl_scancode_to_linux(event.key.scancode);
+
+                if (linux_code != KEY_RESERVED)
+                    emulator_.push_key_event(
+                        {.code = linux_code,
+                         .action = core::KeyEvent::Action::Press});
                 break;
             }
 
             case SDL_EVENT_KEY_UP: {
-                auto linux_code = sdl_scancode_to_linux(event.key.scancode);
-                if (linux_code != KEY_RESERVED && input_sink)
-                    input_sink->push_key_event(
-                        {.input_event_code = linux_code,
-                         .action = InputSink::KeyAction::Release});
+                uint32_t linux_code = sdl_scancode_to_linux(event.key.scancode);
+
+                if (linux_code != KEY_RESERVED)
+                    emulator_.push_key_event(
+                        {.code = linux_code,
+                         .action = core::KeyEvent::Action::Release});
                 break;
             }
 
@@ -147,46 +156,50 @@ void SDL3Backend::update() {
         }
     }
 
+    if (std::string bytes = terminal_.read_input(); !bytes.empty())
+        emulator_.console_input(bytes);
+}
+
+void SDL3Frontend::present() {
+    if (std::string bytes = emulator_.console_output(); !bytes.empty())
+        terminal_.write(bytes);
+
     using clock = std::chrono::steady_clock;
     using namespace std::chrono_literals;
 
-    if (!pixel_source) [[unlikely]]
-        return;
-
-    static auto last_update = clock::now();
     const auto now = clock::now();
     constexpr auto frame_interval = 16ms + 648us;
 
-    if (now - last_update < frame_interval)
+    if (now - last_frame_time_ < frame_interval)
         return;
 
-    const size_t size = pixel_source->get_size();
-    uint8_t* buffer = pixel_buffer_.data();
+    const core::Framebuffer& framebuffer = emulator_.framebuffer();
 
     {
-        std::unique_lock<std::mutex> lock = pixel_source->acquire_lock();
-        const uint8_t* pixels = pixel_source->get_pixels();
-        std::memcpy(buffer, pixels, sizeof(uint8_t) * size);
+        std::unique_lock<std::mutex> lock = framebuffer.lock();
+        std::memcpy(pixel_buffer_.data(), framebuffer.pixels(),
+                    framebuffer.byte_size());
     }
 
-    SDL_UpdateTexture(texture_, nullptr, buffer, display_width_ * 4);
+    SDL_UpdateTexture(texture_, nullptr, pixel_buffer_.data(),
+                      display_width_ * 4);
     SDL_SetRenderDrawColor(renderer_, 64, 64, 64, 255);
     SDL_RenderClear(renderer_);
     SDL_RenderTexture(renderer_, texture_, nullptr, nullptr);
     SDL_RenderPresent(renderer_);
 
-    last_update = now;
+    last_frame_time_ = now;
 }
 
-void SDL3Backend::update_view() {
+void SDL3Frontend::update_view() {
     // Re-apply logical presentation on resize so SDL re-computes the
     // letterbox layout for the new window dimensions.
     SDL_SetRenderLogicalPresentation(renderer_, display_width_, display_height_,
                                      SDL_LOGICAL_PRESENTATION_LETTERBOX);
 }
 
-constexpr InputSink::linux_event_code_t
-SDL3Backend::sdl_scancode_to_linux(SDL_Scancode code) noexcept {
+constexpr uint32_t
+SDL3Frontend::sdl_scancode_to_linux(SDL_Scancode code) noexcept {
     switch (code) {
         // Letters
         case SDL_SCANCODE_A: return KEY_A;
@@ -409,4 +422,4 @@ SDL3Backend::sdl_scancode_to_linux(SDL_Scancode code) noexcept {
     }
 }
 
-} // namespace uemu::ui
+} // namespace uemu::frontend

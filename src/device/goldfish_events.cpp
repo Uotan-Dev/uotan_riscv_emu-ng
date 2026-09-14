@@ -35,12 +35,12 @@ GoldfishEvents::GoldfishEvents(IrqCallback irq_callback, uint32_t interrupt_id,
     set_event_bits(EV_KEY, 0x160, 0x1ff);
 }
 
-void GoldfishEvents::push_key_event(KeyEvent event) {
+void GoldfishEvents::push_key_event(core::KeyEvent event) {
     std::scoped_lock lock(goldfish_events_mutex_);
 
     const auto [keycode, action] = event;
     enqueue_event(EV_KEY, static_cast<uint32_t>(keycode),
-                  action == KeyAction::Press ? 1 : 0);
+                  action == core::KeyEvent::Action::Press ? 1 : 0);
 }
 
 std::optional<uint64_t>

@@ -45,25 +45,27 @@ include(${CMAKE_CURRENT_LIST_DIR}/thirdparty/berkeley-softfloat-3.cmake)
 # Generate .S from .S.in to bake in absolute icon path
 set(UOTAN_ICON_PATH ${CMAKE_CURRENT_SOURCE_DIR}/assets/uotan.png)
 configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/uotan_icon.S.in
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/frontend/uotan_icon.S.in
     ${CMAKE_CURRENT_BINARY_DIR}/generated/uotan_icon.S
     @ONLY
 )
-
-file(GLOB_RECURSE SOURCES
-    "src/*.cpp"
-    "src/*.c"
-    "src/*.S"
-)
-
-list(APPEND SOURCES ${CMAKE_CURRENT_BINARY_DIR}/generated/uotan_icon.S)
 
 file(GLOB_RECURSE HEADERS
     "include/*.h"
     "include/*.hpp"
 )
 
-add_library(uemu_core STATIC ${SOURCES} ${HEADERS})
+# The emulator core: guest execution, memory, devices.  It must stay free of
+# any frontend dependency (see tests/architecture/check_layering.cmake).
+file(GLOB_RECURSE CORE_SOURCES
+    "src/common/*.cpp"
+    "src/core/*.cpp"
+    "src/device/*.cpp"
+    "src/utils/*.cpp"
+    "src/emulator.cpp"
+)
+
+add_library(uemu_core STATIC ${CORE_SOURCES} ${HEADERS})
 
 target_include_directories(uemu_core
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -74,15 +76,29 @@ target_include_directories(uemu_core
 # Link libraries that the core needs
 target_link_libraries(uemu_core
     PUBLIC
-        CLI11::CLI11
         Threads::Threads
         softfloat
+)
+
+# The host frontend: everything that talks to the user (terminal, window,
+# input devices).  It is only linked into the executable, never into tests.
+file(GLOB_RECURSE FRONTEND_SOURCES
+    "src/frontend/*.cpp"
+    "src/frontend/*.S"
+)
+
+list(APPEND FRONTEND_SOURCES ${CMAKE_CURRENT_BINARY_DIR}/generated/uotan_icon.S)
+
+add_library(uemu_frontend STATIC ${FRONTEND_SOURCES})
+target_link_libraries(uemu_frontend
+    PUBLIC
+        uemu_core
         SDL3::SDL3
         SDL3_image::SDL3_image
 )
 
 add_executable(uemu src/main.cpp)
-target_link_libraries(uemu PRIVATE uemu_core)
+target_link_libraries(uemu PRIVATE uemu_frontend CLI11::CLI11)
 target_include_directories(uemu PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 option(BUILD_TESTING "Build tests" ON)

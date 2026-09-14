@@ -16,12 +16,12 @@
 
 #pragma once
 
+#include "core/framebuffer.hpp"
 #include "device/device.hpp"
-#include "ui/pixel_source.hpp"
 
 namespace uemu::device {
 
-class SimpleFB : public Device, public ui::PixelSource {
+class SimpleFB : public Device, public core::Framebuffer {
 public:
     static constexpr size_t DEFAULT_WIDTH = 1024;
     static constexpr size_t DEFAULT_HEIGHT = 768;
@@ -32,17 +32,17 @@ public:
 
     SimpleFB() : Device("SimpleFB", DEFAULT_BASE, SIZE) { vram_.resize(SIZE); }
 
-    size_t get_width() const override { return DEFAULT_WIDTH; }
+    size_t width() const noexcept override { return DEFAULT_WIDTH; }
 
-    size_t get_height() const override { return DEFAULT_HEIGHT; }
+    size_t height() const noexcept override { return DEFAULT_HEIGHT; }
 
-    size_t get_size() const override {
+    size_t byte_size() const noexcept override {
         return DEFAULT_WIDTH * DEFAULT_HEIGHT * BPP;
     }
 
-    const uint8_t* get_pixels() const override { return vram_.data(); }
+    const uint8_t* pixels() const override { return vram_.data(); }
 
-    [[nodiscard]] std::unique_lock<std::mutex> acquire_lock() const override {
+    [[nodiscard]] std::unique_lock<std::mutex> lock() const override {
         return std::unique_lock<std::mutex>(simple_fb_mutex_);
     }
 

@@ -18,12 +18,16 @@
 
 #include <mutex>
 
+#include "core/input.hpp"
 #include "device/device.hpp"
-#include "ui/input_sink.hpp"
+
+extern "C" {
+#include "linux/input-event-codes.h" // IWYU pragma: keep
+}
 
 namespace uemu::device {
 
-class GoldfishEvents : public IrqDevice, public ui::InputSink {
+class GoldfishEvents : public IrqDevice {
 public:
     static constexpr addr_t DEFAULT_BASE = 0x10002000;
     static constexpr size_t SIZE = 0x1000;
@@ -47,7 +51,7 @@ public:
                    uint32_t interrupt_id = DEFAULT_INTERRUPT_ID,
                    const std::string& device_name = "qwerty2");
 
-    void push_key_event(KeyEvent event) override;
+    void push_key_event(core::KeyEvent event);
 
 private:
     // Device state
