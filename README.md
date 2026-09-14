@@ -104,7 +104,8 @@ OPTIONS:
   -d,     --disk TEXT         Disk file to use 
           --flash0 TEXT       Flash0 file to use 
           --flash1 TEXT       Flash1 file to use 
-  -t,     --timeout UINT [0]  Execution timeout in milliseconds (0 = no timeout) 
+  -t,     --timeout INT:NONNEGATIVE [0]  
+                              Execution timeout in milliseconds (0 = no timeout)
           --headless          Run in headless mode (no UI window) 
 ```
 

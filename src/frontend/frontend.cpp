@@ -28,10 +28,16 @@ void Frontend::run(std::chrono::milliseconds timeout) {
     emulator_.start();
 
     const bool timed = timeout.count() > 0;
-    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    const auto start_time = std::chrono::steady_clock::now();
 
     while (!emulator_.finished()) {
-        if (timed && std::chrono::steady_clock::now() >= deadline) {
+        // Compare in the timeout's own unit: promoting the timeout to the
+        // clock's finer duration would overflow for very large values.
+        const auto elapsed =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - start_time);
+
+        if (timed && elapsed >= timeout) {
             log::warn("Execution timeout reached ({} ms), shutting down...",
                       timeout.count());
             break;

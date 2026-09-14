@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 
@@ -35,7 +36,7 @@ int main(int argc, char* argv[]) {
     std::filesystem::path flash0_file;
     std::filesystem::path flash1_file;
     size_t dram_size_mb = 512;
-    uint64_t timeout_ms = 0;
+    int64_t timeout_ms = 0;
     bool headless = false;
 
     // Configure command line options
@@ -50,7 +51,8 @@ int main(int argc, char* argv[]) {
     app.add_option("--flash1", flash1_file, "Flash1 file to use");
     app.add_option("-t,--timeout", timeout_ms,
                    "Execution timeout in milliseconds (0 = no timeout)")
-        ->default_val(0);
+        ->default_val(0)
+        ->check(CLI::NonNegativeNumber);
     app.add_flag("--headless", headless, "Run in headless mode (no UI window)");
 
     try {
