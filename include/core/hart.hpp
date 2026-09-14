@@ -551,9 +551,9 @@ public:
     }
 
 private:
-    // Bits 3(MSIP), 7(MTIP), 11(MEIP) must be read-only zero per spec
-    // (machine-level interrupts cannot be delegated). Only SSIP, STIP, SEIP
-    // are delegatable in standard RV64GC without H/Sscofpmf.
+    // This implementation exposes delegation for the lower-level SSIP, STIP,
+    // and SEIP interrupts.  M-mode interrupt delegation is permitted by the
+    // Privileged ISA, but the corresponding bits remain zero in this subset.
     static constexpr reg_t write_mask_ =
         Field::SSIP | Field::STIP | Field::SEIP;
     std::atomic<reg_t> value_atomic_;
@@ -692,7 +692,9 @@ public:
     void write_unchecked(reg_t v) noexcept override { value_ = v & mask_; }
 
 private:
-    static constexpr reg_t mask_ = ~2ULL;
+    // RV64 exposes the 32-bit inhibit register.  Only implemented cycle and
+    // instret counters have writable inhibit bits; time and HPM bits are zero.
+    static constexpr reg_t mask_ = Field::CY | Field::IR;
 };
 
 class MCYCLE final : public CSR {
