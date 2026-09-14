@@ -16,25 +16,21 @@
 
 #include "execution_engine.hpp"
 
-#include "device/clint.hpp"
-
 namespace uemu {
 
 ExecutionEngine::ExecutionEngine(std::shared_ptr<core::Hart> hart,
                                  std::shared_ptr<core::Dram> dram,
                                  std::shared_ptr<core::Bus> bus,
-                                 std::shared_ptr<core::MMU> mmu,
-                                 std::shared_ptr<device::Clint> clint)
+                                 std::shared_ptr<core::MMU> mmu)
     : hart_(std::move(hart)), dram_(std::move(dram)), bus_(std::move(bus)),
-      mmu_(std::move(mmu)), clint_(std::move(clint)),
-      cpu_thread_running_(false), shutdown_from_guest_(true), shutdown_code_(0),
-      shutdown_status_(0), mcycle_(dynamic_cast<core::MCYCLE*>(
-                               hart_->csrs[core::MCYCLE::ADDRESS].get())),
+      mmu_(std::move(mmu)), cpu_thread_running_(false),
+      shutdown_from_guest_(true), shutdown_code_(0), shutdown_status_(0),
+      mcycle_(dynamic_cast<core::MCYCLE*>(
+          hart_->csrs[core::MCYCLE::ADDRESS].get())),
       minstret_(dynamic_cast<core::MINSTRET*>(
-          hart_->csrs[core::MINSTRET::ADDRESS].get())),
-      deterministic_timer_(clint_->uses_deterministic_timer()) {
+          hart_->csrs[core::MINSTRET::ADDRESS].get())) {
     shutdown_from_host_.store(false, std::memory_order::relaxed);
-    assert(mcycle_ && minstret_ && clint_);
+    assert(mcycle_ && minstret_);
 }
 
 ExecutionEngine::~ExecutionEngine() {
@@ -113,15 +109,6 @@ void ExecutionEngine::request_shutdown_from_host() noexcept {
     shutdown_from_host_.store(true, std::memory_order::relaxed);
 }
 
-void ExecutionEngine::advance_timer(uint64_t simulation_steps) noexcept {
-    if (!deterministic_timer_)
-        return;
-
-    if (const uint64_t ticks = timer_step_divider_.advance(simulation_steps);
-        ticks != 0)
-        clint_->advance_timer(ticks);
-}
-
 void ExecutionEngine::cpu_thread() {
     {
         std::scoped_lock lock(cpu_mutex_);
@@ -138,7 +125,6 @@ void ExecutionEngine::cpu_thread() {
             break;
 
         mcycle_->advance();
-        bool timer_step_accounted = false;
 
         try {
             // Normal execution
@@ -156,8 +142,6 @@ void ExecutionEngine::cpu_thread() {
             // WFI: hart stalls until a locally-enabled interrupt becomes
             // pending (mip & mie != 0).
             minstret_->advance(); // WFI counts as retired
-            advance_timer(1);
-            timer_step_accounted = true;
 
             while (true) {
                 if (shutdown_from_guest_) [[unlikely]]
@@ -167,10 +151,7 @@ void ExecutionEngine::cpu_thread() {
                     [[unlikely]]
                     break;
 
-                // Spike advances device time by one interleave while a hart is
-                // stalled in WFI, allowing deterministic timer interrupts to
-                // wake it.
-                advance_timer(TIMER_INTERLEAVE);
+                std::this_thread::yield();
 
                 if (hart_->has_pending_enabled_interrupt()) {
                     try {
@@ -182,8 +163,6 @@ void ExecutionEngine::cpu_thread() {
 
                     break;
                 }
-
-                std::this_thread::yield();
             }
         } catch (const core::Trap& trap) {
             // RISC-V Traps
@@ -193,9 +172,6 @@ void ExecutionEngine::cpu_thread() {
             shutdown_from_guest_ = true;
             break;
         }
-
-        if (!timer_step_accounted)
-            advance_timer(1);
     }
 
     {

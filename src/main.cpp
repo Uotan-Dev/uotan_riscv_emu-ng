@@ -36,7 +36,6 @@ int main(int argc, char* argv[]) {
     size_t dram_size_mb = 512;
     uint64_t timeout_ms = 0;
     bool headless = false;
-    bool deterministic_timer = false;
 
     // Configure command line options
     app.add_option("-f,--file", elf_file, "ELF file to load")
@@ -52,9 +51,6 @@ int main(int argc, char* argv[]) {
                    "Execution timeout in milliseconds (0 = no timeout)")
         ->default_val(0);
     app.add_flag("--headless", headless, "Run in headless mode (no UI window)");
-    app.add_flag("--deterministic-timer", deterministic_timer,
-                 "Use instruction-driven time for architectural tests, "
-                 "regression, and debugging");
 
     try {
         // Parse command line
@@ -69,10 +65,8 @@ int main(int argc, char* argv[]) {
         if (timeout_ms > 0)
             std::println("  Timeout: {} ms", timeout_ms);
 
-        uemu::Emulator emulator(
-            dram_size, headless, disk_file, flash0_file, flash1_file,
-            deterministic_timer ? uemu::TimerMode::Deterministic
-                                : uemu::TimerMode::Realtime);
+        uemu::Emulator emulator(dram_size, headless, disk_file, flash0_file,
+                                flash1_file);
 
         emulator.loadelf(elf_file);
         emulator.run(std::chrono::milliseconds(timeout_ms));

@@ -16,12 +16,11 @@
 
 #pragma once
 
-#include <memory>
+#include <chrono>
 #include <mutex>
 
 #include "core/hart.hpp"
 #include "device/device.hpp"
-#include "time_source.hpp"
 
 namespace uemu::device {
 
@@ -34,27 +33,27 @@ public:
     static constexpr addr_t MTIMECMP_OFFSET = 0x4000;
     static constexpr addr_t MTIME_OFFSET = 0xBFF8;
 
-    Clint(std::shared_ptr<core::Hart> hart, uint64_t freq_hz = DEFAULT_FREQ,
-          TimerMode timer_mode = TimerMode::Realtime);
+    Clint(std::shared_ptr<core::Hart> hart, uint64_t freq_hz = DEFAULT_FREQ);
 
     void tick() override;
     uint64_t get_mtime() noexcept;
-    void advance_timer(uint64_t ticks) noexcept;
-    [[nodiscard]] bool uses_deterministic_timer() const noexcept;
 
 private:
     std::optional<uint64_t> read_internal(addr_t offset, size_t size) override;
     bool write_internal(addr_t offset, size_t size, uint64_t value) override;
 
-    void update_interrupts(uint64_t mtime) noexcept;
-    void handle_mtimecmp(uint64_t mtime) noexcept;
-    void handle_stimecmp(uint64_t mtime) noexcept;
+    inline void tick_internal();
+    inline void handle_mtimecmp();
+    inline void handle_stimecmp();
 
     std::shared_ptr<core::Hart> hart_;
 
     std::mutex clint_mutex_;
+    uint64_t mtime_;
     uint64_t mtimecmp_;
-    std::unique_ptr<TimeSource> time_source_;
+
+    std::chrono::steady_clock::time_point start_time_;
+    const uint64_t freq_hz_;
 };
 
 } // namespace uemu::device

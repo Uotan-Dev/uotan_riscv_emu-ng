@@ -42,8 +42,7 @@ namespace uemu {
 Emulator::Emulator(size_t dram_size, bool headless,
                    const std::filesystem::path& disk,
                    const std::filesystem::path& flash0_path,
-                   const std::filesystem::path& flash1_path,
-                   TimerMode timer_mode) {
+                   const std::filesystem::path& flash1_path) {
     auto hart = std::make_shared<core::Hart>();
     auto dram = std::make_shared<core::Dram>(dram_size);
     auto bus = std::make_shared<core::Bus>(dram);
@@ -52,9 +51,7 @@ Emulator::Emulator(size_t dram_size, bool headless,
     hart->connect_mmu(mmu.get());
 
     // Clint
-    auto clint = std::make_shared<device::Clint>(
-        hart, device::Clint::DEFAULT_FREQ, timer_mode);
-    bus->add_device(clint);
+    bus->add_device(std::make_shared<device::Clint>(hart));
 
     // TestIntrGen — Sail-style simple interrupt generator for ACT tests
     bus->add_device(std::make_shared<device::TestIntrGen>(hart));
@@ -120,7 +117,7 @@ Emulator::Emulator(size_t dram_size, bool headless,
     bus->add_device(std::make_shared<device::NemuConsole>());
 
     // ExecutionEngine
-    engine_ = std::make_unique<ExecutionEngine>(hart, dram, bus, mmu, clint);
+    engine_ = std::make_unique<ExecutionEngine>(hart, dram, bus, mmu);
 
     // UI backend
     ui::UIBackend::Endpoints endpoints{

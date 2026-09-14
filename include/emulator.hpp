@@ -19,7 +19,6 @@
 #include <filesystem>
 
 #include "execution_engine.hpp"
-#include "time_source.hpp"
 
 namespace uemu {
 
@@ -28,8 +27,7 @@ public:
     explicit Emulator(size_t dram_size, bool headless = true,
                       const std::filesystem::path& disk_path = "",
                       const std::filesystem::path& flash0_path = "",
-                      const std::filesystem::path& flash1_path = "",
-                      TimerMode timer_mode = TimerMode::Realtime);
+                      const std::filesystem::path& flash1_path = "");
     ~Emulator() = default;
 
     Emulator(const Emulator&) = delete;
