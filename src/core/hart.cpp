@@ -112,6 +112,9 @@ Hart::Hart(addr_t reset_pc)
     add_csr<MCOUNTINHIBIT>();
     add_csr<MCYCLE>();
     add_csr<MINSTRET>();
+    add_csr_ranged<MHPMCOUNTERN>();
+    add_csr_ranged<MHPMEVENTN>();
+
     add_csr<MCONFIGPTR>();
 
     add_csr_ranged<PMPCFGN>();

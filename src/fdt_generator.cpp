@@ -110,12 +110,14 @@ std::vector<uint8_t> FdtGenerator::generate() const {
     fdt.set_string(cpu, "status", "okay");
     fdt.set_string(cpu, "compatible", "riscv");
     fdt.set_string(cpu, "mmu-type", "riscv,sv39"); // the MMU implements Sv39
-    // The ISA description mirrors the extension list in README.md.
-    fdt.set_string(cpu, "riscv,isa", "rv64imafdc_zicntr_zicsr_zifencei");
+    // The HPM registers exist as read-only zero, which the specification
+    // allows (norm:mhpmcounter_mhpmevent_rdonly0); both the legacy ISA string
+    // and the extension list describe what the hart implements.
+    fdt.set_string(cpu, "riscv,isa", "rv64imafdc_zicntr_zicsr_zifencei_zihpm");
     fdt.set_string(cpu, "riscv,isa-base", "rv64i");
     fdt.set_string_list(
         cpu, "riscv,isa-extensions",
-        {"i", "m", "a", "f", "d", "c", "zicntr", "zicsr", "zifencei"});
+        {"i", "m", "a", "f", "d", "c", "zicntr", "zicsr", "zifencei", "zihpm"});
 
     const std::string cpu_intc = std::string(cpu) + "/interrupt-controller";
     fdt.add_node(cpu_intc);

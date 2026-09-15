@@ -95,7 +95,7 @@ TEST(FdtGeneratorTest, DefaultTreeDescribesTheVirtualBoard) {
     const int cpu = find_node(dtb, "/cpus/cpu@0");
     EXPECT_EQ(read_string(dtb, cpu, "mmu-type"), "riscv,sv39");
     EXPECT_EQ(read_string(dtb, cpu, "riscv,isa"),
-              "rv64imafdc_zicntr_zicsr_zifencei");
+              "rv64imafdc_zicntr_zicsr_zifencei_zihpm");
     EXPECT_EQ(read_u32(dtb, find_node(dtb, "/cpus"), "timebase-frequency"),
               config.clint.freq_hz);
 

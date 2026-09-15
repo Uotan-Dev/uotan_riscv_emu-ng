@@ -23,6 +23,7 @@ implemented_extensions:
   - { name: Zifencei, version: "= 2.0.0" }
   - { name: Zicntr, version: "= 2.0" }
   - { name: Zihintpause, version: "= 2.0.0" }
+  - { name: Zihpm, version: "= 2.0" }
   # Code size reduction
   - { name: Zca, version: "= 1.0.0" }
   - { name: Zcd, version: "= 1.0.0" }
@@ -41,6 +42,8 @@ implemented_extensions:
   - { name: Ssu64xl, version: "= 1.0.0" }
 
 params:
+  # Zihpm params; the counters are read-only zero, so no event is selectable.
+  HPM_EVENTS: []
   # A params
   MISALIGNED_AMO: false
   LRSC_RESERVATION_STRATEGY: "reserve exactly enough to cover the access"
@@ -131,13 +134,13 @@ params:
   NUM_PMP_ENTRIES: 0
   HPM_COUNTER_EN:
     [
-      false, false, false, false, false,
-      false, false, false, false, false,
-      false, false, false, false, false,
-      false, false, false, false, false,
-      false, false, false, false, false,
-      false, false, false, false, false,
-      false, false,
+      false, false, false, true, true,
+      true, true, true, true, true,
+      true, true, true, true, true,
+      true, true, true, true, true,
+      true, true, true, true, true,
+      true, true, true, true, true,
+      true, true,
     ]
   MCOUNTINHIBIT_IMPLEMENTED: true
   COUNTINHIBIT_EN:

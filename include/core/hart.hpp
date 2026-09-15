@@ -771,6 +771,24 @@ private:
     bool increase_suppressed_ = false;
 };
 
+class MHPMCOUNTERN final : public HardwiredCSR {
+public:
+    static constexpr size_t MIN_ADDRESS = 0xB03;
+    static constexpr size_t MAX_ADDRESS = 0xB1F;
+    static constexpr size_t DELTA_ADDRESS = 1;
+
+    MHPMCOUNTERN(Hart* hart) : HardwiredCSR(hart, PrivilegeLevel::M, 0) {}
+};
+
+class MHPMEVENTN final : public HardwiredCSR {
+public:
+    static constexpr size_t MIN_ADDRESS = 0x323;
+    static constexpr size_t MAX_ADDRESS = 0x33F;
+    static constexpr size_t DELTA_ADDRESS = 1;
+
+    MHPMEVENTN(Hart* hart) : HardwiredCSR(hart, PrivilegeLevel::M, 0) {}
+};
+
 class MCOUNTEREN final : public CSR {
 public:
     static constexpr size_t ADDRESS = 0x306;
@@ -1250,12 +1268,11 @@ public:
     static constexpr size_t MIN_ADDRESS = 0xC03;
     static constexpr size_t MAX_ADDRESS = 0xC1F;
     static constexpr size_t DELTA_ADDRESS = 1;
-    // Machine-mode base corresponding to the user-mode HPM shadow range.
-    static constexpr size_t MACHINE_MIN_ADDRESS = 0xB03;
 
     HPMCOUNTERN(Hart* hart, size_t address)
         : UserCounterCSR(hart, address,
-                         MACHINE_MIN_ADDRESS + address - MIN_ADDRESS) {}
+                         MHPMCOUNTERN::MIN_ADDRESS + address -
+                             HPMCOUNTERN::MIN_ADDRESS) {}
 };
 
 class FFLAGS final : public CSR {
