@@ -170,6 +170,11 @@ public:
     PrivilegeLevel priv;
     MMU* mmu;
 
+    // Bumped whenever state that can change access legality changes without
+    // flushing the TLB (today: any mstatus write, which covers privilege,
+    // MPRV/MPP, SUM and MXR).  Cached translation decisions compare it.
+    uint64_t mmu_context_epoch = 0;
+
     // Set to true after xRET, WFI, or CSR writes that may change
     // interrupt trap conditions.  Forces immediate check_interrupts()
     // on the next loop iteration, bypassing the 256-insn batch window.
@@ -449,6 +454,9 @@ public:
     }
 
     void write_unchecked(reg_t v) noexcept override {
+        // mstatus affects access legality; see mmu_context_epoch.
+        hart_->mmu_context_epoch++;
+
         v = (value_ & ~write_mask_) | (v & write_mask_);
 
         // MPP=0b10 is reserved when only M/S/U privilege modes are

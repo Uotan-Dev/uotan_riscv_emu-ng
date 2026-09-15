@@ -356,6 +356,7 @@ TEST_F(MmuTest, TlbFlushVaddrRefreshesTheCachedHostPage) {
     enable_sv39(root);
 
     EXPECT_EQ(mmu.read<uint32_t>(hart.pc, CODE_VA + 0x40), 0x11111111u);
+    mmu.write<uint32_t>(hart.pc, CODE_VA + 0x44, 0x44444444u);
 
     remap(root, CODE_VA, OTHER_PA, PTE_RWX);
     mmu.tlb_flush_vaddr(CODE_VA);
@@ -364,7 +365,39 @@ TEST_F(MmuTest, TlbFlushVaddrRefreshesTheCachedHostPage) {
 
     mmu.write<uint32_t>(hart.pc, CODE_VA + 0x44, 0x33333333u);
     EXPECT_EQ(dram->read<uint32_t>(OTHER_PA + 0x44), 0x33333333u);
-    EXPECT_EQ(dram->read<uint32_t>(CODE_PA + 0x44), 0u);
+    EXPECT_EQ(dram->read<uint32_t>(CODE_PA + 0x44), 0x44444444u);
+}
+
+// A satp write flushes everything, including the last data access.
+TEST_F(MmuTest, SatpWriteDropsTheLastPageCache) {
+    dram->write<uint32_t>(CODE_PA + 0x58, 0x11111111);
+    dram->write<uint32_t>(OTHER_PA + 0x58, 0x22222222);
+
+    enable_sv39(map(CODE_VA, CODE_PA, PTE_RWX));
+    EXPECT_EQ(mmu.read<uint32_t>(hart.pc, CODE_VA + 0x58), 0x11111111u);
+    mmu.write<uint32_t>(hart.pc, CODE_VA + 0x5C, 0x44444444u);
+
+    enable_sv39(map(CODE_VA, OTHER_PA, PTE_RWX));
+
+    EXPECT_EQ(mmu.read<uint32_t>(hart.pc, CODE_VA + 0x58), 0x22222222u);
+
+    mmu.write<uint32_t>(hart.pc, CODE_VA + 0x5C, 0x33333333u);
+    EXPECT_EQ(dram->read<uint32_t>(OTHER_PA + 0x5C), 0x33333333u);
+    EXPECT_EQ(dram->read<uint32_t>(CODE_PA + 0x5C), 0x44444444u);
+}
+
+// The privilege level is part of what allowed the last access, so an M-mode
+// access must not reuse the page translated for S-mode.
+TEST_F(MmuTest, PrivilegeChangeDoesNotReuseTheLastPage) {
+    dram->write<uint32_t>(CODE_VA + 0x64, 0xAAAAAAAA);
+    dram->write<uint32_t>(CODE_PA + 0x64, 0xBBBBBBBB);
+
+    enable_sv39(map(CODE_VA, CODE_PA, PTE_RWX));
+    EXPECT_EQ(mmu.read<uint32_t>(hart.pc, CODE_VA + 0x64), 0xBBBBBBBBu);
+
+    // No flush and no mstatus write here: M-mode ignores satp.
+    hart.priv = core::PrivilegeLevel::M;
+    EXPECT_EQ(mmu.read<uint32_t>(hart.pc, CODE_VA + 0x64), 0xAAAAAAAAu);
 }
 
 // A page that belongs to a device is not DRAM, so accesses must keep going
@@ -386,7 +419,7 @@ TEST_F(MmuTest, DevicePageIsNotServedFromTheHostCache) {
 
 // The cached page is only an address: permission is decided again on every
 // access, so clearing SUM takes a mapped DRAM page away again.
-TEST_F(MmuTest, UserPageLoadIsRecheckedAgainstSum) {
+TEST_F(MmuTest, UserPageAccessIsRecheckedAgainstSum) {
     dram->write<uint32_t>(CODE_PA + 0x50, 0x0BADF00D);
 
     enable_sv39(map(CODE_VA, CODE_PA, PTE_RWX | PTE_U));
@@ -412,6 +445,8 @@ TEST_F(MmuTest, UserPageLoadIsRecheckedAgainstSum) {
 
     set_sum(true);
     EXPECT_EQ(mmu.read<uint32_t>(hart.pc, CODE_VA + 0x50), 0x0BADF00Du);
+    mmu.write<uint32_t>(hart.pc, CODE_VA + 0x54, 0xCAFEBABEu);
+    EXPECT_EQ(dram->read<uint32_t>(CODE_PA + 0x54), 0xCAFEBABEu);
 
     set_sum(false);
     try {
@@ -421,6 +456,16 @@ TEST_F(MmuTest, UserPageLoadIsRecheckedAgainstSum) {
     } catch (const core::Trap& trap) {
         EXPECT_EQ(trap.cause, core::TrapCause::LoadPageFault);
     }
+
+    try {
+        mmu.write<uint32_t>(hart.pc, CODE_VA + 0x58, 0xDEADBEEFu);
+        FAIL() << "supervisor store to a user page succeeded after SUM was "
+                  "cleared again";
+    } catch (const core::Trap& trap) {
+        EXPECT_EQ(trap.cause, core::TrapCause::StoreAMOPageFault);
+    }
+
+    EXPECT_EQ(dram->read<uint32_t>(CODE_PA + 0x58), 0u);
 }
 
 // In M-mode the address is the physical address, and the page is whole DRAM,

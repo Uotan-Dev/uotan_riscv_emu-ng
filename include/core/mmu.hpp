@@ -57,6 +57,14 @@ public:
 
         // Aligned access
         if (addr % size == 0) [[likely]] {
+            // The previous access of this kind to this page was allowed with
+            // the context that is still in effect, so it is allowed again.
+            if (uint8_t* host = last_page_hit(atype, addr)) [[likely]] {
+                T v;
+                std::memcpy(&v, host + (addr & PGMASK), size);
+                return v;
+            }
+
             uint8_t* page = nullptr;
             addr_t paddr = translate(pc, addr, atype, &page);
 
@@ -111,6 +119,12 @@ public:
 
         // Aligned access
         if (addr % size == 0) [[likely]] {
+            if (uint8_t* host = last_page_hit(AccessType::Store, addr))
+                [[likely]] {
+                std::memcpy(host + (addr & PGMASK), &value, size);
+                return;
+            }
+
             uint8_t* page = nullptr;
             addr_t paddr = translate(pc, addr, AccessType::Store, &page);
 
@@ -243,6 +257,8 @@ public:
         memset(itlb_, 0, sizeof(itlb_));
         memset(dtlb_, 0, sizeof(dtlb_));
         fetch_page_.valid = false;
+        last_load_.valid = false;
+        last_store_.valid = false;
     }
 
     void tlb_flush_vaddr(addr_t vaddr) {
@@ -257,6 +273,12 @@ public:
 
         if (fetch_page_.vpn == vpn)
             fetch_page_.valid = false;
+
+        if (last_load_.valid && last_load_.vpn == vpn)
+            last_load_.valid = false;
+
+        if (last_store_.valid && last_store_.vpn == vpn)
+            last_store_.valid = false;
     }
 
     addr_t reservation_address = 0;
@@ -305,6 +327,57 @@ private:
         PrivilegeLevel priv = PrivilegeLevel::M;
         bool valid = false;
     } fetch_page_;
+
+    // The page the last data access of one kind was allowed on.  A slot records
+    // only that translate() allowed such an access, never the rule that allowed
+    // it, so it is reused only while that decision still holds.
+    struct LastPage {
+        uint8_t* host = nullptr; // DRAM page base
+        addr_t vpn = 0;          // guest page number
+        uint64_t epoch = 0; // hart_->mmu_context_epoch when it was recorded
+        PrivilegeLevel priv = PrivilegeLevel::M;
+        bool valid = false;
+    };
+
+    LastPage last_load_;
+    LastPage last_store_;
+
+    // Host page for `addr` when the last access of `type` to that page was
+    // allowed with the context that is still in effect, else nullptr.  Every
+    // satp write and SFENCE.VMA drops the slots through the TLB flushes.
+    [[nodiscard]] uint8_t* last_page_hit(AccessType type, addr_t addr) const {
+        const LastPage& last =
+            type == AccessType::Load ? last_load_ : last_store_;
+
+        if (last.valid && last.vpn == (addr >> PGSHIFT) &&
+            last.epoch == hart_->mmu_context_epoch && last.priv == hart_->priv)
+            [[likely]]
+            return last.host;
+
+        return nullptr;
+    }
+
+    // Report where `vaddr` translated to and remember that an access of `type`
+    // to that page was just allowed.  Fetch has its own current-page cache.
+    void remember_page(uint8_t** host_page, AccessType type, addr_t vaddr,
+                       uint8_t* host) {
+        *host_page = host;
+
+        if (type == AccessType::Fetch)
+            return;
+
+        LastPage& last = type == AccessType::Load ? last_load_ : last_store_;
+        last.valid = false;
+
+        if (!host)
+            return;
+
+        last.host = host;
+        last.vpn = vaddr >> PGSHIFT;
+        last.epoch = hart_->mmu_context_epoch;
+        last.priv = hart_->priv;
+        last.valid = true;
+    }
 
     // Check if an instruction at pc may cross pages
     static bool may_cross_page(addr_t pc) noexcept {
@@ -360,7 +433,8 @@ private:
 
         if (priv == PrivilegeLevel::M) {
             if (host_page)
-                *host_page = bus_->dram_page_base(vaddr);
+                remember_page(host_page, type, vaddr,
+                              bus_->dram_page_base(vaddr));
 
             return vaddr;
         }
@@ -370,7 +444,8 @@ private:
 
         if (mode == SATP::Mode::Bare) {
             if (host_page)
-                *host_page = bus_->dram_page_base(vaddr);
+                remember_page(host_page, type, vaddr,
+                              bus_->dram_page_base(vaddr));
 
             return vaddr;
         }
@@ -416,7 +491,7 @@ private:
                 goto miss;
 
             if (host_page)
-                *host_page = entry->host;
+                remember_page(host_page, type, vaddr, entry->host);
 
             return (entry->ppn << PGSHIFT) | (vaddr & PGMASK);
         }
@@ -527,7 +602,7 @@ private:
             entry->host = bus_->dram_page_base(final_ppn << PGSHIFT);
 
             if (host_page)
-                *host_page = entry->host;
+                remember_page(host_page, type, vaddr, entry->host);
 
             return (final_ppn << PGSHIFT) | (vaddr & PGMASK);
         }
