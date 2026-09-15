@@ -36,11 +36,25 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 
 # Find required packages
 find_package(CLI11 CONFIG REQUIRED)
-find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 find_package(SDL3 REQUIRED CONFIG)
 find_package(SDL3_image REQUIRED CONFIG)
-pkg_check_modules(LIBFDT REQUIRED IMPORTED_TARGET libfdt)
+
+# libfdt ships no pkg-config file on Ubuntu/Debian, so find the header and the
+# library directly and hand both to the targets through one imported target.
+find_path(LIBFDT_INCLUDE_DIR NAMES libfdt.h)
+find_library(LIBFDT_LIBRARY NAMES fdt)
+
+if(NOT LIBFDT_INCLUDE_DIR OR NOT LIBFDT_LIBRARY)
+    message(FATAL_ERROR "libfdt was not found (libfdt.h and libfdt are both "
+                        "needed; install libfdt-dev)")
+endif()
+
+add_library(LibFDT::LibFDT UNKNOWN IMPORTED)
+set_target_properties(LibFDT::LibFDT PROPERTIES
+    IMPORTED_LOCATION "${LIBFDT_LIBRARY}"
+    INTERFACE_INCLUDE_DIRECTORIES "${LIBFDT_INCLUDE_DIR}"
+)
 
 include(${CMAKE_CURRENT_LIST_DIR}/thirdparty/berkeley-softfloat-3.cmake)
 
@@ -84,7 +98,7 @@ target_link_libraries(uemu_core
         Threads::Threads
         softfloat
     PRIVATE
-        PkgConfig::LIBFDT
+        LibFDT::LibFDT
 )
 
 # The host frontend: everything that talks to the user (terminal, window,

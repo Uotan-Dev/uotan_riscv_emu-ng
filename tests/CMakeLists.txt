@@ -36,7 +36,7 @@ target_link_libraries(uemu_test
     uemu_core
     # The tests read the generated device trees with libfdt themselves; the
     # core keeps its own libfdt dependency private.
-    PkgConfig::LIBFDT
+    LibFDT::LibFDT
 )
 
 target_include_directories(uemu_test PRIVATE 
