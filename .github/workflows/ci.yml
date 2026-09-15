@@ -68,6 +68,7 @@ jobs:
           liburing-dev \
           libfribidi-dev \
           libcli11-dev \
+          libfdt-dev \
           clang
     
     - name: Install RISC-V toolchain

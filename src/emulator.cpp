@@ -15,8 +15,11 @@
  */
 
 #include <exception>
+#include <limits>
 #include <stdexcept>
 #include <thread>
+
+#include <libfdt.h>
 
 #include "common/log.hpp"
 #include "core/mmu.hpp"
@@ -34,7 +37,7 @@
 #include "device/test_intr_gen.hpp"
 #include "device/virtio_blk.hpp"
 #include "emulator.hpp"
-#include "utils/elfloader.hpp"
+#include "utils/elf_loader.hpp"
 #include "utils/fileloader.hpp"
 
 namespace uemu {
@@ -190,13 +193,85 @@ void Emulator::push_key_event(core::KeyEvent event) {
 
 core::Framebuffer& Emulator::framebuffer() noexcept { return *framebuffer_; }
 
-void Emulator::loadelf(const std::filesystem::path& path) {
-    addr_t pc = utils::ElfLoader::load(path, *dram_);
+void Emulator::load_elf(const std::filesystem::path& path) {
+    utils::ElfLoadResult result = utils::ElfLoader::load(path, *dram_);
 
-    hart_->pc = pc;
+    hart_->pc = result.entry;
+    loaded_ranges_.insert(loaded_ranges_.end(), result.loaded_ranges.begin(),
+                          result.loaded_ranges.end());
     log::info("ELF loaded: {}\n"
               "      entry PC = 0x{:016x}",
-              path.string(), pc);
+              path.string(), result.entry);
+}
+
+addr_t Emulator::find_fdt_address(size_t size) const {
+    // Firmware likes the device tree high in DRAM and 2 MiB aligned; QEMU's
+    // riscv virt machine places it the same way, and OpenSBI knows how to keep
+    // it out of the way once it has received it in a1.
+    constexpr addr_t FDT_ALIGNMENT = 2 * 1024 * 1024;
+    constexpr addr_t FDT_ALIGNMENT_MASK = FDT_ALIGNMENT - 1;
+    constexpr addr_t dram_begin = core::Dram::DRAM_BASE;
+
+    if (dram_->size() > std::numeric_limits<addr_t>::max() - dram_begin)
+        throw std::overflow_error("DRAM address range overflows");
+
+    const addr_t dram_end = dram_begin + dram_->size();
+    if (size == 0 || size > dram_->size())
+        throw std::runtime_error("DTB does not fit in DRAM");
+
+    // Walk downwards: try the highest aligned slot first, and when it collides
+    // retry just below the lowest range it hit.  Ranges being moved past can
+    // never hold the blob (the placement overlapped them, so the free space
+    // between two of them is necessarily smaller than the blob), so the search
+    // cannot skip a slot that would have fit, and the ceiling strictly
+    // decreases, so it terminates.
+    addr_t ceiling = dram_end;
+    while (ceiling >= dram_begin && size <= ceiling - dram_begin) {
+        const addr_t candidate = (ceiling - size) & ~FDT_ALIGNMENT_MASK;
+        if (candidate < dram_begin)
+            break;
+
+        const AddressRange placement{candidate, candidate + size};
+        const AddressRange* collision = nullptr;
+        for (const AddressRange& range : loaded_ranges_) {
+            if (placement.overlaps(range) &&
+                (!collision || range.begin < collision->begin))
+                collision = &range;
+        }
+
+        if (!collision)
+            return candidate;
+
+        ceiling = collision->begin;
+    }
+
+    throw std::runtime_error("No free DRAM region is available for the DTB");
+}
+
+addr_t Emulator::install_fdt(std::span<const uint8_t> blob) {
+    // Device trees are written once, before the hart starts: the firmware
+    // receives the address in a1 and owns it from then on.  Call this after
+    // every guest image has been loaded so the placement can avoid them.
+    if (started_)
+        throw std::logic_error("Cannot install a DTB after execution starts");
+    if (fdt_installed_)
+        throw std::logic_error("A DTB has already been installed");
+    if (blob.size() < sizeof(fdt_header) ||
+        fdt_check_full(blob.data(), blob.size()) != 0)
+        throw std::runtime_error("Invalid DTB");
+
+    const size_t total_size = fdt_totalsize(blob.data());
+    if (total_size == 0 || total_size > blob.size())
+        throw std::runtime_error("Truncated DTB");
+
+    const addr_t address = find_fdt_address(total_size);
+    dram_->write_bytes(address, blob.data(), total_size);
+    // a1 is the flattened device tree address; a0 is still 0, the boot hart id.
+    hart_->gprs.write(11, address);
+    fdt_installed_ = true;
+
+    log::info("DTB installed: {} bytes at 0x{:016x}", total_size, address);
+    return address;
 }
 
 void Emulator::load(addr_t addr, const void* p, size_t n) {
@@ -207,6 +282,21 @@ void Emulator::load(addr_t addr, const void* p, size_t n) {
         return;
 
     dram_->write_bytes(addr, p, n);
+
+    // Everything written here is guest state, so the device tree must avoid it
+    // too.  Recording happens after the write so a rejected range leaves the
+    // list untouched.
+    loaded_ranges_.push_back({addr, addr + n});
+}
+
+void Emulator::read(addr_t addr, void* p, size_t n) const {
+    if (!p)
+        throw std::invalid_argument("p is nullptr");
+
+    if (n == 0)
+        return;
+
+    dram_->read_bytes(addr, p, n);
 }
 
 void Emulator::load(addr_t addr, const std::filesystem::path& path) {

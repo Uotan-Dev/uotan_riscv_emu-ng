@@ -31,9 +31,9 @@ namespace uemu {
 // board's single source of truth.
 //
 // Every default is the guest-visible machine ABI documented in README.md and
-// misc/uemu.dts; changing one changes what firmware sees.  A device keeps what
-// its own protocol defines (register offsets, bit fields, virtio constants) and
-// only reads its placement and parameters from here.
+// emitted by FdtGenerator; changing one changes what firmware sees.  A device
+// keeps what its own protocol defines (register offsets, bit fields, virtio
+// constants) and only reads its placement and parameters from here.
 //
 // DRAM itself lives at the architectural address core::Dram::DRAM_BASE, which
 // is also the hart's reset PC, so the board only chooses its size.
@@ -46,6 +46,7 @@ struct NS16550Config {
     addr_t base = 0x10000000; // uart@10000000, "ns16550a"
     size_t size = 0x100;
     uint32_t interrupt_id = 10;
+    uint32_t clock_hz = 3686400;
     uint32_t reg_shift = 0;
     uint32_t reg_io_width = 1;
 };

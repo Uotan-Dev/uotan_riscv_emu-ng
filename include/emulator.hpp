@@ -20,12 +20,14 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <span>
 #include <stop_token>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "board_config.hpp"
+#include "common/address_range.hpp"
 #include "common/types.hpp"
 #include "core/cpu.hpp"
 #include "core/device_thread.hpp"
@@ -68,13 +70,30 @@ public:
     Emulator(Emulator&&) = delete;
     Emulator& operator=(Emulator&&) = delete;
 
-    // Load an elf from path to DRAM
-    void loadelf(const std::filesystem::path& path);
+    // Load an ELF into DRAM, set its entry PC and remember its PT_LOAD ranges.
+    void load_elf(const std::filesystem::path& path);
 
-    // Load data from p to DRAM
+    // Place a packed device tree in an unoccupied DRAM region, write it to
+    // ordinary DRAM and set a1 to its guest physical address (a0 stays the boot
+    // hart id, 0).  Must be called before start(), after every guest image has
+    // been loaded.
+    [[nodiscard]] addr_t install_fdt(std::span<const uint8_t> blob);
+
+    // Guest physical ranges that are already occupied: the ELF's PT_LOAD
+    // segments plus everything written through load().  The device tree is
+    // placed outside them.
+    [[nodiscard]] std::span<const AddressRange> loaded_ranges() const noexcept {
+        return loaded_ranges_;
+    }
+
+    // Load data from p to DRAM and remember the range as occupied
     void load(addr_t addr, const void* p, size_t n);
 
-    // Load a common file to DRAM
+    // Copy data from DRAM to host memory, e.g. to inspect guest state from a
+    // test.  Call only while workers are stopped.
+    void read(addr_t addr, void* p, size_t n) const;
+
+    // Load a common file to DRAM and remember its range as occupied
     void load(addr_t addr, const std::filesystem::path& path);
 
     // Load data from a vector<T> to DRAM
@@ -120,6 +139,7 @@ public:
 
 private:
     void halt_from_guest(uint16_t code, uint16_t status) noexcept;
+    [[nodiscard]] addr_t find_fdt_address(size_t size) const;
 
     // Declared in dependency order: reverse destruction joins the workers
     // before the objects they reference go away.
@@ -137,6 +157,8 @@ private:
     bool started_ = false;
     uint16_t shutdown_code_ = 0;
     uint16_t shutdown_status_ = 0;
+    bool fdt_installed_ = false;
+    std::vector<AddressRange> loaded_ranges_;
 
     core::Cpu cpu_;
     core::DeviceThread device_thread_;

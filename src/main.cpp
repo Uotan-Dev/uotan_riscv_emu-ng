@@ -17,6 +17,9 @@
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
+#include <stdexcept>
+#include <vector>
 
 #include <SDL3/SDL_main.h>
 
@@ -24,6 +27,7 @@
 
 #include "common/log.hpp"
 #include "emulator.hpp"
+#include "fdt_generator.hpp"
 #include "frontend/headless_frontend.hpp"
 #include "frontend/sdl3_frontend.hpp"
 
@@ -36,14 +40,15 @@ int main(int argc, char* argv[]) {
     uemu::BoardConfig config;
 
     std::filesystem::path elf_file;
+    std::filesystem::path dump_dtb_file;
     // The option default is the board's DRAM size, so it stays in one place.
     size_t dram_size_mb = config.dram.size / (1024 * 1024);
     int64_t timeout_ms = 0;
     bool headless = false;
 
     // Configure command line options
-    app.add_option("-f,--file", elf_file, "ELF file to load")
-        ->required()
+    app.add_option("-f,--file", elf_file,
+                   "ELF file to load (required unless --dump-dtb is used)")
         ->check(CLI::ExistingFile);
     app.add_option("-m,--memory", dram_size_mb, "DRAM size in MB")
         ->capture_default_str()
@@ -51,6 +56,8 @@ int main(int argc, char* argv[]) {
     app.add_option("-d,--disk", config.virtio_blk.image, "Disk file to use");
     app.add_option("--flash0", config.flash0.image, "Flash0 file to use");
     app.add_option("--flash1", config.flash1.image, "Flash1 file to use");
+    app.add_option("--dump-dtb", dump_dtb_file,
+                   "Write the generated DTB to a file");
     app.add_option("-t,--timeout", timeout_ms,
                    "Execution timeout in milliseconds (0 = no timeout)")
         ->default_val(0)
@@ -66,14 +73,42 @@ int main(int argc, char* argv[]) {
         uemu::log::info("Initializing emulator...");
         uemu::log::info("  DRAM size: {} MB ({} bytes)", dram_size_mb,
                         config.dram.size);
-        uemu::log::info("  ELF file: {}", elf_file.string());
+        if (!elf_file.empty())
+            uemu::log::info("  ELF file: {}", elf_file.string());
 
         if (timeout_ms > 0)
             uemu::log::info("  Timeout: {} ms", timeout_ms);
 
+        std::vector<uint8_t> dtb = uemu::FdtGenerator(config).generate();
+        if (!dump_dtb_file.empty()) {
+            std::ofstream output(dump_dtb_file, std::ios::binary);
+            if (!output ||
+                !output.write(reinterpret_cast<const char*>(dtb.data()),
+                              static_cast<std::streamsize>(dtb.size())))
+                throw std::runtime_error("Failed to write DTB: " +
+                                         dump_dtb_file.string());
+            output.close();
+            if (!output)
+                throw std::runtime_error("Failed to write DTB: " +
+                                         dump_dtb_file.string());
+            uemu::log::info("  DTB dump: {}", dump_dtb_file.string());
+        }
+
+        // Dumping the tree the emulator would use is useful on its own, so an
+        // ELF is only required when there is something to run.
+        if (elf_file.empty()) {
+            if (dump_dtb_file.empty())
+                throw std::runtime_error(
+                    "--file is required unless --dump-dtb is used");
+
+            uemu::log::info("No ELF file given; exiting after the DTB dump");
+            return EXIT_SUCCESS;
+        }
+
         uemu::Emulator emulator(config);
 
-        emulator.loadelf(elf_file);
+        emulator.load_elf(elf_file);
+        static_cast<void>(emulator.install_fdt(dtb));
 
         if (headless) {
             uemu::frontend::HeadlessFrontend frontend(emulator);

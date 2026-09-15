@@ -36,7 +36,7 @@ void test_file(const std::string& file, std::vector<std::string>& failed,
     try {
         std::filesystem::path test_path = RISCV_TEST_DIR;
         test_path = test_path.parent_path() / file;
-        emulator.loadelf(test_path.string());
+        emulator.load_elf(test_path.string());
     } catch (...) {
         std::println(
             stderr, "Exception happened while loading ELF. Skipping the test.");

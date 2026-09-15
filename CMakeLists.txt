@@ -36,9 +36,11 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 
 # Find required packages
 find_package(CLI11 CONFIG REQUIRED)
+find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 find_package(SDL3 REQUIRED CONFIG)
 find_package(SDL3_image REQUIRED CONFIG)
+pkg_check_modules(LIBFDT REQUIRED IMPORTED_TARGET libfdt)
 
 include(${CMAKE_CURRENT_LIST_DIR}/thirdparty/berkeley-softfloat-3.cmake)
 
@@ -63,6 +65,7 @@ file(GLOB_RECURSE CORE_SOURCES
     "src/device/*.cpp"
     "src/utils/*.cpp"
     "src/emulator.cpp"
+    "src/fdt_generator.cpp"
 )
 
 add_library(uemu_core STATIC ${CORE_SOURCES} ${HEADERS})
@@ -73,11 +76,15 @@ target_include_directories(uemu_core
         ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/kernel-headers/generic/include
 )
 
-# Link libraries that the core needs
+# Link libraries that the core needs.  libfdt is an implementation detail of
+# src/utils/fdt.cpp and src/emulator.cpp, so it stays private; the tests link it
+# themselves because they use it to inspect the trees they build.
 target_link_libraries(uemu_core
     PUBLIC
         Threads::Threads
         softfloat
+    PRIVATE
+        PkgConfig::LIBFDT
 )
 
 # The host frontend: everything that talks to the user (terminal, window,

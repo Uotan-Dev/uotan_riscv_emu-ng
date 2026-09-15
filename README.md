@@ -66,6 +66,7 @@ A UEFI firmware implementation (EDK2) for **uemu-ng** is available at [Uotan-Dev
 ### Required dependencies:
 
 * CLI11 - Command line parsing
+* libfdt (`pkg-config` name `libfdt`, Debian/Ubuntu package `libfdt-dev`) - device tree generation
 * SDL3 & SDL3_image - Graphics and windowing
 * `riscv64-unknown-elf-gcc`, `riscv64-unknown-elf-objcopy`, `riscv64-unknown-elf-objdump`
 
@@ -88,25 +89,46 @@ cmake --build . --config Release -j$(nproc)
 
 ## Usage
 ```
-uemu-ng: RISC-V Emulator 
+uemu-ng: RISC-V Emulator
 
 
 uemu [OPTIONS]
 
 
 OPTIONS:
-  -h,     --help              Print this help message and exit 
-  -v,     --version           Display program version information and exit 
-  -f,     --file TEXT:FILE REQUIRED 
-                              ELF file to load 
-  -m,     --memory UINT:INT in [64 - 16384] [512]  
-                              DRAM size in MB 
-  -d,     --disk TEXT         Disk file to use 
-          --flash0 TEXT       Flash0 file to use 
-          --flash1 TEXT       Flash1 file to use 
-  -t,     --timeout INT:NONNEGATIVE [0]  
+  -h,     --help              Print this help message and exit
+  -v,     --version           Display program version information and exit
+  -f,     --file TEXT:FILE    ELF file to load (required unless --dump-dtb is used)
+  -m,     --memory UINT:INT in [64 - 16384] [512]
+                              DRAM size in MB
+  -d,     --disk TEXT         Disk file to use
+          --flash0 TEXT       Flash0 file to use
+          --flash1 TEXT       Flash1 file to use
+          --dump-dtb TEXT     Write the generated DTB to a file
+  -t,     --timeout INT:NONNEGATIVE [0]
                               Execution timeout in milliseconds (0 = no timeout)
-          --headless          Run in headless mode (no UI window) 
+          --headless          Run in headless mode (no UI window)
+```
+
+## Device tree
+
+The machine description is no longer a checked-in `.dts`: **uemu-ng** builds it
+from the board configuration at startup (`include/board_config.hpp`), so the
+tree firmware receives and the devices the emulator creates always agree.  The
+blob is written to ordinary DRAM and handed over in `a1` (with `a0` holding the
+boot hart id, 0), as the RISC-V boot ABI expects.
+
+`--dump-dtb` writes the tree the run would use, so it can be inspected with the
+usual device tree tools:
+
+```bash
+# Without --file it just writes the tree and exits
+uemu --dump-dtb uemu.dtb
+
+# Or dump the tree of a normal boot
+uemu --headless --file firmware.elf --dump-dtb uemu.dtb
+
+dtc -I dtb -O dts uemu.dtb
 ```
 
 ## Known Issues

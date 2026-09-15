@@ -31,7 +31,7 @@
 namespace uemu::test {
 
 // The board defaults are the guest-visible machine ABI: README's device table
-// and misc/uemu.dts describe the same map, and firmware depends on it.  Pinning
+// and FdtGenerator describe the same map, and firmware depends on it.  Pinning
 // every default here keeps a later change from silently moving a device.
 TEST(BoardConfigTest, DefaultsMatchTheDocumentedMachineLayout) {
     const BoardConfig board;
@@ -41,6 +41,7 @@ TEST(BoardConfigTest, DefaultsMatchTheDocumentedMachineLayout) {
     EXPECT_EQ(board.uart.base, 0x10000000u);
     EXPECT_EQ(board.uart.size, 0x100u);
     EXPECT_EQ(board.uart.interrupt_id, 10u);
+    EXPECT_EQ(board.uart.clock_hz, 3686400u);
     EXPECT_EQ(board.uart.reg_shift, 0u);
     EXPECT_EQ(board.uart.reg_io_width, 1u);
 

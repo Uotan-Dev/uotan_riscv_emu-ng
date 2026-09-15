@@ -34,6 +34,9 @@ target_link_libraries(uemu_test
     GTest::gtest_main 
     GTest::gtest
     uemu_core
+    # The tests read the generated device trees with libfdt themselves; the
+    # core keeps its own libfdt dependency private.
+    PkgConfig::LIBFDT
 )
 
 target_include_directories(uemu_test PRIVATE 

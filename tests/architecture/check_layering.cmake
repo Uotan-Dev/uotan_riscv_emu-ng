@@ -28,8 +28,15 @@ set(_layers "include/core" "include/device" "src/core" "src/device")
 # Core-side files that live outside those directories.
 set(_extra_files
     "include/board_config.hpp"
+    "include/common/address_range.hpp"
     "include/emulator.hpp"
+    "include/fdt_generator.hpp"
+    "include/utils/elf_loader.hpp"
+    "include/utils/fdt.hpp"
     "src/emulator.cpp"
+    "src/fdt_generator.cpp"
+    "src/utils/elf_loader.cpp"
+    "src/utils/fdt.cpp"
 )
 
 # Host-only headers the core must not include.
@@ -53,7 +60,9 @@ set(_forbidden_tokens
     "std::ostream"
     "std::print" # also matches std::println
     "stderr"
-    "stdout"
+    # The device tree's "stdout-path" property is guest-visible data, not host
+    # output; a hyphen is the only thing allowed to follow the name.
+    "stdout([^-]|$)"
 )
 
 set(_offenders "")
