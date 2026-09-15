@@ -105,6 +105,16 @@ public:
             devices_, [addr](const auto& dev) { return dev->contains(addr); });
     }
 
+    // Host pointer to the first byte of the page backing the physical address
+    // `paddr`, or nullptr when that page is not plain DRAM: an address owned by
+    // a device, unmapped, or only partly inside DRAM.  Instruction fetch uses
+    // this to read a page it already translated without going through the
+    // device lookup again; it does not give access to anything read<T>() would
+    // not already serve.
+    [[nodiscard]] const uint8_t* dram_page_base(addr_t paddr) const noexcept {
+        return dram_->page_base(paddr);
+    }
+
     void tick_devices() {
         for (auto& dev : devices_)
             dev->tick();

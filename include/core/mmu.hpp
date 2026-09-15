@@ -145,6 +145,25 @@ public:
     [[nodiscard]] std::pair<uint32_t, Ilen> ifetch() {
         const addr_t pc = hart_->pc;
 
+        // Fast path: the page holding PC was already fetched from, for the
+        // privilege level we are still in, and this instruction stays inside
+        // that page (so the 4-byte host read cannot leave it; this is not an
+        // alignment check).  Such an entry only exists because translate()
+        // allowed exactly this fetch, and it is dropped whenever the
+        // translation context changes, so the bytes it points at are still the
+        // ones the guest would fetch.
+        if ((pc & PGMASK) <= PGSIZE - 4 && fetch_page_.valid &&
+            fetch_page_.vpn == (pc >> PGSHIFT) &&
+            fetch_page_.priv == hart_->priv) [[likely]] {
+            uint32_t insn;
+            std::memcpy(&insn, fetch_page_.host + (pc & PGMASK), sizeof(insn));
+
+            if (Decoder::is_compressed(insn))
+                return {insn & 0xFFFF, Ilen::Compressed};
+
+            return {insn, Ilen::Normal};
+        }
+
         if (!may_cross_page(pc)) [[likely]] {
             addr_t paddr = translate(pc, pc, AccessType::Fetch);
             std::optional<uint32_t> v = bus_->read<uint32_t>(paddr);
@@ -152,6 +171,21 @@ public:
             if (!v.has_value()) [[unlikely]]
                 Trap::raise_exception(pc, TrapCause::InstructionAccessFault,
                                       pc);
+
+            // Remember the page this fetch came from, while it is plain DRAM:
+            // consecutive instructions on it can then be read straight from
+            // host memory.  A target that is not DRAM (MMIO, unmapped) clears
+            // the entry and keeps taking this path.
+            const uint8_t* host = bus_->dram_page_base(paddr);
+
+            fetch_page_.valid = false;
+
+            if (host) {
+                fetch_page_.host = host;
+                fetch_page_.vpn = pc >> PGSHIFT;
+                fetch_page_.priv = hart_->priv;
+                fetch_page_.valid = true;
+            }
 
             uint32_t insn = *v;
 
@@ -187,6 +221,7 @@ public:
     void tlb_flush_all() noexcept {
         memset(itlb_, 0, sizeof(itlb_));
         memset(dtlb_, 0, sizeof(dtlb_));
+        fetch_page_.valid = false;
     }
 
     void tlb_flush_vaddr(addr_t vaddr) {
@@ -198,6 +233,9 @@ public:
 
         if (itlb_[idx].valid && itlb_[idx].vpn == vpn)
             itlb_[idx].valid = false;
+
+        if (fetch_page_.vpn == vpn)
+            fetch_page_.valid = false;
     }
 
     addr_t reservation_address = 0;
@@ -226,6 +264,26 @@ private:
 
     TLBEntry itlb_[TLB_ENTRIES]{};
     TLBEntry dtlb_[TLB_ENTRIES]{};
+
+    // The guest page the last successful instruction fetch came from, so that
+    // consecutive instructions on it are read straight out of DRAM.  This
+    // memoizes one completed translation; it is not a second permission model.
+    // An entry is only created after translate() allowed the fetch, and it is
+    // only used while the page, the privilege level and the translation
+    // context are unchanged: the privilege is tagged, and every event that can
+    // give a page another translation drops the entry through tlb_flush_all()
+    // and tlb_flush_vaddr().  Nothing else can change a fetch's decision,
+    // which is why no permission bits are stored here: for an instruction
+    // fetch, translate() itself decides only from PTE_X and "a user page is
+    // fetched only from U-mode", and both are part of the translation this
+    // entry remembers.  If a fetch decision ever depends on more state (PMP,
+    // for example), that state has to be tagged or flushed here as well.
+    struct {
+        const uint8_t* host = nullptr; // first byte of the page in host DRAM
+        addr_t vpn = 0;                // guest page number
+        PrivilegeLevel priv = PrivilegeLevel::M;
+        bool valid = false;
+    } fetch_page_;
 
     // Check if an instruction at pc may cross pages
     static bool may_cross_page(addr_t pc) noexcept {

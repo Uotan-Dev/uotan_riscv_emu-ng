@@ -98,4 +98,37 @@ TEST_F(DramTest, ExceptionHandling) {
     EXPECT_THROW(dram->read_bytes(edge_addr, dummy, 10), std::out_of_range);
 }
 
+// page_base() hands out a host pointer only for pages that are entirely DRAM.
+TEST_F(DramTest, PageBaseAddressesOnlyWholePages) {
+    const uint8_t* first = dram->page_base(core::Dram::DRAM_BASE);
+
+    ASSERT_NE(first, nullptr);
+    EXPECT_EQ(first, dram->page_base(core::Dram::DRAM_BASE + 1));
+    EXPECT_EQ(first,
+              dram->page_base(core::Dram::DRAM_BASE + core::Dram::PGSIZE - 1));
+    EXPECT_EQ(first + core::Dram::PGSIZE,
+              dram->page_base(core::Dram::DRAM_BASE + core::Dram::PGSIZE));
+
+    // An address that is not part of this DRAM at all.
+    EXPECT_EQ(dram->page_base(0), nullptr);
+    EXPECT_EQ(dram->page_base(core::Dram::DRAM_BASE - 1), nullptr);
+
+    // The page the last byte of a full page lives on is complete; the one after
+    // it is not.
+    const addr_t last_page =
+        core::Dram::DRAM_BASE + TEST_DRAM_SIZE - core::Dram::PGSIZE;
+    EXPECT_NE(dram->page_base(last_page), nullptr);
+    EXPECT_EQ(dram->page_base(core::Dram::DRAM_BASE + TEST_DRAM_SIZE), nullptr);
+
+    // A DRAM whose size is not a multiple of the page size still only exposes
+    // whole pages.
+    core::Dram partial(core::Dram::PGSIZE + 1);
+    EXPECT_NE(partial.page_base(core::Dram::DRAM_BASE), nullptr);
+    EXPECT_EQ(partial.page_base(core::Dram::DRAM_BASE + core::Dram::PGSIZE),
+              nullptr);
+
+    core::Dram tiny(core::Dram::PGSIZE - 1);
+    EXPECT_EQ(tiny.page_base(core::Dram::DRAM_BASE), nullptr);
+}
+
 } // namespace uemu::test

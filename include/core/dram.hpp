@@ -29,6 +29,9 @@ class Dram {
 public:
     static constexpr addr_t DRAM_BASE = 0x80000000;
 
+    // Page granularity of the translation caches in the MMU.
+    static constexpr addr_t PGSIZE = 1ULL << 12;
+
     explicit Dram(size_t size) : mem_(new uint8_t[size]()), size_(size) {
         // An empty DRAM would leave the bus unable to detect devices that
         // overlap the (empty) memory range.
@@ -53,6 +56,20 @@ public:
             return false;
 
         return true;
+    }
+
+    // Host pointer to the first byte of the page containing `addr`, or nullptr
+    // when that page is not entirely inside this DRAM (an MMIO or unmapped
+    // address, or a page that only partly covers the top of memory).  The
+    // backing store is allocated once and never resized or replaced, so a
+    // pointer obtained here stays valid for the lifetime of this Dram.
+    [[nodiscard]] const uint8_t* page_base(addr_t addr) const noexcept {
+        const addr_t page = addr & ~(PGSIZE - 1);
+
+        if (!is_valid_addr(page, PGSIZE)) [[unlikely]]
+            return nullptr;
+
+        return mem_.get() + (page - DRAM_BASE);
     }
 
     template <typename T>
