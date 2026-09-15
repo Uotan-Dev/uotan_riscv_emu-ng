@@ -41,11 +41,9 @@ public:
     Terminal& operator=(Terminal&&) = delete;
 
     // Non-blocking: returns the host input bytes that are currently available.
+    // Nothing is remembered, so a call that finds none is simply retried.
     [[nodiscard]] std::string read_input() {
         std::string bytes;
-
-        if (eof_)
-            return bytes;
 
         char buffer[256];
 
@@ -56,10 +54,6 @@ public:
                 bytes.append(buffer, static_cast<size_t>(nread));
                 continue;
             }
-
-            // A closed pipe stays closed; a terminal just has nothing to read.
-            if (nread == 0)
-                eof_ = true;
 
             break;
         }
@@ -106,7 +100,6 @@ private:
 
     struct termios original_mode_{};
     int original_flags_ = 0;
-    bool eof_ = false;
 };
 
 } // namespace uemu::frontend
