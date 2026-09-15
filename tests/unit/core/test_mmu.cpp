@@ -45,7 +45,37 @@ private:
     size_t reads_ = 0;
 };
 
-class MmuFetchTest : public testing::Test {
+// A device that answers data accesses from one register and counts reads and
+// writes, so an access served from a cached host page can be told apart from
+// one that went out to the device.
+class MockDataDevice final : public uemu::device::Device {
+public:
+    MockDataDevice(addr_t start, size_t size)
+        : Device("MockData", start, size) {}
+
+    [[nodiscard]] size_t reads() const noexcept { return reads_; }
+
+    [[nodiscard]] size_t writes() const noexcept { return writes_; }
+
+protected:
+    std::optional<uint64_t> read_internal(addr_t, size_t) override {
+        reads_++;
+        return value_;
+    }
+
+    bool write_internal(addr_t, size_t, uint64_t value) override {
+        writes_++;
+        value_ = value;
+        return true;
+    }
+
+private:
+    size_t reads_ = 0;
+    size_t writes_ = 0;
+    uint64_t value_ = 0;
+};
+
+class MmuTest : public testing::Test {
 protected:
     static constexpr addr_t DRAM_BASE = core::Dram::DRAM_BASE;
     static constexpr addr_t PGSIZE = core::Dram::PGSIZE;
@@ -71,7 +101,7 @@ protected:
     static constexpr uint32_t INSN_B = 0x00100093;      // addi x1, x0, 1
     static constexpr uint32_t INSN_COMPRESSED = 0x0001; // c.nop
 
-    MmuFetchTest()
+    MmuTest()
         : hart(), dram(std::make_shared<core::Dram>(DRAM_SIZE)),
           bus(std::make_shared<core::Bus>(dram)), mmu(&hart, bus) {
         hart.connect_mmu(&mmu);
@@ -140,7 +170,7 @@ private:
 
 // Instructions next to each other on one page come back correctly, which is the
 // case the current-page cache exists for.
-TEST_F(MmuFetchTest, MachineModeFetchesInstructionsFromDram) {
+TEST_F(MmuTest, MachineModeFetchesInstructionsFromDram) {
     dram->write<uint32_t>(CODE_VA, INSN_A);
     dram->write<uint32_t>(CODE_VA + 4, INSN_COMPRESSED);
 
@@ -154,7 +184,7 @@ TEST_F(MmuFetchTest, MachineModeFetchesInstructionsFromDram) {
 }
 
 // A translated page is used again as long as nothing invalidates it.
-TEST_F(MmuFetchTest, Sv39PageIsFetchedThroughTheMapping) {
+TEST_F(MmuTest, Sv39PageIsFetchedThroughTheMapping) {
     dram->write<uint32_t>(CODE_PA, INSN_A);
     enable_sv39(map(CODE_VA, CODE_PA, PTE_RWX));
 
@@ -165,7 +195,7 @@ TEST_F(MmuFetchTest, Sv39PageIsFetchedThroughTheMapping) {
 
 // SFENCE.VMA (all pages) must retranslate the page, even though the guest page
 // number and the privilege level did not change.
-TEST_F(MmuFetchTest, TlbFlushAllRetranslatesTheCachedPage) {
+TEST_F(MmuTest, TlbFlushAllRetranslatesTheCachedPage) {
     dram->write<uint32_t>(CODE_PA, INSN_A);
     dram->write<uint32_t>(OTHER_PA, INSN_B);
 
@@ -182,7 +212,7 @@ TEST_F(MmuFetchTest, TlbFlushAllRetranslatesTheCachedPage) {
 }
 
 // SFENCE.VMA for this address must do the same.
-TEST_F(MmuFetchTest, TlbFlushVaddrRetranslatesTheCachedPage) {
+TEST_F(MmuTest, TlbFlushVaddrRetranslatesTheCachedPage) {
     dram->write<uint32_t>(CODE_PA, INSN_A);
     dram->write<uint32_t>(OTHER_PA, INSN_B);
 
@@ -200,7 +230,7 @@ TEST_F(MmuFetchTest, TlbFlushVaddrRetranslatesTheCachedPage) {
 
 // A satp write makes the page translate elsewhere, so the page fetched in bare
 // mode must not be served afterwards.
-TEST_F(MmuFetchTest, SatpWriteRetranslatesTheCachedPage) {
+TEST_F(MmuTest, SatpWriteRetranslatesTheCachedPage) {
     dram->write<uint32_t>(CODE_VA, INSN_A);
     dram->write<uint32_t>(OTHER_PA, INSN_B);
 
@@ -214,7 +244,7 @@ TEST_F(MmuFetchTest, SatpWriteRetranslatesTheCachedPage) {
 
 // The cache is per privilege level: an M-mode fetch is the identity mapping and
 // says nothing about what the same page means in S-mode.
-TEST_F(MmuFetchTest, PrivilegeChangeRetranslatesTheCachedPage) {
+TEST_F(MmuTest, PrivilegeChangeRetranslatesTheCachedPage) {
     dram->write<uint32_t>(CODE_VA, INSN_A);
     dram->write<uint32_t>(OTHER_PA, INSN_B);
 
@@ -231,7 +261,7 @@ TEST_F(MmuFetchTest, PrivilegeChangeRetranslatesTheCachedPage) {
 
 // A page translated for supervisor use must not be executed after dropping to
 // user mode: the fetch has to take the full path and fault.
-TEST_F(MmuFetchTest, UserModeDoesNotReuseASupervisorPage) {
+TEST_F(MmuTest, UserModeDoesNotReuseASupervisorPage) {
     dram->write<uint32_t>(CODE_PA, INSN_A);
     enable_sv39(map(CODE_VA, CODE_PA, PTE_RWX));
 
@@ -249,7 +279,7 @@ TEST_F(MmuFetchTest, UserModeDoesNotReuseASupervisorPage) {
 }
 
 // The other direction: a user page is executable in U-mode and not in S-mode.
-TEST_F(MmuFetchTest, SupervisorDoesNotReuseAUserPage) {
+TEST_F(MmuTest, SupervisorDoesNotReuseAUserPage) {
     dram->write<uint32_t>(CODE_PA, INSN_A);
     enable_sv39(map(CODE_VA, CODE_PA, PTE_RWX | PTE_U));
 
@@ -269,7 +299,7 @@ TEST_F(MmuFetchTest, SupervisorDoesNotReuseAUserPage) {
 
 // A 32-bit instruction at the end of a page is assembled from both pages, and
 // a 16-bit instruction there is not extended with the next page's bytes.
-TEST_F(MmuFetchTest, CrossPageInstructionIsAssembledFromBothPages) {
+TEST_F(MmuTest, CrossPageInstructionIsAssembledFromBothPages) {
     dram->write<uint16_t>(DRAM_BASE + 0xFFE, INSN_A & 0xFFFF);
     dram->write<uint16_t>(DRAM_BASE + 0x1000, INSN_A >> 16);
 
@@ -285,7 +315,7 @@ TEST_F(MmuFetchTest, CrossPageInstructionIsAssembledFromBothPages) {
 }
 
 // Pages that are not plain DRAM (here: a device) keep going through the bus.
-TEST_F(MmuFetchTest, DevicePageIsNotCached) {
+TEST_F(MmuTest, DevicePageIsNotCached) {
     constexpr addr_t DEVICE_BASE = 0x1000000;
     auto dev = std::make_shared<MockCodeDevice>(DEVICE_BASE, 0x1000);
     bus->add_device(dev);
@@ -294,6 +324,117 @@ TEST_F(MmuFetchTest, DevicePageIsNotCached) {
     EXPECT_EQ(fetch(), 0x00000013);
     EXPECT_EQ(fetch(), 0x00000013);
     EXPECT_EQ(dev->reads(), 2u);
+}
+
+// A mapped DRAM page is reached directly, for loads and stores alike, at the
+// offset the access asked for.
+TEST_F(MmuTest, Sv39LoadsAndStoresReachTheMappedDramPage) {
+    dram->write<uint32_t>(CODE_PA + 0x24, 0xAABBCCDD);
+    dram->write<uint64_t>(CODE_PA + 0x1C8, 0x1122334455667788ULL);
+
+    enable_sv39(map(CODE_VA, CODE_PA, PTE_RWX));
+
+    EXPECT_EQ(mmu.read<uint32_t>(hart.pc, CODE_VA + 0x24), 0xAABBCCDDu);
+    EXPECT_EQ(mmu.read<uint64_t>(hart.pc, CODE_VA + 0x1C8),
+              0x1122334455667788ULL);
+    EXPECT_EQ(mmu.read<uint8_t>(hart.pc, CODE_VA + 0x24), 0xDDu);
+
+    mmu.write<uint32_t>(hart.pc, CODE_VA + 0x20, 0x55667788u);
+    mmu.write<uint16_t>(hart.pc, CODE_VA + 0x30, 0xBEEFu);
+
+    EXPECT_EQ(dram->read<uint32_t>(CODE_PA + 0x20), 0x55667788u);
+    EXPECT_EQ(dram->read<uint16_t>(CODE_PA + 0x30), 0xBEEFu);
+}
+
+// Remapping the page and flushing it must drop the cached host page, so later
+// accesses use the physical page the mapping names now.
+TEST_F(MmuTest, TlbFlushVaddrRefreshesTheCachedHostPage) {
+    dram->write<uint32_t>(CODE_PA + 0x40, 0x11111111);
+    dram->write<uint32_t>(OTHER_PA + 0x40, 0x22222222);
+
+    const addr_t root = map(CODE_VA, CODE_PA, PTE_RWX);
+    enable_sv39(root);
+
+    EXPECT_EQ(mmu.read<uint32_t>(hart.pc, CODE_VA + 0x40), 0x11111111u);
+
+    remap(root, CODE_VA, OTHER_PA, PTE_RWX);
+    mmu.tlb_flush_vaddr(CODE_VA);
+
+    EXPECT_EQ(mmu.read<uint32_t>(hart.pc, CODE_VA + 0x40), 0x22222222u);
+
+    mmu.write<uint32_t>(hart.pc, CODE_VA + 0x44, 0x33333333u);
+    EXPECT_EQ(dram->read<uint32_t>(OTHER_PA + 0x44), 0x33333333u);
+    EXPECT_EQ(dram->read<uint32_t>(CODE_PA + 0x44), 0u);
+}
+
+// A page that belongs to a device is not DRAM, so accesses must keep going
+// through the bus and reach the device even though the translation is cached.
+TEST_F(MmuTest, DevicePageIsNotServedFromTheHostCache) {
+    constexpr addr_t DEVICE_BASE = 0x1000000;
+    auto dev = std::make_shared<MockDataDevice>(DEVICE_BASE, PGSIZE);
+    bus->add_device(dev);
+
+    enable_sv39(map(CODE_VA, DEVICE_BASE + 0x30, PTE_RWX));
+
+    EXPECT_EQ(mmu.read<uint32_t>(hart.pc, CODE_VA), 0u);
+    mmu.write<uint32_t>(hart.pc, CODE_VA, 0x55667788u);
+    EXPECT_EQ(mmu.read<uint32_t>(hart.pc, CODE_VA), 0x55667788u);
+
+    EXPECT_EQ(dev->reads(), 2u);
+    EXPECT_EQ(dev->writes(), 1u);
+}
+
+// The cached page is only an address: permission is decided again on every
+// access, so clearing SUM takes a mapped DRAM page away again.
+TEST_F(MmuTest, UserPageLoadIsRecheckedAgainstSum) {
+    dram->write<uint32_t>(CODE_PA + 0x50, 0x0BADF00D);
+
+    enable_sv39(map(CODE_VA, CODE_PA, PTE_RWX | PTE_U));
+
+    auto set_sum = [this](bool on) {
+        core::CSR* mstatus = hart.csrs[core::MSTATUS::ADDRESS].get();
+        reg_t v = mstatus->read_unchecked();
+
+        if (on)
+            v |= core::MSTATUS::Field::SUM;
+        else
+            v &= ~core::MSTATUS::Field::SUM;
+
+        mstatus->write_unchecked(v);
+    };
+
+    try {
+        static_cast<void>(mmu.read<uint32_t>(hart.pc, CODE_VA + 0x50));
+        FAIL() << "supervisor load of a user page succeeded with SUM clear";
+    } catch (const core::Trap& trap) {
+        EXPECT_EQ(trap.cause, core::TrapCause::LoadPageFault);
+    }
+
+    set_sum(true);
+    EXPECT_EQ(mmu.read<uint32_t>(hart.pc, CODE_VA + 0x50), 0x0BADF00Du);
+
+    set_sum(false);
+    try {
+        static_cast<void>(mmu.read<uint32_t>(hart.pc, CODE_VA + 0x50));
+        FAIL() << "supervisor load of a user page succeeded after SUM was "
+                  "cleared again";
+    } catch (const core::Trap& trap) {
+        EXPECT_EQ(trap.cause, core::TrapCause::LoadPageFault);
+    }
+}
+
+// In M-mode the address is the physical address, and the page is whole DRAM,
+// so the access needs no bus lookup either.
+TEST_F(MmuTest, MachineModeLoadsAndStoresReachDram) {
+    dram->write<uint32_t>(DRAM_BASE + 0x60, 0xDEADBEEF);
+    dram->write<uint64_t>(DRAM_BASE + 0x68, 0x1122334455667788ULL);
+
+    EXPECT_EQ(mmu.read<uint32_t>(hart.pc, DRAM_BASE + 0x60), 0xDEADBEEFu);
+    EXPECT_EQ(mmu.read<uint64_t>(hart.pc, DRAM_BASE + 0x68),
+              0x1122334455667788ULL);
+
+    mmu.write<uint16_t>(hart.pc, DRAM_BASE + 0x70, 0xBEEF);
+    EXPECT_EQ(dram->read<uint16_t>(DRAM_BASE + 0x70), 0xBEEFu);
 }
 
 } // namespace uemu::test

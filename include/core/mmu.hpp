@@ -38,6 +38,9 @@ public:
         uint8_t perm;
         bool valid;
         bool dirty;
+        // Host base of the translated DRAM page, or nullptr when that page is
+        // not plain DRAM (device, unmapped, or only partly inside DRAM).
+        uint8_t* host;
     };
 
     explicit MMU(Hart* hart, std::shared_ptr<Bus> bus)
@@ -54,7 +57,18 @@ public:
 
         // Aligned access
         if (addr % size == 0) [[likely]] {
-            addr_t paddr = translate(pc, addr, atype);
+            uint8_t* page = nullptr;
+            addr_t paddr = translate(pc, addr, atype, &page);
+
+            // translate() allowed the access and its page is whole DRAM, so
+            // read the bytes here instead of asking the bus for the physical
+            // address.
+            if (page) [[likely]] {
+                T v;
+                std::memcpy(&v, page + (paddr & PGMASK), size);
+                return v;
+            }
+
             std::optional<T> v = bus_->read<T>(paddr);
 
             if (!v.has_value()) [[unlikely]]
@@ -97,7 +111,14 @@ public:
 
         // Aligned access
         if (addr % size == 0) [[likely]] {
-            addr_t paddr = translate(pc, addr, AccessType::Store);
+            uint8_t* page = nullptr;
+            addr_t paddr = translate(pc, addr, AccessType::Store, &page);
+
+            if (page) [[likely]] {
+                std::memcpy(page + (paddr & PGMASK), &value, size);
+                return;
+            }
+
             bool res = bus_->write<T>(paddr, value);
 
             if (!res) [[unlikely]]
@@ -321,7 +342,13 @@ private:
         std::unreachable();
     }
 
-    addr_t translate(addr_t pc, addr_t vaddr, AccessType type) {
+    // Translate `vaddr` for an access of `type` and return the guest physical
+    // address of the byte being accessed.  When `host_page` is not null it
+    // receives the host base of the page holding that physical address, or
+    // nullptr when that page is not plain DRAM; every successful return sets
+    // it, and only after the checks that allow the access have passed.
+    addr_t translate(addr_t pc, addr_t vaddr, AccessType type,
+                     uint8_t** host_page = nullptr) {
         PrivilegeLevel priv = hart_->priv;
         reg_t mstatus = hart_->csrs[MSTATUS::ADDRESS]->read_unchecked();
 
@@ -331,14 +358,22 @@ private:
             priv = static_cast<PrivilegeLevel>(mpp);
         }
 
-        if (priv == PrivilegeLevel::M)
+        if (priv == PrivilegeLevel::M) {
+            if (host_page)
+                *host_page = bus_->dram_page_base(vaddr);
+
             return vaddr;
+        }
 
         reg_t satp = hart_->csrs[SATP::ADDRESS]->read_unchecked();
         reg_t mode = (satp & SATP::Field::MODE) >> SATP::Shift::MODE_SHIFT;
 
-        if (mode == SATP::Mode::Bare)
+        if (mode == SATP::Mode::Bare) {
+            if (host_page)
+                *host_page = bus_->dram_page_base(vaddr);
+
             return vaddr;
+        }
 
         if (mode != SATP::Mode::Sv39) [[unlikely]]
             std::terminate();
@@ -379,6 +414,9 @@ private:
 
             if (type == AccessType::Store && !entry->dirty)
                 goto miss;
+
+            if (host_page)
+                *host_page = entry->host;
 
             return (entry->ppn << PGSHIFT) | (vaddr & PGMASK);
         }
@@ -486,6 +524,10 @@ private:
             entry->perm = pte & PTE_PERM_MASK;
             entry->valid = true;
             entry->dirty = pte & PTE_D;
+            entry->host = bus_->dram_page_base(final_ppn << PGSHIFT);
+
+            if (host_page)
+                *host_page = entry->host;
 
             return (final_ppn << PGSHIFT) | (vaddr & PGMASK);
         }

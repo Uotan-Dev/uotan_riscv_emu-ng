@@ -63,7 +63,7 @@ public:
     // address, or a page that only partly covers the top of memory).  The
     // backing store is allocated once and never resized or replaced, so a
     // pointer obtained here stays valid for the lifetime of this Dram.
-    [[nodiscard]] const uint8_t* page_base(addr_t addr) const noexcept {
+    [[nodiscard]] uint8_t* page_base(addr_t addr) const noexcept {
         const addr_t page = addr & ~(PGSIZE - 1);
 
         if (!is_valid_addr(page, PGSIZE)) [[unlikely]]
