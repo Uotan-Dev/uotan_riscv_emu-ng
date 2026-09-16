@@ -140,6 +140,18 @@ protected:
             (root >> core::MMU::PGSHIFT));
     }
 
+    void set_sum(bool on) {
+        core::CSR* mstatus = hart.csrs[core::MSTATUS::ADDRESS].get();
+        reg_t v = mstatus->read_unchecked();
+
+        if (on)
+            v |= core::MSTATUS::Field::SUM;
+        else
+            v &= ~core::MSTATUS::Field::SUM;
+
+        mstatus->write_unchecked(v);
+    }
+
     core::Hart hart;
     std::shared_ptr<core::Dram> dram;
     std::shared_ptr<core::Bus> bus;
@@ -423,18 +435,6 @@ TEST_F(MmuTest, UserPageAccessIsRecheckedAgainstSum) {
     dram->write<uint32_t>(CODE_PA + 0x50, 0x0BADF00D);
 
     enable_sv39(map(CODE_VA, CODE_PA, PTE_RWX | PTE_U));
-
-    auto set_sum = [this](bool on) {
-        core::CSR* mstatus = hart.csrs[core::MSTATUS::ADDRESS].get();
-        reg_t v = mstatus->read_unchecked();
-
-        if (on)
-            v |= core::MSTATUS::Field::SUM;
-        else
-            v &= ~core::MSTATUS::Field::SUM;
-
-        mstatus->write_unchecked(v);
-    };
 
     try {
         static_cast<void>(mmu.read<uint32_t>(hart.pc, CODE_VA + 0x50));
