@@ -43,7 +43,7 @@ TEST(NS16550Test, ReceiveRequiresEnabledFifo) {
     // Without the FIFO the device does not consume host input at all.
     channel.push_input('w');
     uart.tick();
-    EXPECT_EQ(channel.pop_input(), std::optional<uint8_t>{'w'});
+    EXPECT_EQ(channel.pop_input(0), std::optional<uint8_t>{'w'});
 
     channel.push_input('x');
     ASSERT_TRUE(uart.write<uint8_t>(BASE + device::NS16550::FCR,
@@ -97,7 +97,9 @@ TEST(NS16550Test, TransmitUsesTheConsoleChannel) {
     ASSERT_TRUE(uart.write<uint8_t>(BASE + device::NS16550::TX, 'A'));
     ASSERT_TRUE(uart.write<uint8_t>(BASE + device::NS16550::TX, 'B'));
 
-    EXPECT_EQ(channel.drain_output(), "AB");
+    ASSERT_EQ(channel.output_count(), 1u);
+    EXPECT_EQ(channel.output_name(0), "NS16550A");
+    EXPECT_EQ(channel.drain_output(0), "AB");
 }
 
 } // namespace uemu::test

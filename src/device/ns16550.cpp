@@ -34,9 +34,11 @@ NS16550::NS16550(const NS16550Config& config, IrqCallback irq_callback,
                  ConsoleChannel& console_channel)
     : IrqDevice("NS16550", config.base, config.size, std::move(irq_callback),
                 config.interrupt_id),
-      console_channel_(console_channel), reg_shift_(config.reg_shift),
-      reg_io_width_(config.reg_io_width), dll_(0x0C), dlm_(0), iir_(IIR_NO_INT),
-      ier_(0), fcr_(0), lcr_(0), mcr_(MCR_OUT2), lsr_(LSR_TEMT | LSR_THRE),
+      console_channel_(console_channel),
+      console_port_(console_channel_.register_port("NS16550A", true)),
+      reg_shift_(config.reg_shift), reg_io_width_(config.reg_io_width),
+      dll_(0x0C), dlm_(0), iir_(IIR_NO_INT), ier_(0), fcr_(0), lcr_(0),
+      mcr_(MCR_OUT2), lsr_(LSR_TEMT | LSR_THRE),
       msr_(MSR_DCD | MSR_DSR | MSR_CTS), scr_(0) {
     // Register offsets are shifted right by reg_shift_, which is undefined
     // once it reaches the width of an offset.
@@ -51,7 +53,7 @@ void NS16550::tick() {
         QUEUE_SIZE <= rx_queue_.size())
         return;
 
-    std::optional<uint8_t> byte = console_channel_.pop_input();
+    std::optional<uint8_t> byte = console_channel_.pop_input(console_port_);
 
     if (byte.has_value()) {
         rx_queue_.push(*byte);
@@ -228,7 +230,7 @@ uint8_t NS16550::rx_byte() {
 
 void NS16550::tx_byte(uint8_t val) {
     lsr_ |= LSR_TEMT | LSR_THRE;
-    console_channel_.push_output(val);
+    console_channel_.push_output(console_port_, val);
 }
 
 } // namespace uemu::device

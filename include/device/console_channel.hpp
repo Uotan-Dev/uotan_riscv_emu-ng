@@ -21,7 +21,10 @@
 #include <deque>
 #include <mutex>
 #include <optional>
+#include <stdexcept>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace uemu::device {
 
@@ -34,7 +37,25 @@ namespace uemu::device {
 // grow without bound when the frontend stalls.
 class ConsoleChannel {
 public:
+    using Port = size_t;
+
     static constexpr size_t CAPACITY = 4096;
+
+    [[nodiscard]] Port register_port(std::string name, bool accepts_input) {
+        std::scoped_lock lock(mutex_);
+
+        if (accepts_input && input_port_.has_value())
+            throw std::logic_error(
+                "a console input port is already registered");
+
+        const Port port = outputs_.size();
+        outputs_.push_back({.name = std::move(name), .queue = {}});
+
+        if (accepts_input)
+            input_port_ = port;
+
+        return port;
+    }
 
     // Host frontend -> guest console device.
     void push_input(uint8_t byte) {
@@ -44,8 +65,12 @@ public:
             input_.push_back(byte);
     }
 
-    [[nodiscard]] std::optional<uint8_t> pop_input() {
+    [[nodiscard]] std::optional<uint8_t> pop_input(Port port) {
         std::scoped_lock lock(mutex_);
+
+        static_cast<void>(outputs_.at(port));
+        if (input_port_ != port)
+            return std::nullopt;
 
         if (input_.empty())
             return std::nullopt;
@@ -56,30 +81,50 @@ public:
     }
 
     // Guest console device -> host frontend.
-    void push_output(uint8_t byte) {
+    void push_output(Port port, uint8_t byte) {
         std::scoped_lock lock(mutex_);
 
-        if (output_.size() < CAPACITY)
-            output_.push_back(byte);
+        Output& output = outputs_.at(port);
+
+        if (output.queue.size() < CAPACITY)
+            output.queue.push_back(byte);
     }
 
-    [[nodiscard]] std::string drain_output() {
+    [[nodiscard]] size_t output_count() const {
+        std::scoped_lock lock(mutex_);
+        return outputs_.size();
+    }
+
+    [[nodiscard]] std::string output_name(Port port) const {
+        std::scoped_lock lock(mutex_);
+        return outputs_.at(port).name;
+    }
+
+    [[nodiscard]] std::string drain_output(Port port) {
         std::scoped_lock lock(mutex_);
 
-        std::string bytes;
-        bytes.reserve(output_.size());
+        std::deque<uint8_t>& queue = outputs_.at(port).queue;
 
-        for (uint8_t byte : output_)
+        std::string bytes;
+        bytes.reserve(queue.size());
+
+        for (uint8_t byte : queue)
             bytes.push_back(static_cast<char>(byte));
 
-        output_.clear();
+        queue.clear();
         return bytes;
     }
 
 private:
-    std::mutex mutex_;
+    struct Output {
+        std::string name;
+        std::deque<uint8_t> queue;
+    };
+
+    mutable std::mutex mutex_;
     std::deque<uint8_t> input_;
-    std::deque<uint8_t> output_;
+    std::vector<Output> outputs_;
+    std::optional<Port> input_port_;
 };
 
 } // namespace uemu::device

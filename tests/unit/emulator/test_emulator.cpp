@@ -117,7 +117,11 @@ TEST(EmulatorTest, ConsoleOutputReachesTheFrontendPort) {
 
     emulator.run();
 
-    EXPECT_EQ(emulator.console_output(), "A");
+    ASSERT_EQ(emulator.console_count(), 2u);
+    EXPECT_EQ(emulator.console_name(0), "NS16550A");
+    EXPECT_EQ(emulator.console_name(1), "NEMU Console");
+    EXPECT_EQ(emulator.console_output(0), "A");
+    EXPECT_TRUE(emulator.console_output(1).empty());
 }
 
 TEST(EmulatorTest, StartTwiceThrows) {
@@ -172,7 +176,7 @@ TEST(EmulatorTest, UartBaseComesFromTheConfig) {
     // The guest still halts through SiFiveTest, wherever the UART went.
     emulator.run(std::chrono::milliseconds(2000));
 
-    EXPECT_EQ(emulator.console_output(), "A");
+    EXPECT_EQ(emulator.console_output(0), "A");
     EXPECT_EQ(emulator.shutdown_status(), device::SiFiveTest::Status::PASS);
 }
 

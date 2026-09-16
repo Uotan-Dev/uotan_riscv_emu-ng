@@ -183,8 +183,16 @@ void Emulator::console_input(std::string_view bytes) {
         console_channel_.push_input(static_cast<uint8_t>(byte));
 }
 
-std::string Emulator::console_output() {
-    return console_channel_.drain_output();
+size_t Emulator::console_count() const {
+    return console_channel_.output_count();
+}
+
+std::string Emulator::console_name(size_t console) const {
+    return console_channel_.output_name(console);
+}
+
+std::string Emulator::console_output(size_t console) {
+    return console_channel_.drain_output(console);
 }
 
 void Emulator::push_key_event(core::KeyEvent event) {

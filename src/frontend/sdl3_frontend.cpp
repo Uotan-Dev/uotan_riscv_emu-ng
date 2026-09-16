@@ -15,6 +15,7 @@
  */
 
 #include <chrono>
+#include <cstddef>
 #include <cstring>
 #include <mutex>
 #include <stdexcept>
@@ -161,8 +162,11 @@ void SDL3Frontend::poll_input() {
 }
 
 void SDL3Frontend::present() {
-    if (std::string bytes = emulator_.console_output(); !bytes.empty())
-        terminal_.write(bytes);
+    for (size_t console = 0; console < emulator_.console_count(); console++) {
+        if (std::string bytes = emulator_.console_output(console);
+            !bytes.empty())
+            terminal_.write(bytes);
+    }
 
     using clock = std::chrono::steady_clock;
     using namespace std::chrono_literals;

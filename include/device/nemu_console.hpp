@@ -27,13 +27,16 @@ public:
     explicit NemuConsole(const NemuConsoleConfig& config,
                          ConsoleChannel& console_channel)
         : Device("NemuConsole", config.base, config.size),
-          console_channel_(console_channel) {}
+          console_channel_(console_channel),
+          console_port_(console_channel_.register_port("NEMU Console", false)) {
+    }
 
 private:
     std::optional<uint64_t> read_internal(addr_t offset, size_t size) override;
     bool write_internal(addr_t offset, size_t size, uint64_t value) override;
 
     ConsoleChannel& console_channel_;
+    ConsoleChannel::Port console_port_;
 };
 
 } // namespace uemu::device

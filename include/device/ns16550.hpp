@@ -126,6 +126,7 @@ private:
     void tx_byte(uint8_t val);
 
     ConsoleChannel& console_channel_;
+    ConsoleChannel::Port console_port_;
 
     uint32_t reg_shift_;
     uint32_t reg_io_width_;

@@ -27,7 +27,8 @@ NemuConsole::read_internal([[maybe_unused]] addr_t offset,
 bool NemuConsole::write_internal(addr_t offset, [[maybe_unused]] size_t size,
                                  uint64_t value) {
     if (offset == 0) {
-        console_channel_.push_output(static_cast<uint8_t>(value & 0xFF));
+        console_channel_.push_output(console_port_,
+                                     static_cast<uint8_t>(value & 0xFF));
         return true;
     }
 

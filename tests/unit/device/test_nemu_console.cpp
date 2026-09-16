@@ -18,22 +18,31 @@
 
 #include "device/console_channel.hpp"
 #include "device/nemu_console.hpp"
+#include "device/ns16550.hpp"
 
 namespace uemu::test {
 
-TEST(NemuConsoleTest, BasicTest) {
+TEST(NemuConsoleTest, HasIndependentOutputFromNS16550) {
     constexpr NemuConsoleConfig CONSOLE{};
+    constexpr NS16550Config UART{};
 
     device::ConsoleChannel channel;
+    device::NS16550 uart(UART, [](uint32_t, bool) {}, channel);
     device::NemuConsole console(CONSOLE, channel);
 
-    std::string in = "Hello, uemu-ng";
+    ASSERT_TRUE(uart.write<uint8_t>(UART.base + device::NS16550::TX, 'U'));
+
+    std::string in = "NEMU";
     for (char c : in) {
         bool r = console.write(CONSOLE.base, c);
         ASSERT_TRUE(r);
     }
 
-    EXPECT_EQ(channel.drain_output(), in);
+    ASSERT_EQ(channel.output_count(), 2u);
+    EXPECT_EQ(channel.output_name(0), "NS16550A");
+    EXPECT_EQ(channel.output_name(1), "NEMU Console");
+    EXPECT_EQ(channel.drain_output(0), "U");
+    EXPECT_EQ(channel.drain_output(1), in);
 }
 
 } // namespace uemu::test

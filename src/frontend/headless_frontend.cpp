@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <cstddef>
 #include <string>
 
 #include "emulator.hpp"
@@ -29,8 +30,11 @@ void HeadlessFrontend::poll_input() {
 }
 
 void HeadlessFrontend::present() {
-    if (std::string bytes = emulator_.console_output(); !bytes.empty())
-        terminal_.write(bytes);
+    for (size_t console = 0; console < emulator_.console_count(); console++) {
+        if (std::string bytes = emulator_.console_output(console);
+            !bytes.empty())
+            terminal_.write(bytes);
+    }
 }
 
 } // namespace uemu::frontend
