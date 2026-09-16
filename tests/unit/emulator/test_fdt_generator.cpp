@@ -118,6 +118,7 @@ TEST(FdtGeneratorTest, DefaultTreeDescribesTheVirtualBoard) {
     EXPECT_GE(fdt_path_offset(dtb.data(), "/soc/sifive_test@100000"), 0);
     EXPECT_GE(fdt_path_offset(dtb.data(), "/poweroff"), 0);
     EXPECT_GE(fdt_path_offset(dtb.data(), "/reboot"), 0);
+    EXPECT_EQ(fdt_path_offset(dtb.data(), "/chosen"), -FDT_ERR_NOTFOUND);
 
     EXPECT_EQ(fdt_path_offset(dtb.data(), "/soc/virtio_blk@10001000"),
               -FDT_ERR_NOTFOUND);
@@ -167,8 +168,6 @@ TEST(FdtGeneratorTest, TreeTracksBoardConfigOverrides) {
     EXPECT_EQ(read_u32(dtb, uart, "clock-frequency"), config.uart.clock_hz);
     EXPECT_EQ(read_u32(dtb, uart, "reg-shift"), config.uart.reg_shift);
     EXPECT_EQ(read_u32(dtb, uart, "reg-io-width"), config.uart.reg_io_width);
-    EXPECT_EQ(read_string(dtb, find_node(dtb, "/chosen"), "stdout-path"),
-              "/soc/uart@11000000");
 
     EXPECT_EQ(read_cells(dtb, find_node(dtb, "/flash@24000000"), "reg"),
               (std::vector<uint32_t>{0, 0x24000000, 0, 0x100000, 0, 0x24100000,

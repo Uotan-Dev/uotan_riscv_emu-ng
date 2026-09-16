@@ -85,11 +85,6 @@ std::vector<uint8_t> FdtGenerator::generate() const {
     fdt.set_string("/", "compatible", "riscv-virt");
     fdt.set_string("/", "model", "uemu-ng");
 
-    // Chosen: where the console is.
-    fdt.add_node("/chosen");
-    fdt.set_string("/chosen", "stdout-path",
-                   at("/soc", "uart", config_.uart.base));
-
     // CPUs: the single hart and its own interrupt controller.
     fdt.add_node("/cpus");
     fdt.set_u32("/cpus", "#address-cells", 1);
