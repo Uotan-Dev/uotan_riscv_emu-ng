@@ -32,7 +32,7 @@
 
 int main(int argc, char* argv[]) {
     CLI::App app{"uemu-ng: RISC-V Emulator"};
-    app.set_version_flag("-v,--version", "1.1.0");
+    app.set_version_flag("-v,--version", UEMU_VERSION);
 
     // The board is described once (see board_config.hpp); the options below
     // only override the fields the user asked for.

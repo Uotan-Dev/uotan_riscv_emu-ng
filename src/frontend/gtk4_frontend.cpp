@@ -358,12 +358,49 @@ private:
         g_free(text);
     }
 
+    static void on_about(GSimpleAction*, GVariant*, gpointer data) noexcept {
+        auto* self = static_cast<Impl*>(data);
+
+        try {
+            auto* about = ADW_ABOUT_DIALOG(adw_about_dialog_new());
+
+            adw_about_dialog_set_application_name(about, "uemu-ng");
+            adw_about_dialog_set_developer_name(about, "Nuo Shen");
+            adw_about_dialog_set_comments(
+                about, "Towards a Compliant and Educational Full-System "
+                       "RISC-V Emulator.");
+            adw_about_dialog_set_website(
+                about, "https://github.com/Uotan-Dev/uotan_riscv_emu-ng");
+            adw_about_dialog_set_issue_url(
+                about,
+                "https://github.com/Uotan-Dev/uotan_riscv_emu-ng/issues");
+            adw_about_dialog_set_license_type(about, GTK_LICENSE_APACHE_2_0);
+            adw_about_dialog_set_copyright(
+                about, "© 2025–2026 Nuo Shen, Nanjing University\n"
+                       "© 2026 UOTAN");
+            adw_about_dialog_set_version(about, UEMU_VERSION);
+
+            adw_dialog_present(ADW_DIALOG(about),
+                               GTK_WIDGET(self->main_window_));
+        } catch (...) { self->fail(std::current_exception()); }
+    }
+
+    // Application-level actions, referred to as "app.<name>" in a menu model.
+    // The trailing {} initializes GActionEntry's private padding.
+    static constexpr GActionEntry APPLICATION_ACTIONS[] = {
+        {"about", on_about, nullptr, nullptr, nullptr, {}},
+    };
+
     void activate() {
         if (activated_)
             return;
         activated_ = true;
 
         load_window_icon();
+
+        g_action_map_add_action_entries(
+            G_ACTION_MAP(application_), APPLICATION_ACTIONS,
+            G_N_ELEMENTS(APPLICATION_ACTIONS), this);
 
         const WindowView main = create_window(true);
         main_window_ = main.window;
@@ -438,6 +475,19 @@ private:
                 gtk_image_new_from_paintable(GDK_PAINTABLE(window_icon_));
             gtk_image_set_pixel_size(GTK_IMAGE(icon), HEADER_ICON_SIZE);
             adw_header_bar_pack_start(header, icon);
+        }
+
+        if (main) {
+            auto* menu = g_menu_new();
+            g_menu_append(menu, "About uemu-ng", "app.about");
+
+            auto* button = gtk_menu_button_new();
+            gtk_menu_button_set_icon_name(GTK_MENU_BUTTON(button),
+                                          "open-menu-symbolic");
+            gtk_menu_button_set_menu_model(GTK_MENU_BUTTON(button),
+                                           G_MENU_MODEL(menu));
+            adw_header_bar_pack_end(header, button);
+            g_object_unref(menu);
         }
 
         adw_banner_set_revealed(banner, guest_stopped_);

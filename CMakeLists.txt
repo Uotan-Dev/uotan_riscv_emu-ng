@@ -13,7 +13,7 @@
 # limitations under the License.
 
 cmake_minimum_required(VERSION 3.20)
-project(uemu-ng LANGUAGES C CXX ASM)
+project(uemu-ng VERSION 1.1.0 LANGUAGES C CXX ASM)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -41,7 +41,7 @@ find_package(SDL3 REQUIRED CONFIG)
 find_package(SDL3_image REQUIRED CONFIG)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GTK4 REQUIRED IMPORTED_TARGET gtk4>=4.14)
-pkg_check_modules(ADWAITA REQUIRED IMPORTED_TARGET libadwaita-1>=1.4)
+pkg_check_modules(ADWAITA REQUIRED IMPORTED_TARGET libadwaita-1>=1.5)
 pkg_check_modules(VTE REQUIRED IMPORTED_TARGET vte-2.91-gtk4>=0.68)
 
 # libfdt ships no pkg-config file on Ubuntu/Debian, so find the header and the
@@ -125,10 +125,16 @@ target_link_libraries(uemu_frontend
         PkgConfig::ADWAITA
         PkgConfig::VTE
 )
+target_compile_definitions(uemu_frontend
+    PRIVATE UEMU_VERSION="${PROJECT_VERSION}"
+)
 
 add_executable(uemu src/main.cpp)
 target_link_libraries(uemu PRIVATE uemu_frontend CLI11::CLI11)
 target_include_directories(uemu PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_compile_definitions(uemu
+    PRIVATE UEMU_VERSION="${PROJECT_VERSION}"
+)
 
 option(BUILD_TESTING "Build tests" ON)
 if(BUILD_TESTING)
