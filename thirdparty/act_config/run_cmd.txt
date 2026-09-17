@@ -1,1 +1,1 @@
-uemu --headless -m 128 -f
+uemu --frontend headless -m 128 -f

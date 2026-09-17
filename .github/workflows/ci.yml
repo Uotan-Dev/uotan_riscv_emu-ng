@@ -69,6 +69,9 @@ jobs:
           libfribidi-dev \
           libcli11-dev \
           libfdt-dev \
+          libgtk-4-dev \
+          libadwaita-1-dev \
+          libvte-2.91-gtk4-dev \
           clang
     
     - name: Install RISC-V toolchain

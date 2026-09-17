@@ -68,6 +68,8 @@ A UEFI firmware implementation (EDK2) for **uemu-ng** is available at [Uotan-Dev
 * CLI11 - Command line parsing
 * libfdt (`pkg-config` name `libfdt`, Debian/Ubuntu package `libfdt-dev`) - device tree generation
 * SDL3 & SDL3_image - Graphics and windowing
+* GTK4, libadwaita and VTE GTK4 (`libgtk-4-dev`, `libadwaita-1-dev`,
+  `libvte-2.91-gtk4-dev`) - GTK graphical frontend
 * `riscv64-unknown-elf-gcc`, `riscv64-unknown-elf-objcopy`, `riscv64-unknown-elf-objdump`
 
 ### Build Instructions
@@ -107,7 +109,8 @@ OPTIONS:
           --dump-dtb TEXT     Write the generated DTB to a file
   -t,     --timeout INT:NONNEGATIVE [0]
                               Execution timeout in milliseconds (0 = no timeout)
-          --headless          Run in headless mode (no UI window)
+          --frontend TEXT:{headless,sdl3,gtk4} [sdl3]
+                              Frontend to use
 ```
 
 ## Device tree
@@ -126,7 +129,7 @@ usual device tree tools:
 uemu --dump-dtb uemu.dtb
 
 # Or dump the tree of a normal boot
-uemu --headless --file firmware.elf --dump-dtb uemu.dtb
+uemu --frontend headless --file firmware.elf --dump-dtb uemu.dtb
 
 dtc -I dtb -O dts uemu.dtb
 ```

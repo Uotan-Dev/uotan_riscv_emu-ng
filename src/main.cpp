@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 Nuo Shen, Nanjing University
+ * Copyright 2025-2026 Nuo Shen, Nanjing University
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,13 +21,12 @@
 #include <stdexcept>
 #include <vector>
 
-#include <SDL3/SDL_main.h>
-
 #include <CLI/CLI.hpp>
 
 #include "common/log.hpp"
 #include "emulator.hpp"
 #include "fdt_generator.hpp"
+#include "frontend/gtk4_frontend.hpp"
 #include "frontend/headless_frontend.hpp"
 #include "frontend/sdl3_frontend.hpp"
 
@@ -44,7 +43,7 @@ int main(int argc, char* argv[]) {
     // The option default is the board's DRAM size, so it stays in one place.
     size_t dram_size_mb = config.dram.size / (1024 * 1024);
     int64_t timeout_ms = 0;
-    bool headless = false;
+    std::string frontend_name = "sdl3";
 
     // Configure command line options
     app.add_option("-f,--file", elf_file,
@@ -62,7 +61,9 @@ int main(int argc, char* argv[]) {
                    "Execution timeout in milliseconds (0 = no timeout)")
         ->default_val(0)
         ->check(CLI::NonNegativeNumber);
-    app.add_flag("--headless", headless, "Run in headless mode (no UI window)");
+    app.add_option("--frontend", frontend_name, "Frontend to use")
+        ->default_val("sdl3")
+        ->check(CLI::IsMember({"headless", "sdl3", "gtk4"}));
 
     try {
         // Parse command line
@@ -110,11 +111,14 @@ int main(int argc, char* argv[]) {
         emulator.load_elf(elf_file);
         static_cast<void>(emulator.install_fdt(dtb));
 
-        if (headless) {
+        if (frontend_name == "headless") {
             uemu::frontend::HeadlessFrontend frontend(emulator);
             frontend.run(std::chrono::milliseconds(timeout_ms));
-        } else {
+        } else if (frontend_name == "sdl3") {
             uemu::frontend::SDL3Frontend frontend(emulator);
+            frontend.run(std::chrono::milliseconds(timeout_ms));
+        } else {
+            uemu::frontend::Gtk4Frontend frontend(emulator);
             frontend.run(std::chrono::milliseconds(timeout_ms));
         }
     } catch (const std::runtime_error& e) {

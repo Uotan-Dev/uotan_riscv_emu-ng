@@ -39,6 +39,10 @@ find_package(CLI11 CONFIG REQUIRED)
 find_package(Threads REQUIRED)
 find_package(SDL3 REQUIRED CONFIG)
 find_package(SDL3_image REQUIRED CONFIG)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(GTK4 REQUIRED IMPORTED_TARGET gtk4>=4.14)
+pkg_check_modules(ADWAITA REQUIRED IMPORTED_TARGET libadwaita-1>=1.4)
+pkg_check_modules(VTE REQUIRED IMPORTED_TARGET vte-2.91-gtk4>=0.68)
 
 # libfdt ships no pkg-config file on Ubuntu/Debian, so find the header and the
 # library directly and hand both to the targets through one imported target.
@@ -116,6 +120,10 @@ target_link_libraries(uemu_frontend
         uemu_core
         SDL3::SDL3
         SDL3_image::SDL3_image
+    PRIVATE
+        PkgConfig::GTK4
+        PkgConfig::ADWAITA
+        PkgConfig::VTE
 )
 
 add_executable(uemu src/main.cpp)

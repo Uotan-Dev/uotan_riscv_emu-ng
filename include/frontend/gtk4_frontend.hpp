@@ -16,28 +16,31 @@
 
 #pragma once
 
-#include <cstddef>
-#include <optional>
+#include <chrono>
+#include <memory>
 
 #include "frontend/frontend.hpp"
-#include "frontend/terminal.hpp"
 
 namespace uemu::frontend {
 
-// Terminal-only frontend: host stdin feeds the guest console and guest console
-// output is written to host stdout.  This is the headless frontend used by the
-// ACT4 and riscv-tests runners.
-class HeadlessFrontend final : public Frontend {
+// GTK4/libadwaita frontend.  Its implementation is kept out of this header so
+// GTK remains a private dependency of the frontend library.
+class Gtk4Frontend final : public Frontend {
 public:
-    explicit HeadlessFrontend(Emulator& emulator);
+    explicit Gtk4Frontend(Emulator& emulator);
+    ~Gtk4Frontend() override;
 
-protected:
+    void run(std::chrono::milliseconds timeout =
+                 std::chrono::milliseconds::zero()) override;
+
+private:
+    class Impl;
+
+    // Gtk4Frontend uses the GLib main loop instead of Frontend's polling loop.
     void poll_input() override;
     void present() override;
 
-private:
-    Terminal terminal_;
-    std::optional<size_t> input_console_;
+    std::unique_ptr<Impl> impl_;
 };
 
 } // namespace uemu::frontend
