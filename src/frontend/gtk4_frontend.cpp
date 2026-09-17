@@ -272,6 +272,29 @@ private:
         } catch (...) { self->fail(std::current_exception()); }
     }
 
+    static void on_framebuffer_pressed(GtkGestureClick*, int, double, double,
+                                       gpointer data) noexcept {
+        static_cast<Impl*>(data)->focus_framebuffer();
+    }
+
+    static void on_page_attached(AdwTabView* tabs, AdwTabPage* page, int,
+                                 gpointer data) noexcept {
+        auto* self = static_cast<Impl*>(data);
+
+        if (!self->framebuffer_picture_ ||
+            adw_tab_page_get_child(page) !=
+                GTK_WIDGET(self->framebuffer_picture_))
+            return;
+
+        // libadwaita selects the attached page right after emitting this
+        // signal, so an empty selection also means this page.  Leave the focus
+        // alone while another page of the view is still selected.
+        AdwTabPage* selected = adw_tab_view_get_selected_page(tabs);
+
+        if (!selected || selected == page)
+            self->focus_framebuffer();
+    }
+
     static gboolean on_copy(GtkWidget*, GVariant*, gpointer data) noexcept {
         auto* view = static_cast<ConsoleView*>(data);
         vte_terminal_copy_clipboard_format(view->terminal, VTE_FORMAT_TEXT);
@@ -371,6 +394,8 @@ private:
         g_signal_connect(tabs, "close-page", G_CALLBACK(on_close_page), this);
         g_signal_connect(tabs, "create-window", G_CALLBACK(on_create_window),
                          this);
+        g_signal_connect(tabs, "page-attached", G_CALLBACK(on_page_attached),
+                         this);
 
         if (main) {
             g_signal_connect(window, "close-request", G_CALLBACK(on_main_close),
@@ -401,6 +426,12 @@ private:
         g_signal_connect(keyboard, "key-released",
                          G_CALLBACK(on_framebuffer_key_released), this);
         gtk_widget_add_controller(GTK_WIDGET(picture), keyboard);
+
+        GtkGesture* click = gtk_gesture_click_new();
+        g_signal_connect(click, "pressed", G_CALLBACK(on_framebuffer_pressed),
+                         this);
+        gtk_widget_add_controller(GTK_WIDGET(picture),
+                                  GTK_EVENT_CONTROLLER(click));
         framebuffer_picture_ = picture;
 
         AdwTabPage* framebuffer_page =
@@ -809,6 +840,11 @@ private:
         gtk_picture_set_paintable(framebuffer_picture_, GDK_PAINTABLE(texture));
         g_object_unref(texture);
         g_bytes_unref(bytes);
+    }
+
+    void focus_framebuffer() noexcept {
+        if (framebuffer_picture_)
+            gtk_widget_grab_focus(GTK_WIDGET(framebuffer_picture_));
     }
 
     [[nodiscard]] bool guest_running() const noexcept {
