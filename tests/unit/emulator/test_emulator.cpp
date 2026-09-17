@@ -120,6 +120,8 @@ TEST(EmulatorTest, ConsoleOutputReachesTheFrontendPort) {
     ASSERT_EQ(emulator.console_count(), 2u);
     EXPECT_EQ(emulator.console_name(0), "NS16550A");
     EXPECT_EQ(emulator.console_name(1), "NEMU Console");
+    EXPECT_TRUE(emulator.console_accepts_input(0));
+    EXPECT_FALSE(emulator.console_accepts_input(1));
     EXPECT_EQ(emulator.console_output(0), "A");
     EXPECT_TRUE(emulator.console_output(1).empty());
 }

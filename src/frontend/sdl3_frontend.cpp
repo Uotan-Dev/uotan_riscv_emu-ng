@@ -25,6 +25,7 @@
 #include <SDL3/SDL_iostream.h>
 #include <SDL3_image/SDL_image.h>
 
+#include "common/log.hpp"
 #include "core/input.hpp"
 #include "emulator.hpp"
 #include "frontend/sdl3_frontend.hpp"
@@ -42,6 +43,21 @@ namespace uemu::frontend {
 
 SDL3Frontend::SDL3Frontend(Emulator& emulator) : Frontend(emulator) {
     initialize_window();
+
+    for (size_t console = 0; console < emulator_.console_count(); console++) {
+        if (!emulator_.console_accepts_input(console))
+            continue;
+
+        if (input_console_.has_value()) {
+            log::warn(
+                "multiple input consoles are available; SDL3 frontend uses "
+                "\"{}\" for host input",
+                emulator_.console_name(*input_console_));
+            break;
+        }
+
+        input_console_ = console;
+    }
 }
 
 SDL3Frontend::~SDL3Frontend() {
@@ -157,8 +173,10 @@ void SDL3Frontend::poll_input() {
         }
     }
 
-    if (std::string bytes = terminal_.read_input(); !bytes.empty())
-        emulator_.console_input(bytes);
+    if (input_console_.has_value()) {
+        if (std::string bytes = terminal_.read_input(); !bytes.empty())
+            emulator_.console_input(*input_console_, bytes);
+    }
 }
 
 void SDL3Frontend::present() {

@@ -21,7 +21,6 @@
 #include <deque>
 #include <mutex>
 #include <optional>
-#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -44,39 +43,35 @@ public:
     [[nodiscard]] Port register_port(std::string name, bool accepts_input) {
         std::scoped_lock lock(mutex_);
 
-        if (accepts_input && input_port_.has_value())
-            throw std::logic_error(
-                "a console input port is already registered");
-
-        const Port port = outputs_.size();
-        outputs_.push_back({.name = std::move(name), .queue = {}});
-
-        if (accepts_input)
-            input_port_ = port;
+        const Port port = ports_.size();
+        ports_.push_back({.name = std::move(name),
+                          .accepts_input = accepts_input,
+                          .input = {},
+                          .output = {}});
 
         return port;
     }
 
     // Host frontend -> guest console device.
-    void push_input(uint8_t byte) {
+    void push_input(Port port, uint8_t byte) {
         std::scoped_lock lock(mutex_);
 
-        if (input_.size() < CAPACITY)
-            input_.push_back(byte);
+        PortState& state = ports_.at(port);
+
+        if (state.accepts_input && state.input.size() < CAPACITY)
+            state.input.push_back(byte);
     }
 
     [[nodiscard]] std::optional<uint8_t> pop_input(Port port) {
         std::scoped_lock lock(mutex_);
 
-        static_cast<void>(outputs_.at(port));
-        if (input_port_ != port)
+        PortState& state = ports_.at(port);
+
+        if (!state.accepts_input || state.input.empty())
             return std::nullopt;
 
-        if (input_.empty())
-            return std::nullopt;
-
-        uint8_t byte = input_.front();
-        input_.pop_front();
+        uint8_t byte = state.input.front();
+        state.input.pop_front();
         return byte;
     }
 
@@ -84,26 +79,31 @@ public:
     void push_output(Port port, uint8_t byte) {
         std::scoped_lock lock(mutex_);
 
-        Output& output = outputs_.at(port);
+        std::deque<uint8_t>& output = ports_.at(port).output;
 
-        if (output.queue.size() < CAPACITY)
-            output.queue.push_back(byte);
+        if (output.size() < CAPACITY)
+            output.push_back(byte);
     }
 
-    [[nodiscard]] size_t output_count() const {
+    [[nodiscard]] size_t port_count() const {
         std::scoped_lock lock(mutex_);
-        return outputs_.size();
+        return ports_.size();
     }
 
-    [[nodiscard]] std::string output_name(Port port) const {
+    [[nodiscard]] std::string port_name(Port port) const {
         std::scoped_lock lock(mutex_);
-        return outputs_.at(port).name;
+        return ports_.at(port).name;
+    }
+
+    [[nodiscard]] bool port_accepts_input(Port port) const {
+        std::scoped_lock lock(mutex_);
+        return ports_.at(port).accepts_input;
     }
 
     [[nodiscard]] std::string drain_output(Port port) {
         std::scoped_lock lock(mutex_);
 
-        std::deque<uint8_t>& queue = outputs_.at(port).queue;
+        std::deque<uint8_t>& queue = ports_.at(port).output;
 
         std::string bytes;
         bytes.reserve(queue.size());
@@ -116,15 +116,15 @@ public:
     }
 
 private:
-    struct Output {
+    struct PortState {
         std::string name;
-        std::deque<uint8_t> queue;
+        bool accepts_input;
+        std::deque<uint8_t> input;
+        std::deque<uint8_t> output;
     };
 
     mutable std::mutex mutex_;
-    std::deque<uint8_t> input_;
-    std::vector<Output> outputs_;
-    std::optional<Port> input_port_;
+    std::vector<PortState> ports_;
 };
 
 } // namespace uemu::device

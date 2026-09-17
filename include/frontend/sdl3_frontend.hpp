@@ -19,6 +19,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 #include <SDL3/SDL.h>
@@ -47,6 +48,7 @@ private:
     static constexpr uint32_t sdl_scancode_to_linux(SDL_Scancode code) noexcept;
 
     Terminal terminal_;
+    std::optional<size_t> input_console_;
 
     SDL_Window* window_ = nullptr;
     SDL_Renderer* renderer_ = nullptr;

@@ -17,16 +17,35 @@
 #include <cstddef>
 #include <string>
 
+#include "common/log.hpp"
 #include "emulator.hpp"
 #include "frontend/headless_frontend.hpp"
 
 namespace uemu::frontend {
 
-HeadlessFrontend::HeadlessFrontend(Emulator& emulator) : Frontend(emulator) {}
+HeadlessFrontend::HeadlessFrontend(Emulator& emulator) : Frontend(emulator) {
+    for (size_t console = 0; console < emulator_.console_count(); console++) {
+        if (!emulator_.console_accepts_input(console))
+            continue;
+
+        if (input_console_.has_value()) {
+            log::warn(
+                "multiple input consoles are available; headless frontend "
+                "uses \"{}\" for host input",
+                emulator_.console_name(*input_console_));
+            break;
+        }
+
+        input_console_ = console;
+    }
+}
 
 void HeadlessFrontend::poll_input() {
+    if (!input_console_.has_value())
+        return;
+
     if (std::string bytes = terminal_.read_input(); !bytes.empty())
-        emulator_.console_input(bytes);
+        emulator_.console_input(*input_console_, bytes);
 }
 
 void HeadlessFrontend::present() {

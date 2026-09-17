@@ -38,9 +38,11 @@ TEST(NemuConsoleTest, HasIndependentOutputFromNS16550) {
         ASSERT_TRUE(r);
     }
 
-    ASSERT_EQ(channel.output_count(), 2u);
-    EXPECT_EQ(channel.output_name(0), "NS16550A");
-    EXPECT_EQ(channel.output_name(1), "NEMU Console");
+    ASSERT_EQ(channel.port_count(), 2u);
+    EXPECT_EQ(channel.port_name(0), "NS16550A");
+    EXPECT_EQ(channel.port_name(1), "NEMU Console");
+    EXPECT_TRUE(channel.port_accepts_input(0));
+    EXPECT_FALSE(channel.port_accepts_input(1));
     EXPECT_EQ(channel.drain_output(0), "U");
     EXPECT_EQ(channel.drain_output(1), in);
 }

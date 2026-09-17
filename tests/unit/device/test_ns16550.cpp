@@ -41,11 +41,11 @@ TEST(NS16550Test, ReceiveRequiresEnabledFifo) {
     device::NS16550 uart(UART, [](uint32_t, bool) {}, channel);
 
     // Without the FIFO the device does not consume host input at all.
-    channel.push_input('w');
+    channel.push_input(0, 'w');
     uart.tick();
     EXPECT_EQ(channel.pop_input(0), std::optional<uint8_t>{'w'});
 
-    channel.push_input('x');
+    channel.push_input(0, 'x');
     ASSERT_TRUE(uart.write<uint8_t>(BASE + device::NS16550::FCR,
                                     device::NS16550::FCR_ENABLE_FIFO));
     uart.tick();
@@ -82,7 +82,7 @@ TEST(NS16550Test, ReceiveRaisesInterrupt) {
     ASSERT_TRUE(uart.write<uint8_t>(BASE + device::NS16550::IER,
                                     device::NS16550::IER_RDI));
 
-    channel.push_input('z');
+    channel.push_input(0, 'z');
     uart.tick();
 
     EXPECT_EQ(irq.raised, 1u);
@@ -97,8 +97,9 @@ TEST(NS16550Test, TransmitUsesTheConsoleChannel) {
     ASSERT_TRUE(uart.write<uint8_t>(BASE + device::NS16550::TX, 'A'));
     ASSERT_TRUE(uart.write<uint8_t>(BASE + device::NS16550::TX, 'B'));
 
-    ASSERT_EQ(channel.output_count(), 1u);
-    EXPECT_EQ(channel.output_name(0), "NS16550A");
+    ASSERT_EQ(channel.port_count(), 1u);
+    EXPECT_EQ(channel.port_name(0), "NS16550A");
+    EXPECT_TRUE(channel.port_accepts_input(0));
     EXPECT_EQ(channel.drain_output(0), "AB");
 }
 

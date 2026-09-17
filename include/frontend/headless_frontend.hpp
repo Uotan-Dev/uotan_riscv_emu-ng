@@ -16,6 +16,9 @@
 
 #pragma once
 
+#include <cstddef>
+#include <optional>
+
 #include "frontend/frontend.hpp"
 #include "frontend/terminal.hpp"
 
@@ -34,6 +37,7 @@ protected:
 
 private:
     Terminal terminal_;
+    std::optional<size_t> input_console_;
 };
 
 } // namespace uemu::frontend

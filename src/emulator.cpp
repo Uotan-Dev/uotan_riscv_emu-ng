@@ -178,17 +178,19 @@ void Emulator::halt_from_guest(uint16_t code, uint16_t status) noexcept {
     stop_source_.request_stop();
 }
 
-void Emulator::console_input(std::string_view bytes) {
+void Emulator::console_input(size_t console, std::string_view bytes) {
     for (char byte : bytes)
-        console_channel_.push_input(static_cast<uint8_t>(byte));
+        console_channel_.push_input(console, static_cast<uint8_t>(byte));
 }
 
-size_t Emulator::console_count() const {
-    return console_channel_.output_count();
-}
+size_t Emulator::console_count() const { return console_channel_.port_count(); }
 
 std::string Emulator::console_name(size_t console) const {
-    return console_channel_.output_name(console);
+    return console_channel_.port_name(console);
+}
+
+bool Emulator::console_accepts_input(size_t console) const {
+    return console_channel_.port_accepts_input(console);
 }
 
 std::string Emulator::console_output(size_t console) {

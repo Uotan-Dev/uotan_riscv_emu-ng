@@ -132,9 +132,10 @@ public:
     }
 
     // Frontend ports.  Main thread only.
-    void console_input(std::string_view bytes);
+    void console_input(size_t console, std::string_view bytes);
     [[nodiscard]] size_t console_count() const;
     [[nodiscard]] std::string console_name(size_t console) const;
+    [[nodiscard]] bool console_accepts_input(size_t console) const;
     [[nodiscard]] std::string console_output(size_t console);
     void push_key_event(core::KeyEvent event);
     [[nodiscard]] core::Framebuffer& framebuffer() noexcept;
