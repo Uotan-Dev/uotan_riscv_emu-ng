@@ -69,13 +69,15 @@ public:
 
         std::exception_ptr worker_error;
 
-        if (started_) {
+        if (started_ && !workers_joined_) {
             emulator_.request_shutdown();
 
             try {
-                emulator_.wait();
+                wait_for_workers();
             } catch (...) { worker_error = std::current_exception(); }
+        }
 
+        if (started_) {
             // Drain bytes written between the last UI tick and worker exit.
             try {
                 present();
@@ -112,6 +114,8 @@ private:
     struct WindowView {
         AdwApplicationWindow* window;
         AdwTabView* tabs;
+        AdwBanner* banner;
+        GtkLabel* title;
     };
 
     struct PasteRequest {
@@ -143,8 +147,42 @@ private:
     }
 
     static gboolean on_main_close(GtkWindow*, gpointer data) noexcept {
-        static_cast<Impl*>(data)->request_exit();
+        auto* self = static_cast<Impl*>(data);
+
+        try {
+            if (self->guest_stopped_) {
+                self->quit_application();
+            } else if (self->emulator_.finished()) {
+                self->finish_guest();
+                self->quit_application();
+            } else {
+                self->confirm_main_close();
+            }
+        } catch (...) { self->fail(std::current_exception()); }
+
         return GDK_EVENT_STOP;
+    }
+
+    static void on_close_confirmation(GObject* source, GAsyncResult* result,
+                                      gpointer data) noexcept {
+        auto* self = static_cast<Impl*>(data);
+        self->close_confirmation_pending_ = false;
+
+        try {
+            GError* error = nullptr;
+            const int response = gtk_alert_dialog_choose_finish(
+                GTK_ALERT_DIALOG(source), result, &error);
+
+            if (error) {
+                const std::string message(error->message);
+                g_error_free(error);
+                throw std::runtime_error("Failed to show close confirmation: " +
+                                         message);
+            }
+
+            if (response == 1)
+                self->request_exit();
+        } catch (...) { self->fail(std::current_exception()); }
     }
 
     static gboolean on_detached_close(GtkWindow* window,
@@ -165,6 +203,15 @@ private:
                       [window](const WindowView& view) {
                           return GTK_WIDGET(view.window) == window;
                       });
+    }
+
+    static void on_detached_page_selected(AdwTabView* tabs, GParamSpec*,
+                                          gpointer data) noexcept {
+        auto* self = static_cast<Impl*>(data);
+
+        try {
+            self->update_detached_title(tabs);
+        } catch (...) { self->fail(std::current_exception()); }
     }
 
     static gboolean on_close_page(AdwTabView* view, AdwTabPage* page,
@@ -189,6 +236,9 @@ private:
         auto* view = static_cast<ConsoleView*>(data);
 
         try {
+            if (!view->frontend->guest_running())
+                return;
+
             view->frontend->emulator_.console_input(
                 view->console, std::string_view(text, size));
         } catch (...) { view->frontend->fail(std::current_exception()); }
@@ -233,6 +283,9 @@ private:
         auto* view = static_cast<ConsoleView*>(data);
 
         try {
+            if (!view->frontend->guest_running())
+                return TRUE;
+
             auto request =
                 std::make_unique<PasteRequest>(view->frontend, view->console);
             gdk_clipboard_read_text_async(gtk_widget_get_clipboard(widget),
@@ -262,7 +315,9 @@ private:
             return;
 
         try {
-            request->frontend->emulator_.console_input(request->console, text);
+            if (request->frontend->guest_running())
+                request->frontend->emulator_.console_input(request->console,
+                                                           text);
         } catch (...) { request->frontend->fail(std::current_exception()); }
 
         g_free(text);
@@ -276,6 +331,7 @@ private:
         const WindowView main = create_window(true);
         main_window_ = main.window;
         main_tabs_ = main.tabs;
+        main_banner_ = main.banner;
 
         create_pages();
         gtk_window_present(GTK_WINDOW(main_window_));
@@ -291,15 +347,23 @@ private:
             adw_application_window_new(GTK_APPLICATION(application_)));
         auto* toolbar = ADW_TOOLBAR_VIEW(adw_toolbar_view_new());
         auto* header = ADW_HEADER_BAR(adw_header_bar_new());
+        auto* banner = ADW_BANNER(adw_banner_new("Guest has stopped"));
         auto* tab_bar = ADW_TAB_BAR(adw_tab_bar_new());
         auto* tabs = ADW_TAB_VIEW(adw_tab_view_new());
+        auto* title = GTK_LABEL(gtk_label_new("uemu-ng"));
 
         gtk_window_set_title(GTK_WINDOW(window), "uemu-ng");
         gtk_window_set_default_size(GTK_WINDOW(window), 1024, 768);
+        gtk_widget_add_css_class(GTK_WIDGET(title), "title-3");
+        gtk_widget_add_css_class(GTK_WIDGET(title),
+                                 main ? "accent" : "warning");
 
         adw_tab_bar_set_view(tab_bar, tabs);
         adw_tab_bar_set_autohide(tab_bar, FALSE);
+        adw_header_bar_set_title_widget(header, GTK_WIDGET(title));
+        adw_banner_set_revealed(banner, guest_stopped_);
         adw_toolbar_view_add_top_bar(toolbar, GTK_WIDGET(header));
+        adw_toolbar_view_add_top_bar(toolbar, GTK_WIDGET(banner));
         adw_toolbar_view_add_top_bar(toolbar, GTK_WIDGET(tab_bar));
         adw_toolbar_view_set_content(toolbar, GTK_WIDGET(tabs));
         adw_application_window_set_content(window, GTK_WIDGET(toolbar));
@@ -316,9 +380,11 @@ private:
                              G_CALLBACK(on_detached_close), this);
             g_signal_connect(window, "destroy", G_CALLBACK(on_detached_destroy),
                              this);
+            g_signal_connect(tabs, "notify::selected-page",
+                             G_CALLBACK(on_detached_page_selected), this);
         }
 
-        return {window, tabs};
+        return {window, tabs, banner, title};
     }
 
     void create_pages() {
@@ -377,6 +443,9 @@ private:
     }
 
     [[nodiscard]] bool push_key(guint keyval, core::KeyEvent::Action action) {
+        if (!guest_running())
+            return false;
+
         const uint32_t code = gdk_key_to_linux(keyval);
 
         if (code == KEY_RESERVED)
@@ -615,8 +684,27 @@ private:
     [[nodiscard]] AdwTabView* create_detached_window() {
         const WindowView view = create_window(false);
         detached_windows_.push_back(view);
+        update_detached_title(view.tabs);
         gtk_window_present(GTK_WINDOW(view.window));
         return view.tabs;
+    }
+
+    void update_detached_title(AdwTabView* tabs) {
+        const auto it = std::ranges::find_if(
+            detached_windows_,
+            [tabs](const WindowView& view) { return view.tabs == tabs; });
+
+        if (it == detached_windows_.end())
+            return;
+
+        AdwTabPage* page = adw_tab_view_get_selected_page(tabs);
+        const char* title = page ? adw_tab_page_get_title(page) : nullptr;
+
+        if (!title || *title == '\0')
+            title = "uemu-ng";
+
+        gtk_label_set_text(it->title, title);
+        gtk_window_set_title(GTK_WINDOW(it->window), title);
     }
 
     void dock_window(AdwApplicationWindow* window) {
@@ -643,7 +731,7 @@ private:
         present();
 
         if (emulator_.finished()) {
-            request_exit();
+            finish_guest();
             return false;
         }
 
@@ -661,6 +749,36 @@ private:
         }
 
         return true;
+    }
+
+    void finish_guest() {
+        wait_for_workers();
+
+        // Capture output produced immediately before the workers exited.
+        present();
+
+        guest_stopped_ = true;
+        for (const ConsoleView& view : consoles_)
+            vte_terminal_set_input_enabled(view.terminal, FALSE);
+
+        if (main_banner_)
+            adw_banner_set_revealed(main_banner_, TRUE);
+        for (const WindowView& view : detached_windows_)
+            adw_banner_set_revealed(view.banner, TRUE);
+    }
+
+    void wait_for_workers() {
+        if (!started_ || workers_joined_)
+            return;
+
+        try {
+            emulator_.wait();
+        } catch (...) {
+            workers_joined_ = true;
+            throw;
+        }
+
+        workers_joined_ = true;
     }
 
     void present() {
@@ -693,15 +811,48 @@ private:
         g_bytes_unref(bytes);
     }
 
-    void request_exit() noexcept {
+    [[nodiscard]] bool guest_running() const noexcept {
+        return started_ && !guest_stopped_ && !quitting_ &&
+               !emulator_.finished();
+    }
+
+    void confirm_main_close() {
+        if (close_confirmation_pending_ || quitting_)
+            return;
+
+        auto* dialog = gtk_alert_dialog_new("Stop the virtual machine?");
+        constexpr const char* BUTTONS[] = {"Cancel", "Stop", nullptr};
+
+        gtk_alert_dialog_set_detail(
+            dialog,
+            "The guest is still running. Closing the main window will stop "
+            "it.");
+        gtk_alert_dialog_set_buttons(dialog, BUTTONS);
+        gtk_alert_dialog_set_cancel_button(dialog, 0);
+        gtk_alert_dialog_set_default_button(dialog, 0);
+
+        close_confirmation_pending_ = true;
+        gtk_alert_dialog_choose(dialog, GTK_WINDOW(main_window_), nullptr,
+                                on_close_confirmation, this);
+        g_object_unref(dialog);
+    }
+
+    void quit_application() noexcept {
         if (quitting_)
             return;
 
         quitting_ = true;
-        if (started_)
-            emulator_.request_shutdown();
         if (application_)
             g_application_quit(G_APPLICATION(application_));
+    }
+
+    void request_exit() noexcept {
+        if (quitting_)
+            return;
+
+        if (started_ && !workers_joined_)
+            emulator_.request_shutdown();
+        quit_application();
     }
 
     void fail(std::exception_ptr error) noexcept {
@@ -720,6 +871,7 @@ private:
             gtk_window_destroy(GTK_WINDOW(main_window_));
             main_window_ = nullptr;
             main_tabs_ = nullptr;
+            main_banner_ = nullptr;
             framebuffer_picture_ = nullptr;
         }
 
@@ -730,6 +882,7 @@ private:
     AdwApplication* application_ = nullptr;
     AdwApplicationWindow* main_window_ = nullptr;
     AdwTabView* main_tabs_ = nullptr;
+    AdwBanner* main_banner_ = nullptr;
     GtkPicture* framebuffer_picture_ = nullptr;
     std::vector<ConsoleView> consoles_;
     std::vector<WindowView> detached_windows_;
@@ -739,6 +892,9 @@ private:
     std::exception_ptr callback_error_;
     bool activated_ = false;
     bool started_ = false;
+    bool workers_joined_ = false;
+    bool guest_stopped_ = false;
+    bool close_confirmation_pending_ = false;
     bool quitting_ = false;
 };
 
