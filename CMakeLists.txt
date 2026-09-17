@@ -94,6 +94,12 @@ target_include_directories(uemu_core
         ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/kernel-headers/generic/include
 )
 
+# The device tree describes the emulator the guest is running on, so the core
+# names the same version the CLI and the frontend already report.
+target_compile_definitions(uemu_core
+    PRIVATE UEMU_VERSION="${PROJECT_VERSION}"
+)
+
 # Link libraries that the core needs.  libfdt is an implementation detail of
 # src/utils/fdt.cpp and src/emulator.cpp, so it stays private; the tests link it
 # themselves because they use it to inspect the trees they build.

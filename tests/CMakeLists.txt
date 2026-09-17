@@ -44,6 +44,12 @@ target_include_directories(uemu_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../src
 )
 
+# The FDT test compares the generated property against the macro the core was
+# compiled with.
+target_compile_definitions(uemu_test
+    PRIVATE UEMU_VERSION="${PROJECT_VERSION}"
+)
+
 include(GoogleTest)
 gtest_discover_tests(uemu_test)
 

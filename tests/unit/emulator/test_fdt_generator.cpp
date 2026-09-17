@@ -91,6 +91,7 @@ TEST(FdtGeneratorTest, DefaultTreeDescribesTheVirtualBoard) {
     EXPECT_EQ(static_cast<size_t>(fdt_totalsize(dtb.data())), dtb.size());
     EXPECT_EQ(read_string(dtb, 0, "compatible"), "riscv-virt");
     EXPECT_EQ(read_string(dtb, 0, "model"), "uemu-ng");
+    EXPECT_EQ(read_string(dtb, 0, "uotan,emulator-version"), UEMU_VERSION);
 
     const int cpu = find_node(dtb, "/cpus/cpu@0");
     EXPECT_EQ(read_string(dtb, cpu, "mmu-type"), "riscv,sv39");

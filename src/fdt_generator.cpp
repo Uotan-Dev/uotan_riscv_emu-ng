@@ -84,6 +84,9 @@ std::vector<uint8_t> FdtGenerator::generate() const {
     fdt.set_u32("/", "#size-cells", 2);
     fdt.set_string("/", "compatible", "riscv-virt");
     fdt.set_string("/", "model", "uemu-ng");
+    // Firmware reads the running emulator's version from the machine
+    // description, so it comes from the build rather than a second constant.
+    fdt.set_string("/", "uotan,emulator-version", UEMU_VERSION);
 
     // CPUs: the single hart and its own interrupt controller.
     fdt.add_node("/cpus");
