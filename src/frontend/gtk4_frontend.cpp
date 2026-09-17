@@ -16,6 +16,8 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <exception>
 #include <memory>
@@ -39,6 +41,12 @@ extern "C" {
 #include "linux/input-event-codes.h" // IWYU pragma: keep
 }
 
+// The embedded PNG icon, shared with the SDL3 frontend.
+extern "C" {
+extern const uint8_t uotan_icon_data[];
+extern const ptrdiff_t uotan_icon_size;
+}
+
 namespace uemu::frontend {
 
 class Gtk4Frontend::Impl {
@@ -50,6 +58,8 @@ public:
             destroy_windows();
             g_clear_object(&application_);
         }
+
+        g_clear_object(&window_icon_);
     }
 
     void run(std::chrono::milliseconds timeout) {
@@ -125,6 +135,8 @@ private:
 
     static constexpr guint UI_INTERVAL_MS = 16;
     static constexpr glong SCROLLBACK_LINES = 10000;
+    // Matches the size GTK uses for the window-control icon.
+    static constexpr int HEADER_ICON_SIZE = 16;
 
     static void on_activate(GApplication*, gpointer data) noexcept {
         auto* self = static_cast<Impl*>(data);
@@ -351,6 +363,8 @@ private:
             return;
         activated_ = true;
 
+        load_window_icon();
+
         const WindowView main = create_window(true);
         main_window_ = main.window;
         main_tabs_ = main.tabs;
@@ -363,6 +377,40 @@ private:
         started_ = true;
         start_time_ = std::chrono::steady_clock::now();
         tick_source_ = g_timeout_add(UI_INTERVAL_MS, on_tick, this);
+    }
+
+    // Decodes the embedded PNG once; every window reuses this texture.
+    void load_window_icon() {
+        GBytes* bytes = g_bytes_new_static(
+            uotan_icon_data, static_cast<size_t>(uotan_icon_size));
+        GError* error = nullptr;
+        window_icon_ = gdk_texture_new_from_bytes(bytes, &error);
+        g_bytes_unref(bytes);
+
+        if (error) {
+            log::warn("Failed to load the window icon: {}", error->message);
+            g_error_free(error);
+            window_icon_ = nullptr;
+        }
+    }
+
+    static void on_window_realize(GtkWidget* window, gpointer data) noexcept {
+        auto* self = static_cast<Impl*>(data);
+        GdkTexture* icon = self->window_icon_;
+
+        if (!icon)
+            return;
+
+        // A realized GtkWindow is a GtkNative backed by a GdkToplevel.
+        GdkSurface* surface = gtk_native_get_surface(GTK_NATIVE(window));
+
+        if (!surface || !GDK_IS_TOPLEVEL(surface))
+            return;
+
+        // GDK consumes the list during the call, so only the nodes are ours.
+        GList* icons = g_list_prepend(nullptr, icon);
+        gdk_toplevel_set_icon_list(GDK_TOPLEVEL(surface), icons);
+        g_list_free(icons);
     }
 
     [[nodiscard]] WindowView create_window(bool main) {
@@ -384,6 +432,14 @@ private:
         adw_tab_bar_set_view(tab_bar, tabs);
         adw_tab_bar_set_autohide(tab_bar, FALSE);
         adw_header_bar_set_title_widget(header, GTK_WIDGET(title));
+
+        if (window_icon_ != nullptr) {
+            auto* icon =
+                gtk_image_new_from_paintable(GDK_PAINTABLE(window_icon_));
+            gtk_image_set_pixel_size(GTK_IMAGE(icon), HEADER_ICON_SIZE);
+            adw_header_bar_pack_start(header, icon);
+        }
+
         adw_banner_set_revealed(banner, guest_stopped_);
         adw_toolbar_view_add_top_bar(toolbar, GTK_WIDGET(header));
         adw_toolbar_view_add_top_bar(toolbar, GTK_WIDGET(banner));
@@ -395,6 +451,9 @@ private:
         g_signal_connect(tabs, "create-window", G_CALLBACK(on_create_window),
                          this);
         g_signal_connect(tabs, "page-attached", G_CALLBACK(on_page_attached),
+                         this);
+
+        g_signal_connect(window, "realize", G_CALLBACK(on_window_realize),
                          this);
 
         if (main) {
@@ -920,6 +979,7 @@ private:
     AdwTabView* main_tabs_ = nullptr;
     AdwBanner* main_banner_ = nullptr;
     GtkPicture* framebuffer_picture_ = nullptr;
+    GdkTexture* window_icon_ = nullptr;
     std::vector<ConsoleView> consoles_;
     std::vector<WindowView> detached_windows_;
     guint tick_source_ = 0;
