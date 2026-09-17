@@ -46,6 +46,12 @@ TEST_F(SimpleFBTest, SingleByteAccess) {
     EXPECT_EQ(val.value(), 0xFF);
 }
 
+TEST_F(SimpleFBTest, HasAFrontendDisplayName) {
+    const core::Framebuffer& framebuffer = *fb;
+
+    EXPECT_EQ(framebuffer.display_name(), "SimpleFB");
+}
+
 TEST_F(SimpleFBTest, MultiByteAccess) {
     addr_t base = fb->start();
 

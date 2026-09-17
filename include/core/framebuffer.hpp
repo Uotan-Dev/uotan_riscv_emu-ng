@@ -19,6 +19,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
+#include <string_view>
 
 namespace uemu::core {
 
@@ -31,6 +32,7 @@ public:
     [[nodiscard]] virtual size_t width() const noexcept = 0;
     [[nodiscard]] virtual size_t height() const noexcept = 0;
     [[nodiscard]] virtual size_t byte_size() const noexcept = 0;
+    [[nodiscard]] virtual std::string_view display_name() const noexcept = 0;
 
     [[nodiscard]] virtual std::unique_lock<std::mutex> lock() const = 0;
     [[nodiscard]] virtual const uint8_t* pixels() const = 0;

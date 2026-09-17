@@ -42,6 +42,8 @@ public:
         return width_ * height_ * BPP;
     }
 
+    std::string_view display_name() const noexcept override { return name_; }
+
     const uint8_t* pixels() const override { return vram_.data(); }
 
     [[nodiscard]] std::unique_lock<std::mutex> lock() const override {

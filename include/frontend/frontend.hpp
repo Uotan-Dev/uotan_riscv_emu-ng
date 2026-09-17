@@ -43,7 +43,7 @@ public:
     // Runs the main loop: polls host input, presents guest output and stops on
     // guest halt, host quit or the optional timeout.  Rethrows worker
     // exceptions and leaves the emulator stopped and joined.
-    void
+    virtual void
     run(std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
 
 protected:
