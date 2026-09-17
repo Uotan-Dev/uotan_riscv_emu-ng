@@ -97,7 +97,7 @@ void setup_sv39() {
         leaf_page_table_nonid[i] = 0;
     }
 
-    puts("Setting up page tables...\n");
+    puts("Setting up page tables...\r\n");
 
     // Identity map RAM: 0x80000000 - 0x80200000 (2MB with 4KB pages)
     uint64_t mid_ram_pa = (uint64_t)mid_page_table_ram;
@@ -108,11 +108,11 @@ void setup_sv39() {
         uint64_t pa = 0x80000000 + (i * PAGE_SIZE);
         leaf_page_table_ram[i] = make_pte(pa, PTE_V | PTE_R | PTE_W | PTE_X);
     }
-    puts(" RAM identity mapped (0x80000000-0x80200000)\n");
+    puts(" RAM identity mapped (0x80000000-0x80200000)\r\n");
 
     // Identity map devices using 1GB huge page
     root_page_table[0] = make_pte(0x00000000, PTE_V | PTE_R | PTE_W);
-    puts(" All devices identity mapped (0x00000000-0x3FFFFFFF)\n");
+    puts(" All devices identity mapped (0x00000000-0x3FFFFFFF)\r\n");
 
     // Non-identity mapping: Map physical 0x80100000 to virtual 0xC0000000
     // (4KB page)
@@ -122,24 +122,24 @@ void setup_sv39() {
     mid_page_table_nonid[0] = make_pte(leaf_nonid_pa, PTE_V);
     leaf_page_table_nonid[0] =
         make_pte(0x80100000, PTE_V | PTE_R | PTE_W | PTE_X);
-    puts(" Non-identity mapping: VA 0xC0000000 -> PA 0x80100000\n");
+    puts(" Non-identity mapping: VA 0xC0000000 -> PA 0x80100000\r\n");
 
-    puts("Page tables setup complete\n\n");
+    puts("Page tables setup complete\r\n\r\n");
 }
 
 void enable_sv39() {
     uint64_t root_ppn = ((uint64_t)root_page_table) >> 12;
     uint64_t satp_val = SATP_MODE_SV39 | root_ppn;
 
-    puts("Enabling SV39...\n");
+    puts("Enabling SV39...\r\n");
     puts("SATP value: ");
     print_hex(satp_val);
-    puts("\n");
+    puts("\r\n");
 
     write_csr(satp, satp_val);
     sfence_vma();
 
-    puts("SV39 enabled!\n\n");
+    puts("SV39 enabled!\r\n\r\n");
 }
 
 static inline void shutdown(int code) {
@@ -148,106 +148,106 @@ static inline void shutdown(int code) {
 }
 
 void test_virtual_memory() {
-    puts("=== Virtual Memory Tests ===\n\n");
+    puts("=== Virtual Memory Tests ===\r\n\r\n");
 
     // Test 1: Identity mapped R/W
-    puts("Test 1: Identity-mapped R/W\n");
+    puts("Test 1: Identity-mapped R/W\r\n");
     test_data = 0x12345678ABCDEF00ULL;
     puts(" Written: ");
     print_hex(test_data);
-    puts("\n");
+    puts("\r\n");
 
     uint64_t read_val = test_data;
     puts(" Read: ");
     print_hex(read_val);
-    puts("\n");
+    puts("\r\n");
 
     if (read_val == 0x12345678ABCDEF00ULL) {
-        puts(" PASS\n\n");
+        puts(" PASS\r\n\r\n");
     } else {
-        puts(" FAIL\n\n");
+        puts(" FAIL\r\n\r\n");
         shutdown(-1);
     }
 
     // Test 2: Non-identity mapping
-    puts("Test 2: Non-identity mapping\n");
+    puts("Test 2: Non-identity mapping\r\n");
     volatile uint64_t* virtual_addr = (volatile uint64_t*)0xC0000000;
     volatile uint64_t* physical_addr = (volatile uint64_t*)0x80100000;
 
     // Write through physical address
     *physical_addr = 0xCAFEBABEDEADC0DEULL;
-    puts(" Written 0xCAFEBABEDEADC0DE to PA 0x80100000\n");
+    puts(" Written 0xCAFEBABEDEADC0DE to PA 0x80100000\r\n");
 
     // Read through virtual address
     uint64_t virt_read = *virtual_addr;
     puts(" Read from VA 0xC0000000: ");
     print_hex(virt_read);
-    puts("\n");
+    puts("\r\n");
 
     if (virt_read == 0xCAFEBABEDEADC0DEULL) {
-        puts(" PASS: Non-identity mapping works!\n\n");
+        puts(" PASS: Non-identity mapping works!\r\n\r\n");
     } else {
-        puts(" FAIL: Non-identity mapping broken\n\n");
+        puts(" FAIL: Non-identity mapping broken\r\n\r\n");
         shutdown(-1);
     }
 
     // Test 3: Write through virtual, read through physical
-    puts("Test 3: Reverse non-identity test\n");
+    puts("Test 3: Reverse non-identity test\r\n");
     *virtual_addr = 0x0123456789ABCDEFULL;
-    puts(" Written 0x0123456789ABCDEF to VA 0xC0000000\n");
+    puts(" Written 0x0123456789ABCDEF to VA 0xC0000000\r\n");
 
     uint64_t phys_read = *physical_addr;
     puts(" Read from PA 0x80100000: ");
     print_hex(phys_read);
-    puts("\n");
+    puts("\r\n");
 
     if (phys_read == 0x0123456789ABCDEFULL) {
-        puts(" PASS\n\n");
+        puts(" PASS\r\n\r\n");
     } else {
-        puts(" FAIL\n\n");
+        puts(" FAIL\r\n\r\n");
         shutdown(-1);
     }
 
     // Test 4: Verify SATP
-    puts("Test 4: Verify SATP register\n");
+    puts("Test 4: Verify SATP register\r\n");
     uint64_t satp_val = read_csr(satp);
     puts(" SATP: ");
     print_hex(satp_val);
-    puts("\n");
+    puts("\r\n");
 
     uint64_t mode = satp_val >> 60;
     if (mode == 8) {
-        puts(" PASS: SV39 mode active\n\n");
+        puts(" PASS: SV39 mode active\r\n\r\n");
     } else {
-        puts(" FAIL: SV39 mode not active\n\n");
+        puts(" FAIL: SV39 mode not active\r\n\r\n");
         shutdown(-1);
     }
 
-    puts("=== All Tests Complete ===\n");
+    puts("=== All Tests Complete ===\r\n");
 }
 
 int main() {
-    puts("\n========================================\n");
-    puts(" RISC-V SV39 Virtual Memory Test\n");
-    puts(" (Fixed with device mappings)\n");
-    puts("========================================\n\n");
+    puts("\r\n========================================\r\n");
+    puts(" RISC-V SV39 Virtual Memory Test\r\n");
+    puts(" (Fixed with device mappings)\r\n");
+    puts("========================================\r\n\r\n");
 
     // Check initial mode
     uint64_t satp = read_csr(satp);
     puts("Initial SATP: ");
     print_hex(satp);
-    puts("\n");
+    puts("\r\n");
 
     uint64_t sstatus = read_csr(sstatus);
     puts("Initial sstatus: ");
     print_hex(sstatus);
-    puts("\n\n");
+    puts("\r\n\r\n");
 
     setup_sv39();
     enable_sv39();
     test_virtual_memory();
 
-    puts("\nTest completed successfully!\n");
+    puts("\r\nTest completed successfully!\r\n");
 
     shutdown(0);
     while (1)
