@@ -358,6 +358,26 @@ private:
         g_free(text);
     }
 
+    // VTE parents the popover to the terminal only while the menu is shown, so
+    // the activated item finds it through its ancestors.
+    static void close_terminal_menu(GtkWidget* item) noexcept {
+        if (auto* popover = gtk_widget_get_ancestor(item, GTK_TYPE_POPOVER))
+            gtk_popover_popdown(GTK_POPOVER(popover));
+    }
+
+    static void on_terminal_menu_copy(GtkButton* item, gpointer data) noexcept {
+        auto* view = static_cast<ConsoleView*>(data);
+        close_terminal_menu(GTK_WIDGET(item));
+        static_cast<void>(on_copy(GTK_WIDGET(view->terminal), nullptr, view));
+    }
+
+    static void on_terminal_menu_paste(GtkButton* item,
+                                       gpointer data) noexcept {
+        auto* view = static_cast<ConsoleView*>(data);
+        close_terminal_menu(GTK_WIDGET(item));
+        static_cast<void>(on_paste(GTK_WIDGET(view->terminal), nullptr, view));
+    }
+
     static void on_about(GSimpleAction*, GVariant*, gpointer data) noexcept {
         auto* self = static_cast<Impl*>(data);
 
@@ -572,6 +592,8 @@ private:
             } else {
                 add_copy_shortcut(view);
             }
+
+            add_terminal_menu(view, accepts_input);
 
             AdwTabPage* page =
                 adw_tab_view_append(main_tabs_, GTK_WIDGET(terminal));
@@ -819,6 +841,31 @@ private:
             &controller, make_shortcut("<Control><Shift>c", on_copy, view));
         gtk_shortcut_controller_add_shortcut(
             &controller, make_shortcut("<Control><Shift>v", on_paste, view));
+    }
+
+    static void add_terminal_menu(ConsoleView& view, bool accepts_input) {
+        GtkWidget* box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+        GtkWidget* copy = gtk_button_new_with_label("Copy");
+        GtkWidget* paste = gtk_button_new_with_label("Paste");
+
+        gtk_widget_add_css_class(copy, "flat");
+        gtk_widget_add_css_class(paste, "flat");
+        gtk_widget_set_sensitive(paste, accepts_input);
+
+        g_signal_connect(copy, "clicked", G_CALLBACK(on_terminal_menu_copy),
+                         &view);
+        g_signal_connect(paste, "clicked", G_CALLBACK(on_terminal_menu_paste),
+                         &view);
+
+        gtk_box_append(GTK_BOX(box), copy);
+        gtk_box_append(GTK_BOX(box), paste);
+
+        GtkWidget* popover = gtk_popover_new();
+
+        gtk_popover_set_child(GTK_POPOVER(popover), box);
+
+        // VTE owns the popover and shows it on right click.
+        vte_terminal_set_context_menu(view.terminal, popover);
     }
 
     [[nodiscard]] AdwTabView* create_detached_window() {

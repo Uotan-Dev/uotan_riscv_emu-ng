@@ -42,7 +42,7 @@ find_package(SDL3_image REQUIRED CONFIG)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GTK4 REQUIRED IMPORTED_TARGET gtk4>=4.14)
 pkg_check_modules(ADWAITA REQUIRED IMPORTED_TARGET libadwaita-1>=1.5)
-pkg_check_modules(VTE REQUIRED IMPORTED_TARGET vte-2.91-gtk4>=0.68)
+pkg_check_modules(VTE REQUIRED IMPORTED_TARGET vte-2.91-gtk4>=0.76)
 
 # libfdt ships no pkg-config file on Ubuntu/Debian, so find the header and the
 # library directly and hand both to the targets through one imported target.
