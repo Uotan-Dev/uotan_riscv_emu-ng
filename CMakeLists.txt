@@ -34,6 +34,25 @@ add_compile_options(-Wall -Wextra)
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 
+# Interprocedural optimization (LTO) for the Release configuration.  Every
+# target is enabled together on purpose: a target that links an LTO static
+# archive has to be built with IPO itself, otherwise Clang refuses the link
+# with "file format not recognized" (GCC only happens to tolerate the mix).
+include(CheckIPOSupported)
+check_ipo_supported(RESULT UEMU_IPO_SUPPORTED OUTPUT UEMU_IPO_ERROR
+                    LANGUAGES C CXX)
+if(UEMU_IPO_SUPPORTED)
+    # Release only, so Debug builds stay debuggable.  The variable is left
+    # undefined unless the user asks otherwise.
+    if(NOT DEFINED CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+    endif()
+    message(STATUS "IPO/LTO for Release: "
+                   "${CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE}")
+else()
+    message(STATUS "IPO/LTO is not supported: ${UEMU_IPO_ERROR}")
+endif()
+
 # Find required packages
 find_package(CLI11 CONFIG REQUIRED)
 find_package(Threads REQUIRED)
