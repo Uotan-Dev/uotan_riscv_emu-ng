@@ -85,6 +85,15 @@ struct VirtioBlkConfig {
     std::filesystem::path image; // empty: no block device
 };
 
+// Generic ECAM host bridge. These are board-level windows; PCI endpoint BARs
+// are guest-programmable and deliberately do not have fixed board addresses.
+struct PciHostConfig {
+    addr_t ecam_base = 0x30000000; // pci@30000000, one ECAM bus
+    size_t ecam_size = 0x100000;
+    addr_t mmio_base = 0x60000000; // non-prefetchable 32-bit Memory window
+    size_t mmio_size = 0x10000000;
+};
+
 struct GoldfishRtcConfig {
     addr_t base = 0x101000; // rtc@101000, "google,goldfish-rtc"
     size_t size = 0x100;
@@ -135,6 +144,7 @@ struct BoardConfig {
     PFlashConfig flash1;
     SimpleFBConfig framebuffer;
     VirtioBlkConfig virtio_blk;
+    PciHostConfig pci;
     GoldfishRtcConfig rtc;
     GoldfishEventsConfig input;
     GoldfishBatteryConfig battery;

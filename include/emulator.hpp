@@ -39,6 +39,7 @@ namespace uemu::device {
 
 class GoldfishEvents;
 class NS16550;
+class PciHost;
 class SimpleFB;
 
 } // namespace uemu::device
@@ -148,6 +149,7 @@ private:
     // before the objects they reference go away.
     std::shared_ptr<core::Dram> dram_;
     std::shared_ptr<core::Hart> hart_;
+    std::unique_ptr<device::PciHost> pci_host_;
     std::shared_ptr<core::Bus> bus_;
     std::shared_ptr<core::MMU> mmu_;
 

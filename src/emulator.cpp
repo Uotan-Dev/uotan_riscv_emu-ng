@@ -30,6 +30,7 @@
 #include "device/goldfish_rtc.hpp"
 #include "device/nemu_console.hpp"
 #include "device/ns16550.hpp"
+#include "device/pci_host.hpp"
 #include "device/pflash_cfi01.hpp"
 #include "device/plic.hpp"
 #include "device/sifive_test.hpp"
@@ -45,10 +46,16 @@ namespace uemu {
 Emulator::Emulator(const BoardConfig& config)
     : dram_(std::make_shared<core::Dram>(config.dram.size)),
       hart_(std::make_shared<core::Hart>()),
+      pci_host_(std::make_unique<device::PciHost>(config.pci)),
       bus_(std::make_shared<core::Bus>(dram_)),
       mmu_(std::make_shared<core::MMU>(hart_.get(), bus_)),
       cpu_(*hart_, *mmu_, stop_source_), device_thread_(*bus_, stop_source_) {
     hart_->connect_mmu(mmu_.get());
+
+    // PCI: a fixed ECAM window and a board-defined Memory aperture. BAR
+    // placement within the aperture remains guest-programmable.
+    bus_->add_device(pci_host_->ecam_device());
+    bus_->add_device(pci_host_->mmio_device());
 
     // Clint
     bus_->add_device(std::make_shared<device::Clint>(config.clint, hart_));

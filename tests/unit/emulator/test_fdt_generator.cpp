@@ -107,6 +107,31 @@ TEST(FdtGeneratorTest, DefaultTreeDescribesTheVirtualBoard) {
                config.plic.size);
     expect_reg(dtb, "/soc/uart@10000000", config.uart.base, config.uart.size);
 
+    const int pci = find_node(dtb, "/soc/pci@30000000");
+    EXPECT_EQ(read_string(dtb, pci, "compatible"), "pci-host-ecam-generic");
+    EXPECT_EQ(read_string(dtb, pci, "device_type"), "pci");
+    EXPECT_EQ(read_u32(dtb, pci, "linux,pci-domain"), 0u);
+    EXPECT_EQ(read_u32(dtb, pci, "#address-cells"), 3u);
+    EXPECT_EQ(read_u32(dtb, pci, "#size-cells"), 2u);
+    EXPECT_EQ(read_cells(dtb, pci, "bus-range"), (std::vector<uint32_t>{0, 0}));
+    expect_reg(dtb, "/soc/pci@30000000", config.pci.ecam_base,
+               config.pci.ecam_size);
+    EXPECT_EQ(read_cells(dtb, pci, "ranges"),
+              (std::vector<uint32_t>{0x02000000,
+                                     utils::upper_cell(config.pci.mmio_base),
+                                     utils::lower_cell(config.pci.mmio_base),
+                                     utils::upper_cell(config.pci.mmio_base),
+                                     utils::lower_cell(config.pci.mmio_base),
+                                     utils::upper_cell(config.pci.mmio_size),
+                                     utils::lower_cell(config.pci.mmio_size)}));
+
+    int length = 0;
+    EXPECT_EQ(fdt_getprop(dtb.data(), pci, "#interrupt-cells", &length),
+              nullptr);
+    EXPECT_EQ(length, -FDT_ERR_NOTFOUND);
+    EXPECT_EQ(fdt_getprop(dtb.data(), pci, "interrupt-map", &length), nullptr);
+    EXPECT_EQ(length, -FDT_ERR_NOTFOUND);
+
     const uint64_t framebuffer_size = config.framebuffer.width *
                                       config.framebuffer.height *
                                       device::SimpleFB::BPP;
@@ -153,6 +178,10 @@ TEST(FdtGeneratorTest, TreeTracksBoardConfigOverrides) {
     config.framebuffer.height = 480;
     config.virtio_blk.base = 0x10005000;
     config.virtio_blk.image = "disk.img";
+    config.pci.ecam_base = 0x31000000;
+    config.pci.ecam_size = 0x100000;
+    config.pci.mmio_base = 0x62000000;
+    config.pci.mmio_size = 0x2000000;
 
     const std::vector<uint8_t> dtb = FdtGenerator(config).generate();
 
@@ -177,6 +206,16 @@ TEST(FdtGeneratorTest, TreeTracksBoardConfigOverrides) {
                640 * 480 * device::SimpleFB::BPP);
     expect_reg(dtb, "/soc/virtio_blk@10005000", config.virtio_blk.base,
                config.virtio_blk.size);
+    expect_reg(dtb, "/soc/pci@31000000", config.pci.ecam_base,
+               config.pci.ecam_size);
+    EXPECT_EQ(read_cells(dtb, find_node(dtb, "/soc/pci@31000000"), "ranges"),
+              (std::vector<uint32_t>{0x02000000,
+                                     utils::upper_cell(config.pci.mmio_base),
+                                     utils::lower_cell(config.pci.mmio_base),
+                                     utils::upper_cell(config.pci.mmio_base),
+                                     utils::lower_cell(config.pci.mmio_base),
+                                     utils::upper_cell(config.pci.mmio_size),
+                                     utils::lower_cell(config.pci.mmio_size)}));
 }
 
 // Firmware resolves the interrupt topology through phandles, so the references

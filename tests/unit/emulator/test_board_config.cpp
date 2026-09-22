@@ -71,6 +71,11 @@ TEST(BoardConfigTest, DefaultsMatchTheDocumentedMachineLayout) {
     EXPECT_EQ(board.virtio_blk.interrupt_id, 12u);
     EXPECT_TRUE(board.virtio_blk.image.empty());
 
+    EXPECT_EQ(board.pci.ecam_base, 0x30000000u);
+    EXPECT_EQ(board.pci.ecam_size, 0x100000u);
+    EXPECT_EQ(board.pci.mmio_base, 0x60000000u);
+    EXPECT_EQ(board.pci.mmio_size, 0x10000000u);
+
     EXPECT_EQ(board.rtc.base, 0x101000u);
     EXPECT_EQ(board.rtc.size, 0x100u);
     EXPECT_EQ(board.rtc.interrupt_id, 11u);

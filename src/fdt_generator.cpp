@@ -156,6 +156,27 @@ std::vector<uint8_t> FdtGenerator::generate() const {
     fdt.set_string("/soc", "compatible", "simple-bus");
     fdt.set_empty("/soc", "ranges");
 
+    // PCI: the host has one ECAM bus and only a non-prefetchable 32-bit
+    // Memory window. There is no interrupt nexus until the board implements
+    // PCI interrupt delivery, so it intentionally has no interrupt-map or
+    // #interrupt-cells property.
+    const std::string pci = at("/soc", "pci", config_.pci.ecam_base);
+    fdt.add_node(pci);
+    fdt.set_string(pci, "compatible", "pci-host-ecam-generic");
+    fdt.set_string(pci, "device_type", "pci");
+    fdt.set_u32(pci, "linux,pci-domain", 0);
+    fdt.set_u32(pci, "#address-cells", 3);
+    fdt.set_u32(pci, "#size-cells", 2);
+    fdt.set_cells(pci, "bus-range", {0, 0});
+    set_reg(fdt, pci, config_.pci.ecam_base, config_.pci.ecam_size);
+    fdt.set_cells(pci, "ranges",
+                  {0x02000000, utils::upper_cell(config_.pci.mmio_base),
+                   utils::lower_cell(config_.pci.mmio_base),
+                   utils::upper_cell(config_.pci.mmio_base),
+                   utils::lower_cell(config_.pci.mmio_base),
+                   utils::upper_cell(config_.pci.mmio_size),
+                   utils::lower_cell(config_.pci.mmio_size)});
+
     const std::string plic =
         at("/soc", "interrupt-controller", config_.plic.base);
     fdt.add_node(plic);
