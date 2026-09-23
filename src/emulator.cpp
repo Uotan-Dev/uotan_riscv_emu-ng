@@ -24,6 +24,7 @@
 #include "common/log.hpp"
 #include "core/mmu.hpp"
 #include "device/bcm2835_rng.hpp"
+#include "device/bochs_display.hpp"
 #include "device/clint.hpp"
 #include "device/goldfish_battery.hpp"
 #include "device/goldfish_events.hpp"
@@ -83,9 +84,16 @@ Emulator::Emulator(const BoardConfig& config)
                                                  console_channel_);
     bus_->add_device(console_);
 
-    // SimpleFB
-    framebuffer_ = std::make_shared<device::SimpleFB>(config.framebuffer);
-    bus_->add_device(framebuffer_);
+    if (config.display_device == DisplayDevice::SimpleFB) {
+        auto simple_fb = std::make_shared<device::SimpleFB>(config.framebuffer);
+        bus_->add_device(simple_fb);
+        framebuffer_ = std::move(simple_fb);
+    } else {
+        auto bochs = std::make_shared<device::BochsDisplay>(config.framebuffer);
+        pci_host_->register_function({.device = 1, .function = 0},
+                                     bochs->pci_function());
+        framebuffer_ = std::move(bochs);
+    }
 
     // VirtioBLK; absent unless the board names a disk image
     if (!config.virtio_blk.image.empty())

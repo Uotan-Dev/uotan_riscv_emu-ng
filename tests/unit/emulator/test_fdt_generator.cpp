@@ -132,11 +132,8 @@ TEST(FdtGeneratorTest, DefaultTreeDescribesTheVirtualBoard) {
     EXPECT_EQ(fdt_getprop(dtb.data(), pci, "interrupt-map", &length), nullptr);
     EXPECT_EQ(length, -FDT_ERR_NOTFOUND);
 
-    const uint64_t framebuffer_size = config.framebuffer.width *
-                                      config.framebuffer.height *
-                                      device::SimpleFB::BPP;
-    expect_reg(dtb, "/soc/frame-buffer@50000000", config.framebuffer.base,
-               framebuffer_size);
+    EXPECT_EQ(fdt_path_offset(dtb.data(), "/soc/frame-buffer@50000000"),
+              -FDT_ERR_NOTFOUND);
     EXPECT_GE(fdt_path_offset(dtb.data(), "/soc/rtc@101000"), 0);
     EXPECT_GE(fdt_path_offset(dtb.data(), "/soc/events@10002000"), 0);
     EXPECT_GE(fdt_path_offset(dtb.data(), "/soc/goldfish_battery@10003000"), 0);
@@ -156,6 +153,7 @@ TEST(FdtGeneratorTest, DefaultTreeDescribesTheVirtualBoard) {
 
 TEST(FdtGeneratorTest, TreeTracksBoardConfigOverrides) {
     BoardConfig config;
+    config.set_display_device("simple-fb");
     config.dram.size = 256 * 1024 * 1024;
     config.clint.base = 0x3000000;
     config.clint.size = 0x20000;
@@ -173,7 +171,7 @@ TEST(FdtGeneratorTest, TreeTracksBoardConfigOverrides) {
     config.flash0.num_blocks = 16;
     config.flash1.base = 0x24100000;
     config.flash1.num_blocks = 8;
-    config.framebuffer.base = 0x51000000;
+    config.framebuffer.simple_fb_base = 0x51000000;
     config.framebuffer.width = 640;
     config.framebuffer.height = 480;
     config.virtio_blk.base = 0x10005000;
@@ -202,7 +200,8 @@ TEST(FdtGeneratorTest, TreeTracksBoardConfigOverrides) {
     EXPECT_EQ(read_cells(dtb, find_node(dtb, "/flash@24000000"), "reg"),
               (std::vector<uint32_t>{0, 0x24000000, 0, 0x100000, 0, 0x24100000,
                                      0, 0x80000}));
-    expect_reg(dtb, "/soc/frame-buffer@51000000", config.framebuffer.base,
+    expect_reg(dtb, "/soc/frame-buffer@51000000",
+               config.framebuffer.simple_fb_base,
                640 * 480 * device::SimpleFB::BPP);
     expect_reg(dtb, "/soc/virtio_blk@10005000", config.virtio_blk.base,
                config.virtio_blk.size);
@@ -220,15 +219,31 @@ TEST(FdtGeneratorTest, TreeTracksBoardConfigOverrides) {
 
 TEST(FdtGeneratorTest, DisplaySizeSetsTheSimpleFramebufferProperties) {
     BoardConfig config;
+    config.set_display_device("simple-fb");
     config.set_display_size("1366x768");
     const auto dtb = FdtGenerator(config).generate();
     const int node = find_node(dtb, "/soc/frame-buffer@50000000");
 
-    expect_reg(dtb, "/soc/frame-buffer@50000000", config.framebuffer.base,
+    expect_reg(dtb, "/soc/frame-buffer@50000000",
+               config.framebuffer.simple_fb_base,
                1366u * 768u * device::SimpleFB::BPP);
     EXPECT_EQ(read_u32(dtb, node, "width"), 1366u);
     EXPECT_EQ(read_u32(dtb, node, "height"), 768u);
     EXPECT_EQ(read_u32(dtb, node, "stride"), 1366u * device::SimpleFB::BPP);
+}
+
+TEST(FdtGeneratorTest, DisplayNodesFollowTheSelectedDevice) {
+    BoardConfig config;
+    const auto bochs_tree = FdtGenerator(config).generate();
+    EXPECT_EQ(fdt_path_offset(bochs_tree.data(), "/soc/frame-buffer@50000000"),
+              -FDT_ERR_NOTFOUND);
+    EXPECT_GE(fdt_path_offset(bochs_tree.data(), "/soc/pci@30000000"), 0);
+
+    config.set_display_device("simple-fb");
+    const auto simple_tree = FdtGenerator(config).generate();
+    EXPECT_GE(fdt_path_offset(simple_tree.data(), "/soc/frame-buffer@50000000"),
+              0);
+    EXPECT_GE(fdt_path_offset(simple_tree.data(), "/soc/pci@30000000"), 0);
 }
 
 // Firmware resolves the interrupt topology through phandles, so the references

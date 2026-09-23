@@ -64,9 +64,10 @@ TEST(BoardConfigTest, DefaultsMatchTheDocumentedMachineLayout) {
         EXPECT_TRUE(bank->image.empty());
     }
 
-    EXPECT_EQ(board.framebuffer.base, 0x50000000u);
+    EXPECT_EQ(board.framebuffer.simple_fb_base, 0x50000000u);
     EXPECT_EQ(board.framebuffer.width, 1024u);
     EXPECT_EQ(board.framebuffer.height, 768u);
+    EXPECT_EQ(board.display_device, DisplayDevice::BochsDisplay);
 
     EXPECT_EQ(board.virtio_blk.base, 0x10001000u);
     EXPECT_EQ(board.virtio_blk.size, 0x1000u);
@@ -125,6 +126,17 @@ TEST(BoardConfigTest, DisplaySizeAcceptsArbitrarySafeGeometry) {
     EXPECT_EQ(board.framebuffer.height, 768u);
 }
 
+TEST(BoardConfigTest, DisplayDeviceSelectionIsValidated) {
+    BoardConfig board;
+    EXPECT_EQ(board.display_device, DisplayDevice::BochsDisplay);
+    board.set_display_device("simple-fb");
+    EXPECT_EQ(board.display_device, DisplayDevice::SimpleFB);
+    board.set_display_device("bochs-display");
+    EXPECT_EQ(board.display_device, DisplayDevice::BochsDisplay);
+    EXPECT_THROW(board.set_display_device("vga"), std::invalid_argument);
+    EXPECT_EQ(board.display_device, DisplayDevice::BochsDisplay);
+}
+
 TEST(BoardConfigTest, DisplaySizeRejectsInvalidOrOverlappingGeometry) {
     BoardConfig board;
     for (std::string_view value :
@@ -133,9 +145,11 @@ TEST(BoardConfigTest, DisplaySizeRejectsInvalidOrOverlappingGeometry) {
         EXPECT_THROW(board.set_display_size(value), std::invalid_argument)
             << value;
 
-    board.framebuffer.base = board.pci.mmio_base - 0x1000;
+    board.set_display_device("simple-fb");
+    board.framebuffer.simple_fb_base = board.pci.mmio_base - 0x1000;
     EXPECT_THROW(board.set_display_size("1024x768"), std::invalid_argument);
-    board.framebuffer.base = std::numeric_limits<addr_t>::max() - 0x1000;
+    board.framebuffer.simple_fb_base =
+        std::numeric_limits<addr_t>::max() - 0x1000;
     EXPECT_THROW(board.set_display_size("1024x768"), std::invalid_argument);
     EXPECT_EQ(board.framebuffer.width, 1024u);
     EXPECT_EQ(board.framebuffer.height, 768u);
@@ -148,7 +162,7 @@ TEST(BoardConfigTest, RejectsZeroSizedRegions) {
     flash.num_blocks = 0;
     EXPECT_THROW(device::PFlashCFI01 bank(flash), std::invalid_argument);
 
-    SimpleFBConfig framebuffer;
+    DisplayConfig framebuffer;
     framebuffer.width = 0;
     EXPECT_THROW(device::SimpleFB screen(framebuffer), std::invalid_argument);
 }

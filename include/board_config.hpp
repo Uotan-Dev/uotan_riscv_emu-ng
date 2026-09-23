@@ -34,8 +34,8 @@ namespace uemu {
 // describe the same machine from the same values, so the defaults below are the
 // board's single source of truth.
 //
-// Every default is the guest-visible machine ABI documented in README.md and
-// emitted by FdtGenerator; changing one changes what firmware sees.  A device
+// Selected defaults are guest-visible: FdtGenerator describes the fixed
+// topology, while PCI endpoints are discovered through ECAM. A device
 // keeps what its own protocol defines (register offsets, bit fields, virtio
 // constants) and only reads its placement and parameters from here.
 //
@@ -74,13 +74,16 @@ struct PFlashConfig {
     std::filesystem::path image;   // empty: an erased (0xff) bank
 };
 
-struct SimpleFBConfig {
-    // The window is width * height * SimpleFB::BPP; the geometry is the
-    // framebuffer, there is no separate reserved size to disagree with.
-    addr_t base = 0x50000000; // frame-buffer@50000000, "simple-framebuffer"
+struct DisplayConfig {
+    // Only SimpleFB uses a fixed MMIO base; both displays use the initial
+    // geometry. The SimpleFB window is width * height * SimpleFB::BPP.
+    addr_t simple_fb_base =
+        0x50000000; // frame-buffer@50000000, "simple-framebuffer"
     size_t width = 1024;
     size_t height = 768;
 };
+
+enum class DisplayDevice { SimpleFB, BochsDisplay };
 
 struct VirtioBlkConfig {
     addr_t base = 0x10001000; // virtio_blk@10001000, "virtio,mmio"
@@ -146,7 +149,8 @@ struct BoardConfig {
     PlicConfig plic;
     PFlashConfig flash0;
     PFlashConfig flash1;
-    SimpleFBConfig framebuffer;
+    DisplayConfig framebuffer;
+    DisplayDevice display_device = DisplayDevice::BochsDisplay;
     VirtioBlkConfig virtio_blk;
     PciHostConfig pci;
     GoldfishRtcConfig rtc;
@@ -160,6 +164,15 @@ struct BoardConfig {
     // flash0/flash1 are the two 32 MiB banks of one cfi-flash node: they share
     // the geometry above and differ only in the window the board wires them to.
     BoardConfig() { flash1.base = 0x22000000; }
+
+    void set_display_device(std::string_view value) {
+        if (value == "simple-fb")
+            display_device = DisplayDevice::SimpleFB;
+        else if (value == "bochs-display")
+            display_device = DisplayDevice::BochsDisplay;
+        else
+            throw std::invalid_argument("unknown display device");
+    }
 
     void set_display_size(std::string_view value) {
         const size_t separator = value.find('x');
@@ -185,9 +198,11 @@ struct BoardConfig {
             throw std::invalid_argument("display framebuffer exceeds 64 MiB");
 
         const size_t bytes = width * height * BYTES_PER_PIXEL;
-        if (bytes - 1 > std::numeric_limits<addr_t>::max() - framebuffer.base ||
-            framebuffer.base >= pci.mmio_base ||
-            bytes > pci.mmio_base - framebuffer.base)
+        if (display_device == DisplayDevice::SimpleFB &&
+            (bytes - 1 > std::numeric_limits<addr_t>::max() -
+                             framebuffer.simple_fb_base ||
+             framebuffer.simple_fb_base >= pci.mmio_base ||
+             bytes > pci.mmio_base - framebuffer.simple_fb_base))
             throw std::invalid_argument(
                 "display framebuffer overlaps the PCI MMIO window");
 

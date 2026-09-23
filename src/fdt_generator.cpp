@@ -259,30 +259,35 @@ std::vector<uint8_t> FdtGenerator::generate() const {
     fdt.set_string(rng, "compatible", "brcm,bcm2835-rng");
     set_reg(fdt, rng, config_.rng.base, config_.rng.size);
 
-    // Framebuffer: the window is exactly the pixels the device manages, so its
-    // size and stride follow from the geometry.
-    const uint64_t stride = checked_multiply(
-        config_.framebuffer.width, device::SimpleFB::BPP, "framebuffer stride");
-    const uint64_t framebuffer_size = checked_multiply(
-        stride, config_.framebuffer.height, "framebuffer size");
-    if (config_.framebuffer.width > std::numeric_limits<uint32_t>::max() ||
-        config_.framebuffer.height > std::numeric_limits<uint32_t>::max() ||
-        stride > std::numeric_limits<uint32_t>::max())
-        throw std::overflow_error("framebuffer geometry does not fit the FDT");
+    // Only SimpleFB has a fixed MMIO window and a simple-framebuffer node;
+    // the alternative PCI display is discovered through the ECAM host.
+    if (config_.display_device == DisplayDevice::SimpleFB) {
+        const uint64_t stride =
+            checked_multiply(config_.framebuffer.width, device::SimpleFB::BPP,
+                             "framebuffer stride");
+        const uint64_t framebuffer_size = checked_multiply(
+            stride, config_.framebuffer.height, "framebuffer size");
+        if (config_.framebuffer.width > std::numeric_limits<uint32_t>::max() ||
+            config_.framebuffer.height > std::numeric_limits<uint32_t>::max() ||
+            stride > std::numeric_limits<uint32_t>::max())
+            throw std::overflow_error(
+                "framebuffer geometry does not fit the FDT");
 
-    const std::string framebuffer =
-        at("/soc", "frame-buffer", config_.framebuffer.base);
-    fdt.add_node(framebuffer);
-    fdt.set_string(framebuffer, "compatible", "simple-framebuffer");
-    set_reg(fdt, framebuffer, config_.framebuffer.base, framebuffer_size);
-    fdt.set_u32(framebuffer, "width",
-                static_cast<uint32_t>(config_.framebuffer.width));
-    fdt.set_u32(framebuffer, "height",
-                static_cast<uint32_t>(config_.framebuffer.height));
-    fdt.set_u32(framebuffer, "stride", static_cast<uint32_t>(stride));
-    fdt.set_string(framebuffer, "format", "x8r8g8b8");
-    fdt.set_string(framebuffer, "status", "okay");
-    fdt.set_string(framebuffer, "linux,fb-type", "simple");
+        const std::string framebuffer =
+            at("/soc", "frame-buffer", config_.framebuffer.simple_fb_base);
+        fdt.add_node(framebuffer);
+        fdt.set_string(framebuffer, "compatible", "simple-framebuffer");
+        set_reg(fdt, framebuffer, config_.framebuffer.simple_fb_base,
+                framebuffer_size);
+        fdt.set_u32(framebuffer, "width",
+                    static_cast<uint32_t>(config_.framebuffer.width));
+        fdt.set_u32(framebuffer, "height",
+                    static_cast<uint32_t>(config_.framebuffer.height));
+        fdt.set_u32(framebuffer, "stride", static_cast<uint32_t>(stride));
+        fdt.set_string(framebuffer, "format", "x8r8g8b8");
+        fdt.set_string(framebuffer, "status", "okay");
+        fdt.set_string(framebuffer, "linux,fb-type", "simple");
+    }
 
     // Power control: the two magic values that take the SiFive test device to
     // PASS or to a reset.

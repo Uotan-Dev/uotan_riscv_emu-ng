@@ -44,6 +44,7 @@ int main(int argc, char* argv[]) {
     size_t dram_size_mb = config.dram.size / (1024 * 1024);
     int64_t timeout_ms = 0;
     std::string frontend_name = "sdl3";
+    std::string display_device = "bochs-display";
     std::string display_size = std::to_string(config.framebuffer.width) + "x" +
                                std::to_string(config.framebuffer.height);
 
@@ -69,12 +70,16 @@ int main(int argc, char* argv[]) {
     app.add_option("--display-size", display_size,
                    "Initial guest display size (WIDTHxHEIGHT)")
         ->capture_default_str();
+    app.add_option("--display-device", display_device, "Guest display device")
+        ->default_val("bochs-display")
+        ->check(CLI::IsMember({"simple-fb", "bochs-display"}));
 
     try {
         // Parse command line
         CLI11_PARSE(app, argc, argv);
 
         config.dram.size = dram_size_mb * 1024 * 1024;
+        config.set_display_device(display_device);
         config.set_display_size(display_size);
 
         uemu::log::info("Initializing emulator...");

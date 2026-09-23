@@ -40,7 +40,6 @@ namespace uemu::device {
 class GoldfishEvents;
 class NS16550;
 class PciHost;
-class SimpleFB;
 
 } // namespace uemu::device
 
@@ -156,7 +155,7 @@ private:
     device::ConsoleChannel console_channel_;
     std::shared_ptr<device::NS16550> console_;
     std::shared_ptr<device::GoldfishEvents> input_;
-    std::shared_ptr<device::SimpleFB> framebuffer_;
+    std::shared_ptr<core::Framebuffer> framebuffer_;
 
     std::stop_source stop_source_;
     bool started_ = false;

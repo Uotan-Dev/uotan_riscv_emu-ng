@@ -28,8 +28,9 @@ public:
 
     // The framebuffer is its geometry: the address window is
     // width * height * BPP, with no separately reserved size.
-    explicit SimpleFB(const SimpleFBConfig& config)
-        : Device("SimpleFB", config.base, config.width * config.height * BPP),
+    explicit SimpleFB(const DisplayConfig& config)
+        : Device("SimpleFB", config.simple_fb_base,
+                 config.width * config.height * BPP),
           width_(config.width), height_(config.height) {
         vram_.resize(size());
     }
