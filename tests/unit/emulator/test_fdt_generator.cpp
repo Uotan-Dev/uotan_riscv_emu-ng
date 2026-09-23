@@ -218,6 +218,19 @@ TEST(FdtGeneratorTest, TreeTracksBoardConfigOverrides) {
                                      utils::lower_cell(config.pci.mmio_size)}));
 }
 
+TEST(FdtGeneratorTest, DisplaySizeSetsTheSimpleFramebufferProperties) {
+    BoardConfig config;
+    config.set_display_size("1366x768");
+    const auto dtb = FdtGenerator(config).generate();
+    const int node = find_node(dtb, "/soc/frame-buffer@50000000");
+
+    expect_reg(dtb, "/soc/frame-buffer@50000000", config.framebuffer.base,
+               1366u * 768u * device::SimpleFB::BPP);
+    EXPECT_EQ(read_u32(dtb, node, "width"), 1366u);
+    EXPECT_EQ(read_u32(dtb, node, "height"), 768u);
+    EXPECT_EQ(read_u32(dtb, node, "stride"), 1366u * device::SimpleFB::BPP);
+}
+
 // Firmware resolves the interrupt topology through phandles, so the references
 // have to point at the nodes that own them.
 TEST(FdtGeneratorTest, PhandlesLinkTheInterruptTopology) {

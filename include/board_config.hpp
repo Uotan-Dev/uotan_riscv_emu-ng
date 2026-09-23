@@ -16,10 +16,14 @@
 
 #pragma once
 
+#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <limits>
+#include <stdexcept>
 #include <string>
+#include <string_view>
 
 #include "common/types.hpp"
 
@@ -156,6 +160,40 @@ struct BoardConfig {
     // flash0/flash1 are the two 32 MiB banks of one cfi-flash node: they share
     // the geometry above and differ only in the window the board wires them to.
     BoardConfig() { flash1.base = 0x22000000; }
+
+    void set_display_size(std::string_view value) {
+        const size_t separator = value.find('x');
+        if (separator == std::string_view::npos)
+            throw std::invalid_argument("display size must be WIDTHxHEIGHT");
+
+        const auto parse_dimension = [](std::string_view text) {
+            size_t dimension = 0;
+            const auto [end, error] = std::from_chars(
+                text.data(), text.data() + text.size(), dimension);
+            if (error != std::errc{} || end != text.data() + text.size() ||
+                dimension < 64 || dimension > 8192)
+                throw std::invalid_argument(
+                    "display dimensions must be 64..8192");
+            return dimension;
+        };
+
+        const size_t width = parse_dimension(value.substr(0, separator));
+        const size_t height = parse_dimension(value.substr(separator + 1));
+        constexpr size_t MAX_BYTES = 64 * 1024 * 1024;
+        constexpr size_t BYTES_PER_PIXEL = 4;
+        if (width > MAX_BYTES / BYTES_PER_PIXEL / height)
+            throw std::invalid_argument("display framebuffer exceeds 64 MiB");
+
+        const size_t bytes = width * height * BYTES_PER_PIXEL;
+        if (bytes - 1 > std::numeric_limits<addr_t>::max() - framebuffer.base ||
+            framebuffer.base >= pci.mmio_base ||
+            bytes > pci.mmio_base - framebuffer.base)
+            throw std::invalid_argument(
+                "display framebuffer overlaps the PCI MMIO window");
+
+        framebuffer.width = width;
+        framebuffer.height = height;
+    }
 };
 
 } // namespace uemu

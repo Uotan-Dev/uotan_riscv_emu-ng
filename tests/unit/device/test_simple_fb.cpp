@@ -52,6 +52,18 @@ TEST_F(SimpleFBTest, HasAFrontendDisplayName) {
     EXPECT_EQ(framebuffer.display_name(), "SimpleFB");
 }
 
+TEST_F(SimpleFBTest, GeometryAndPixelsShareTheFramebufferLock) {
+    const core::Framebuffer& framebuffer = *fb;
+    auto lock = framebuffer.lock();
+    const auto geometry = framebuffer.geometry();
+
+    EXPECT_EQ(geometry.width, 1024u);
+    EXPECT_EQ(geometry.height, 768u);
+    EXPECT_EQ(geometry.stride, 1024u * device::SimpleFB::BPP);
+    EXPECT_EQ(geometry.byte_size(), fb->size());
+    EXPECT_NE(framebuffer.pixels(), nullptr);
+}
+
 TEST_F(SimpleFBTest, MultiByteAccess) {
     addr_t base = fb->start();
 

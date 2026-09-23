@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
+#include <limits>
 #include <memory>
 #include <stdexcept>
+#include <string_view>
 
 #include <gtest/gtest.h>
 
@@ -113,6 +115,30 @@ TEST(BoardConfigTest, TwoFlashBanksGetDistinctWindows) {
     EXPECT_EQ(flash0.size(), 0x2000000u);
     EXPECT_EQ(flash1.start(), 0x22000000u);
     EXPECT_EQ(flash1.size(), 0x2000000u);
+}
+
+TEST(BoardConfigTest, DisplaySizeAcceptsArbitrarySafeGeometry) {
+    BoardConfig board;
+    board.set_display_size("1366x768");
+
+    EXPECT_EQ(board.framebuffer.width, 1366u);
+    EXPECT_EQ(board.framebuffer.height, 768u);
+}
+
+TEST(BoardConfigTest, DisplaySizeRejectsInvalidOrOverlappingGeometry) {
+    BoardConfig board;
+    for (std::string_view value :
+         {"", "1024", "1024X768", "1024x768x1", "0x768", "63x768", "8193x768",
+          "4096x4097", "999999999999999999999x1"})
+        EXPECT_THROW(board.set_display_size(value), std::invalid_argument)
+            << value;
+
+    board.framebuffer.base = board.pci.mmio_base - 0x1000;
+    EXPECT_THROW(board.set_display_size("1024x768"), std::invalid_argument);
+    board.framebuffer.base = std::numeric_limits<addr_t>::max() - 0x1000;
+    EXPECT_THROW(board.set_display_size("1024x768"), std::invalid_argument);
+    EXPECT_EQ(board.framebuffer.width, 1024u);
+    EXPECT_EQ(board.framebuffer.height, 768u);
 }
 
 // A window the device cannot decode would make the bus unable to see the

@@ -31,15 +31,11 @@ public:
     explicit SimpleFB(const SimpleFBConfig& config)
         : Device("SimpleFB", config.base, config.width * config.height * BPP),
           width_(config.width), height_(config.height) {
-        vram_.resize(byte_size());
+        vram_.resize(size());
     }
 
-    size_t width() const noexcept override { return width_; }
-
-    size_t height() const noexcept override { return height_; }
-
-    size_t byte_size() const noexcept override {
-        return width_ * height_ * BPP;
+    core::FramebufferGeometry geometry() const noexcept override {
+        return {.width = width_, .height = height_, .stride = width_ * BPP};
     }
 
     std::string_view display_name() const noexcept override { return name_; }

@@ -24,6 +24,7 @@
 
 #include <SDL3/SDL.h>
 
+#include "core/framebuffer.hpp"
 #include "frontend/frontend.hpp"
 #include "frontend/terminal.hpp"
 
@@ -54,8 +55,7 @@ private:
     SDL_Renderer* renderer_ = nullptr;
     SDL_Texture* texture_ = nullptr;
 
-    size_t display_width_ = 0;
-    size_t display_height_ = 0;
+    core::FramebufferGeometry display_geometry_{};
     std::vector<uint8_t> pixel_buffer_;
 
     std::chrono::steady_clock::time_point last_frame_time_;

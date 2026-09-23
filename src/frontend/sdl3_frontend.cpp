@@ -17,7 +17,6 @@
 #include <chrono>
 #include <cstddef>
 #include <cstring>
-#include <mutex>
 #include <stdexcept>
 #include <string>
 
@@ -82,25 +81,28 @@ SDL3Frontend::~SDL3Frontend() {
 void SDL3Frontend::initialize_window() {
     const core::Framebuffer& framebuffer = emulator_.framebuffer();
 
-    display_width_ = framebuffer.width();
-    display_height_ = framebuffer.height();
-    pixel_buffer_.resize(framebuffer.byte_size());
+    {
+        auto lock = framebuffer.lock();
+        display_geometry_ = framebuffer.geometry();
+    }
+    pixel_buffer_.resize(display_geometry_.byte_size());
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
         goto fail;
 
     if (!(window_ = SDL_CreateWindow("Uotan RISC-V Emulator (Next Generation)",
-                                     display_width_, display_height_,
-                                     SDL_WINDOW_RESIZABLE)))
+                                     1280, 900, SDL_WINDOW_RESIZABLE)))
         goto fail;
 
     if (!(renderer_ = SDL_CreateRenderer(window_, nullptr)))
         goto fail;
 
-    if (!(texture_ = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_XRGB8888,
-                                       SDL_TEXTUREACCESS_STREAMING,
-                                       display_width_, display_height_)))
+    if (!(texture_ = SDL_CreateTexture(
+              renderer_, SDL_PIXELFORMAT_XRGB8888, SDL_TEXTUREACCESS_STREAMING,
+              display_geometry_.width, display_geometry_.height)))
         goto fail;
+
+    update_view();
 
     {
         // Set window icon from embedded PNG via SDL3_image
@@ -196,15 +198,33 @@ void SDL3Frontend::present() {
         return;
 
     const core::Framebuffer& framebuffer = emulator_.framebuffer();
+    core::FramebufferGeometry geometry;
 
     {
-        std::unique_lock<std::mutex> lock = framebuffer.lock();
+        auto lock = framebuffer.lock();
+        geometry = framebuffer.geometry();
+        pixel_buffer_.resize(geometry.byte_size());
         std::memcpy(pixel_buffer_.data(), framebuffer.pixels(),
-                    framebuffer.byte_size());
+                    geometry.byte_size());
     }
 
-    SDL_UpdateTexture(texture_, nullptr, pixel_buffer_.data(),
-                      display_width_ * 4);
+    if (geometry.width != display_geometry_.width ||
+        geometry.height != display_geometry_.height) {
+        SDL_Texture* next = SDL_CreateTexture(
+            renderer_, SDL_PIXELFORMAT_XRGB8888, SDL_TEXTUREACCESS_STREAMING,
+            geometry.width, geometry.height);
+        if (!next)
+            throw std::runtime_error(std::string("SDL3 texture: ") +
+                                     SDL_GetError());
+        SDL_DestroyTexture(texture_);
+        texture_ = next;
+        display_geometry_ = geometry;
+        update_view();
+    } else {
+        display_geometry_ = geometry;
+    }
+
+    SDL_UpdateTexture(texture_, nullptr, pixel_buffer_.data(), geometry.stride);
     SDL_SetRenderDrawColor(renderer_, 64, 64, 64, 255);
     SDL_RenderClear(renderer_);
     SDL_RenderTexture(renderer_, texture_, nullptr, nullptr);
@@ -216,7 +236,8 @@ void SDL3Frontend::present() {
 void SDL3Frontend::update_view() {
     // Re-apply logical presentation on resize so SDL re-computes the
     // letterbox layout for the new window dimensions.
-    SDL_SetRenderLogicalPresentation(renderer_, display_width_, display_height_,
+    SDL_SetRenderLogicalPresentation(renderer_, display_geometry_.width,
+                                     display_geometry_.height,
                                      SDL_LOGICAL_PRESENTATION_LETTERBOX);
 }
 

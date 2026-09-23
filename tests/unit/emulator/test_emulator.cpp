@@ -157,15 +157,17 @@ TEST(EmulatorTest, DramSizeComesFromTheConfig) {
 
 TEST(EmulatorTest, FramebufferGeometryComesFromTheConfig) {
     BoardConfig config = default_board();
-    config.framebuffer.width = 320;
-    config.framebuffer.height = 200;
+    config.set_display_size("320x200");
 
     Emulator emulator(config);
+    auto& framebuffer = emulator.framebuffer();
+    auto lock = framebuffer.lock();
+    const auto geometry = framebuffer.geometry();
 
-    EXPECT_EQ(emulator.framebuffer().width(), 320u);
-    EXPECT_EQ(emulator.framebuffer().height(), 200u);
-    EXPECT_EQ(emulator.framebuffer().byte_size(),
-              320u * 200u * device::SimpleFB::BPP);
+    EXPECT_EQ(geometry.width, 320u);
+    EXPECT_EQ(geometry.height, 200u);
+    EXPECT_EQ(geometry.stride, 320u * device::SimpleFB::BPP);
+    EXPECT_EQ(geometry.byte_size(), 320u * 200u * device::SimpleFB::BPP);
 }
 
 TEST(EmulatorTest, UartBaseComesFromTheConfig) {

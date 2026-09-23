@@ -21,7 +21,6 @@
 #include <cstring>
 #include <exception>
 #include <memory>
-#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -481,7 +480,7 @@ private:
         auto* title = GTK_LABEL(gtk_label_new("uemu-ng"));
 
         gtk_window_set_title(GTK_WINDOW(window), "uemu-ng");
-        gtk_window_set_default_size(GTK_WINDOW(window), 1024, 768);
+        gtk_window_set_default_size(GTK_WINDOW(window), 1280, 900);
         gtk_widget_add_css_class(GTK_WIDGET(title), "title-3");
         gtk_widget_add_css_class(GTK_WIDGET(title),
                                  main ? "accent" : "warning");
@@ -980,19 +979,20 @@ private:
             return;
 
         const core::Framebuffer& framebuffer = emulator_.framebuffer();
-        const size_t size = framebuffer.byte_size();
-        void* pixels = g_malloc(size);
+        core::FramebufferGeometry geometry;
+        void* pixels;
 
         {
-            std::unique_lock<std::mutex> lock = framebuffer.lock();
-            std::memcpy(pixels, framebuffer.pixels(), size);
+            auto lock = framebuffer.lock();
+            geometry = framebuffer.geometry();
+            pixels = g_malloc(geometry.byte_size());
+            std::memcpy(pixels, framebuffer.pixels(), geometry.byte_size());
         }
 
-        GBytes* bytes = g_bytes_new_take(pixels, size);
+        GBytes* bytes = g_bytes_new_take(pixels, geometry.byte_size());
         GdkTexture* texture = gdk_memory_texture_new(
-            static_cast<int>(framebuffer.width()),
-            static_cast<int>(framebuffer.height()), GDK_MEMORY_B8G8R8X8, bytes,
-            framebuffer.width() * 4);
+            static_cast<int>(geometry.width), static_cast<int>(geometry.height),
+            GDK_MEMORY_B8G8R8X8, bytes, geometry.stride);
         gtk_picture_set_paintable(framebuffer_picture_, GDK_PAINTABLE(texture));
         g_object_unref(texture);
         g_bytes_unref(bytes);

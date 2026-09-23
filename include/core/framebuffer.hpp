@@ -23,15 +23,22 @@
 
 namespace uemu::core {
 
-// Read-only view of the guest framebuffer for the host frontend.  The pixel
-// bytes are only stable while the lock returned by lock() is held.
+struct FramebufferGeometry {
+    size_t width;
+    size_t height;
+    size_t stride; // Bytes per row, including any padding.
+
+    // Implementations keep stride * height within the pixel buffer.
+    [[nodiscard]] size_t byte_size() const noexcept { return stride * height; }
+};
+
+// Read-only view of the guest framebuffer for the host frontend. Geometry and
+// pixels must be read under the same lock so a frame sees one display mode.
 class Framebuffer {
 public:
     virtual ~Framebuffer() = default;
 
-    [[nodiscard]] virtual size_t width() const noexcept = 0;
-    [[nodiscard]] virtual size_t height() const noexcept = 0;
-    [[nodiscard]] virtual size_t byte_size() const noexcept = 0;
+    [[nodiscard]] virtual FramebufferGeometry geometry() const noexcept = 0;
     [[nodiscard]] virtual std::string_view display_name() const noexcept = 0;
 
     [[nodiscard]] virtual std::unique_lock<std::mutex> lock() const = 0;
