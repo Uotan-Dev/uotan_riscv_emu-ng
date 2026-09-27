@@ -168,15 +168,16 @@ TEST(EmulatorTest, FramebufferGeometryComesFromTheConfig) {
     EXPECT_EQ(geometry.height, 200u);
     EXPECT_EQ(geometry.stride, 320u * device::SimpleFB::BPP);
     EXPECT_EQ(geometry.byte_size(), 320u * 200u * device::SimpleFB::BPP);
-    EXPECT_EQ(framebuffer.display_name(), "Bochs Display");
+    EXPECT_EQ(framebuffer.display_name(), "SimpleFB");
 
-    config.set_display_device("simple-fb");
-    Emulator simple_emulator(config);
-    EXPECT_EQ(simple_emulator.framebuffer().display_name(), "SimpleFB");
+    config.set_display_device("bochs-display");
+    Emulator bochs_emulator(config);
+    EXPECT_EQ(bochs_emulator.framebuffer().display_name(), "Bochs Display");
 }
 
 TEST(EmulatorTest, BochsSelectionNeverInstantiatesSimpleFb) {
     BoardConfig config = default_board();
+    config.set_display_device("bochs-display");
     config.framebuffer.simple_fb_base = config.pci.ecam_base;
 
     // This address would make SimpleFB overlap PCI ECAM, but Bochs only uses

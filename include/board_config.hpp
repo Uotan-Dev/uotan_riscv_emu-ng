@@ -150,7 +150,7 @@ struct BoardConfig {
     PFlashConfig flash0;
     PFlashConfig flash1;
     DisplayConfig framebuffer;
-    DisplayDevice display_device = DisplayDevice::BochsDisplay;
+    DisplayDevice display_device = DisplayDevice::SimpleFB;
     VirtioBlkConfig virtio_blk;
     PciHostConfig pci;
     GoldfishRtcConfig rtc;

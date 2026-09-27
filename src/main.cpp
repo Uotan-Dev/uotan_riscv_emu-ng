@@ -44,7 +44,7 @@ int main(int argc, char* argv[]) {
     size_t dram_size_mb = config.dram.size / (1024 * 1024);
     int64_t timeout_ms = 0;
     std::string frontend_name = "sdl3";
-    std::string display_device = "bochs-display";
+    std::string display_device = "simple-fb";
     std::string display_size = std::to_string(config.framebuffer.width) + "x" +
                                std::to_string(config.framebuffer.height);
 
@@ -71,7 +71,7 @@ int main(int argc, char* argv[]) {
                    "Initial guest display size (WIDTHxHEIGHT)")
         ->capture_default_str();
     app.add_option("--display-device", display_device, "Guest display device")
-        ->default_val("bochs-display")
+        ->default_val("simple-fb")
         ->check(CLI::IsMember({"simple-fb", "bochs-display"}));
 
     try {

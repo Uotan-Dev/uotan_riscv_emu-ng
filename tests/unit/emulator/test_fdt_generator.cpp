@@ -132,8 +132,7 @@ TEST(FdtGeneratorTest, DefaultTreeDescribesTheVirtualBoard) {
     EXPECT_EQ(fdt_getprop(dtb.data(), pci, "interrupt-map", &length), nullptr);
     EXPECT_EQ(length, -FDT_ERR_NOTFOUND);
 
-    EXPECT_EQ(fdt_path_offset(dtb.data(), "/soc/frame-buffer@50000000"),
-              -FDT_ERR_NOTFOUND);
+    EXPECT_GE(fdt_path_offset(dtb.data(), "/soc/frame-buffer@50000000"), 0);
     EXPECT_GE(fdt_path_offset(dtb.data(), "/soc/rtc@101000"), 0);
     EXPECT_GE(fdt_path_offset(dtb.data(), "/soc/events@10002000"), 0);
     EXPECT_GE(fdt_path_offset(dtb.data(), "/soc/goldfish_battery@10003000"), 0);
@@ -234,16 +233,16 @@ TEST(FdtGeneratorTest, DisplaySizeSetsTheSimpleFramebufferProperties) {
 
 TEST(FdtGeneratorTest, DisplayNodesFollowTheSelectedDevice) {
     BoardConfig config;
-    const auto bochs_tree = FdtGenerator(config).generate();
-    EXPECT_EQ(fdt_path_offset(bochs_tree.data(), "/soc/frame-buffer@50000000"),
-              -FDT_ERR_NOTFOUND);
-    EXPECT_GE(fdt_path_offset(bochs_tree.data(), "/soc/pci@30000000"), 0);
-
-    config.set_display_device("simple-fb");
     const auto simple_tree = FdtGenerator(config).generate();
     EXPECT_GE(fdt_path_offset(simple_tree.data(), "/soc/frame-buffer@50000000"),
               0);
     EXPECT_GE(fdt_path_offset(simple_tree.data(), "/soc/pci@30000000"), 0);
+
+    config.set_display_device("bochs-display");
+    const auto bochs_tree = FdtGenerator(config).generate();
+    EXPECT_EQ(fdt_path_offset(bochs_tree.data(), "/soc/frame-buffer@50000000"),
+              -FDT_ERR_NOTFOUND);
+    EXPECT_GE(fdt_path_offset(bochs_tree.data(), "/soc/pci@30000000"), 0);
 }
 
 // Firmware resolves the interrupt topology through phandles, so the references

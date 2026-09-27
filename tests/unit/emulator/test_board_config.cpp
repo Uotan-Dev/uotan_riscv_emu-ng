@@ -67,7 +67,7 @@ TEST(BoardConfigTest, DefaultsMatchTheDocumentedMachineLayout) {
     EXPECT_EQ(board.framebuffer.simple_fb_base, 0x50000000u);
     EXPECT_EQ(board.framebuffer.width, 1024u);
     EXPECT_EQ(board.framebuffer.height, 768u);
-    EXPECT_EQ(board.display_device, DisplayDevice::BochsDisplay);
+    EXPECT_EQ(board.display_device, DisplayDevice::SimpleFB);
 
     EXPECT_EQ(board.virtio_blk.base, 0x10001000u);
     EXPECT_EQ(board.virtio_blk.size, 0x1000u);
@@ -128,7 +128,7 @@ TEST(BoardConfigTest, DisplaySizeAcceptsArbitrarySafeGeometry) {
 
 TEST(BoardConfigTest, DisplayDeviceSelectionIsValidated) {
     BoardConfig board;
-    EXPECT_EQ(board.display_device, DisplayDevice::BochsDisplay);
+    EXPECT_EQ(board.display_device, DisplayDevice::SimpleFB);
     board.set_display_device("simple-fb");
     EXPECT_EQ(board.display_device, DisplayDevice::SimpleFB);
     board.set_display_device("bochs-display");
